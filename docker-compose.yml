@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16 # Use the official postgres image
+    restart: always # Ensures the container restarts if it fails
+    environment:
+      POSTGRES_USER: dbuser 
+      POSTGRES_USER_PASSWORD_FILE: /run/secrets/postgres_user_password
+      POSTGRES_DB: communib
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+    volumes:
+      - pgdata:/var/lib/postgresql/data # Mount a named volume for data persistence
+    ports:
+      - "5432:5432" # Map port 5432 on the host
+    secrets:
+      - postgres_user_password
+
+  communib-backend: # Name of the backend service
+    build: backend
+    environment:
+      POSTGRES_USER_PASSWORD_FILE: /run/secrets/postgres_user_password
+      DB_NAME: communib
+      DB_USER: dbuser
+      DB_PWD: postgres_user_password
+      DB_HOST: host.docker.internal
+      DB_PORT: 5432
+    ports:
+      - "8001:8080"
+    secrets:
+      - postgres_user_password
+ 
+  communib-frontend: # Name of the frontend service
+    build: frontend
+    ports: 
+      - "10001:80"
+  
+volumes:
+  pgdata: # Define the named volume
+
+secrets:
+  postgres_user_password:
+    file: ./secrets/postgres_user_password.txt
