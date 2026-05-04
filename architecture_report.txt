@@ -1,0 +1,167 @@
+ARCHITECTURE REPORT
+================================================================================
+
+DIRECTORY TREE
+--------------------------------------------------------------------------------
+django
+├── backend
+│   ├── api
+│   │   ├── __init__.py
+│   │   ├── admin.py
+│   │   ├── apps.py
+│   │   ├── models.py
+│   │   ├── serializers.py
+│   │   ├── tests.py
+│   │   ├── urls.py
+│   │   └── views.py
+│   ├── backend
+│   │   ├── __init__.py
+│   │   ├── asgi.py
+│   │   ├── settings.py
+│   │   ├── urls.py
+│   │   └── wsgi.py
+│   ├── db.sqlite3
+│   ├── manage.py
+│   └── requirements.txt
+├── frontend
+│   ├── public
+│   │   └── vite.svg
+│   ├── src
+│   │   ├── assets
+│   │   │   └── react.svg
+│   │   ├── components
+│   │   │   ├── Form.jsx
+│   │   │   ├── LoadingIndicator.jsx
+│   │   │   ├── Note.jsx
+│   │   │   └── ProtectedRoute.jsx
+│   │   ├── pages
+│   │   │   ├── Home.jsx
+│   │   │   ├── Login.jsx
+│   │   │   ├── NotFound.jsx
+│   │   │   └── Register.jsx
+│   │   ├── styles
+│   │   │   ├── Form.css
+│   │   │   ├── Home.css
+│   │   │   ├── LoadingIndicator.css
+│   │   │   └── Note.css
+│   │   ├── api.js
+│   │   ├── App.jsx
+│   │   ├── constants.js
+│   │   └── main.jsx
+│   ├── .env
+│   ├── .gitignore
+│   ├── eslint.config.js
+│   ├── index.html
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── README.md
+│   └── vite.config.js
+├── .env
+├── .gitattributes
+├── package-lock.json
+├── package.json
+└── repo_architecture_map.py
+
+KEY FILE ANALYSIS
+--------------------------------------------------------------------------------
+
+FILE: backend\api\__init__.py
+
+FILE: backend\api\admin.py
+  Imports: django.contrib
+
+FILE: backend\api\apps.py
+  Classes: ApiConfig
+  Imports: django.apps
+
+FILE: backend\api\models.py
+  Django models: Note
+  Classes: Note
+  Functions: __str__
+  Imports: django.contrib.auth.models, django.db
+
+FILE: backend\api\serializers.py
+  Classes: UserSerializer, NoteSerializer, Meta, Meta
+  Functions: create
+  Imports: django.contrib.auth.models, models, rest_framework
+
+FILE: backend\api\tests.py
+  Imports: django.test
+
+FILE: backend\api\urls.py
+  Imports: django.urls
+
+FILE: backend\api\views.py
+  Classes: NoteListCreate, NoteDelete, CreateUserView
+  Functions: get_queryset, perform_create, get_queryset
+  Imports: django.contrib.auth.models, models, rest_framework, rest_framework.authentication, rest_framework.permissions, serializers
+
+FILE: backend\backend\__init__.py
+
+FILE: backend\backend\asgi.py
+  Imports: django.core.asgi, os
+
+FILE: backend\backend\settings.py
+  Imports: datetime, dotenv, os, pathlib
+
+FILE: backend\backend\urls.py
+  Imports: api.views, django.contrib, django.urls, rest_framework_simplejwt.views
+
+FILE: backend\backend\wsgi.py
+  Imports: django.core.wsgi, os
+
+FILE: backend\manage.py
+  Functions: main
+  Imports: django.core.management, os, sys
+
+FILE: frontend\eslint.config.js
+  Exports: export default defineConfig([
+
+FILE: frontend\src\api.js
+  Exports: export default api;
+
+FILE: frontend\src\App.jsx
+  Exports: export default App
+  Possible components: function Logout() {, function RegisterAndLogout() {, function App() {
+
+FILE: frontend\src\components\Form.jsx
+  Exports: export default Form
+  Possible components: function Form({ route, method }) {
+
+FILE: frontend\src\components\LoadingIndicator.jsx
+  Exports: export default LoadingIndicator
+
+FILE: frontend\src\components\Note.jsx
+  Exports: export default Note
+  Possible components: function Note({ note, onDelete }) {
+
+FILE: frontend\src\components\ProtectedRoute.jsx
+  Exports: export default ProtectedRoute;
+  Possible components: function ProtectedRoute({ children }) {
+
+FILE: frontend\src\constants.js
+
+FILE: frontend\src\main.jsx
+
+FILE: frontend\src\pages\Home.jsx
+  Exports: export default Home;
+  Possible components: function Home() {
+
+FILE: frontend\src\pages\Login.jsx
+  Exports: export default Login
+  Possible components: function Login() {
+
+FILE: frontend\src\pages\NotFound.jsx
+  Exports: export default NotFound
+  Possible components: function NotFound() {
+
+FILE: frontend\src\pages\Register.jsx
+  Exports: export default Register
+  Possible components: function Register() {
+
+FILE: frontend\vite.config.js
+  Exports: export default defineConfig({
+
+FILE: repo_architecture_map.py
+  Functions: should_ignore, build_tree, extract_python_info, extract_frontend_info, find_interesting_files, summarize_project, walk
+  Imports: ast, os, pathlib
