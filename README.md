@@ -46,3 +46,8 @@ docker buildx build --platform linux/amd64,linux/arm64 --output "type=image,push
 ```
 
 Go to the google console then go to Cloud Run. From Overview, select the resource to build (either communib or django-backend). Select "Edit & deploy new revision". Pick the new "Container Image URL" and hit "Deploy".
+
+To set up database:
+```
+python manage.py migrate
+```
