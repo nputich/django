@@ -1,12 +1,7 @@
 import Form from "../components/Form"
-import AuthLayout from "../components/layout/AuthLayout"
 
 function Login() {
-    return (
-        <AuthLayout>
-            <Form route="/api/token/" method="login" />
-        </AuthLayout>
-    )
+    return <Form route="/api/token/" method="login" />
 }
 
 export default Login

@@ -1,8 +1,8 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
 import api from "../api";
+import { useNavigate } from "react-router-dom";
 import { ACCESS_TOKEN, REFRESH_TOKEN } from "../constants";
-import "../styles/Form.css";
+import "../styles/Form.css"
 import LoadingIndicator from "./LoadingIndicator";
 
 function Form({ route, method }) {
@@ -10,25 +10,30 @@ function Form({ route, method }) {
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
-    const name = method === "login" ? "Sign in" : "Register";
+    <p>
+    <Link to="/login">Login</Link>
+    {" · "}
+    <Link to="/register">Register</Link>
+    </p>
 
     const handleSubmit = async (e) => {
         setLoading(true);
         e.preventDefault();
 
         try {
+            console.log("route=" + route + "; import.meta.env.VITE_API_URL=" + import.meta.env.VITE_API_URL);
             const res = await api.post(route, { username, password });
             if (method === "login") {
                 localStorage.setItem(ACCESS_TOKEN, res.data.access);
                 localStorage.setItem(REFRESH_TOKEN, res.data.refresh);
-                navigate("/app");
+                navigate("/")
             } else {
-                navigate("/login");
+                navigate("/login")
             }
         } catch (error) {
-            alert(error);
+            alert(error)
         } finally {
-            setLoading(false);
+            setLoading(false)
         }
     };
 
@@ -41,7 +46,6 @@ function Form({ route, method }) {
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Username"
-                required
             />
             <input
                 className="form-input"
@@ -49,27 +53,13 @@ function Form({ route, method }) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
-                required
             />
             {loading && <LoadingIndicator />}
-            <button className="form-button" type="submit" disabled={loading}>
+            <button className="form-button" type="submit">
                 {name}
             </button>
-            <p className="form-footer">
-                {method === "login" ? (
-                    <>
-                        New here? <Link to="/register">Create an account</Link>
-                    </>
-                ) : (
-                    <>
-                        Already have an account? <Link to="/login">Sign in</Link>
-                    </>
-                )}
-                {" · "}
-                <Link to="/">Find organization</Link>
-            </p>
         </form>
     );
 }
 
-export default Form;
+export default Form
