@@ -1,0 +1,25 @@
+.logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 1.25rem;
+  letter-spacing: -0.02em;
+}
+
+.logo-mark {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--brand-black);
+  color: var(--brand-yellow);
+  font-weight: 800;
+  font-size: 1.1rem;
+  text-transform: lowercase;
+}
+
+.logo-text {
+  color: var(--text);
+}

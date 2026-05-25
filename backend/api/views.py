@@ -1,9 +1,10 @@
 from django.contrib.auth.models import User
+from django.shortcuts import get_object_or_404
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.authentication import BasicAuthentication, SessionAuthentication
-from .serializers import UserSerializer, NoteSerializer
-from .models import Note
+from .serializers import UserSerializer, NoteSerializer, OrganizationSerializer
+from .models import Note, Organization
 
 
 #Only logged-in users can see or create their notes
@@ -30,6 +31,21 @@ class NoteDelete(generics.DestroyAPIView):
     def get_queryset(self):
         user = self.request.user
         return Note.objects.filter(author=user)
+
+
+class OrganizationDetail(generics.RetrieveAPIView):
+    serializer_class = OrganizationSerializer
+    permission_classes = [AllowAny]
+    authentication_classes = []
+    lookup_field = "code"
+    lookup_value_regex = r"[\w\-]+"
+
+    def get_queryset(self):
+        return Organization.objects.filter(is_active=True)
+
+    def get_object(self):
+        code = self.kwargs[self.lookup_field].strip().upper()
+        return get_object_or_404(self.get_queryset(), code=code)
 
 
 #Registration endpoint (open to everyone, no JWT required)

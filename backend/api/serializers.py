@@ -1,6 +1,6 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from .models import Note
+from .models import Note, Organization
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -13,6 +13,12 @@ class UserSerializer(serializers.ModelSerializer):
         user = User.objects.create_user(**validated_data)
         return user
     
+class OrganizationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Organization
+        fields = ["code", "name", "description", "website"]
+
+
 class NoteSerializer(serializers.ModelSerializer):
     class Meta:
         model = Note

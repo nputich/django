@@ -48,7 +48,17 @@ function ProtectedRoute({ children }) {
     };
 
     if (isAuthorized === null) {
-        return <div>Loading...</div>;
+        return (
+            <div className="auth-loading" style={{
+                minHeight: "100vh",
+                display: "grid",
+                placeItems: "center",
+                color: "var(--text-muted)",
+                fontFamily: "var(--font)",
+            }}>
+                Loading…
+            </div>
+        );
     }
 
     return isAuthorized ? children : <Navigate to="/login" />;

@@ -4,6 +4,7 @@ import Login from "./pages/Login"
 import Register from "./pages/Register"
 import Home from "./pages/Home"
 import NotFound from "./pages/NotFound"
+import OrganizationLanding from "./pages/OrganizationLanding"
 import ProtectedRoute from "./components/ProtectedRoute"
 
 function Logout() {
@@ -20,8 +21,10 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/" element={<OrganizationLanding />} />
+        <Route path="/org/:code" element={<OrganizationLanding />} />
         <Route
-          path="/"
+          path="/app"
           element={
             <ProtectedRoute>
               <Home />
@@ -30,8 +33,8 @@ function App() {
         />
         <Route path="/login" element={<Login />} />
         <Route path="/logout" element={<Logout />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="*" element={<NotFound />}></Route>
+        <Route path="/register" element={<RegisterAndLogout />} />
+        <Route path="*" element={<NotFound />} />
       </Routes>
     </BrowserRouter>
   )
