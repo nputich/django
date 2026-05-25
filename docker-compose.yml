@@ -32,8 +32,10 @@ services:
  
   communib-frontend: # Name of the frontend service
     build: frontend
-    ports: 
-      - "10001:80"
+    environment:
+      PORT: 8080
+    ports:
+      - "10001:8080"
   
 volumes:
   pgdata: # Define the named volume

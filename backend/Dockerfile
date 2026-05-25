@@ -15,9 +15,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy the entire Django project into the container
 COPY . /app/
 
-# Expose the port your Django application will run on
+# Cloud Run sets PORT (default 8080)
+ENV PORT=8080
 EXPOSE 8080
 
-# Run Django using manage.py
-#CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
-CMD exec gunicorn --bind :8080 --workers 1 --threads 8 --timeout 0 backend.wsgi:application
+CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT:-8080} --workers 1 --threads 8 --timeout 120 backend.wsgi:application"]
