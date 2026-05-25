@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import api from "../api";
-import Note from "../components/Note"
-import "../styles/Home.css"
+import Note from "../components/Note";
+import "../styles/Home.css";
 
 function Home() {
     const [notes, setNotes] = useState([]);
@@ -48,6 +49,9 @@ function Home() {
 
     return (
         <div>
+            <p>
+                <Link to="/logout">Logout</Link>
+            </p>
             <div>
                 <h2>Notes</h2>
                 {notes.map((note) => (

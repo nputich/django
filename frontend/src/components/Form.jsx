@@ -10,8 +10,11 @@ function Form({ route, method }) {
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
-
-    const name = method === "login" ? "Login" : "Register";
+    <p>
+    <Link to="/login">Login</Link>
+    {" · "}
+    <Link to="/register">Register</Link>
+    </p>
 
     const handleSubmit = async (e) => {
         setLoading(true);
