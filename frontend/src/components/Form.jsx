@@ -21,9 +21,9 @@ function Form({ route, method }) {
             if (method === "login") {
                 localStorage.setItem(ACCESS_TOKEN, res.data.access);
                 localStorage.setItem(REFRESH_TOKEN, res.data.refresh);
-                navigate("/");
+                navigate("/app");
             } else {
-                navigate("/login");
+                navigate("/");
             }
         } catch (error) {
             alert(error);
@@ -62,7 +62,7 @@ function Form({ route, method }) {
                     </>
                 ) : (
                     <>
-                        Already have an account? <Link to="/login">Sign in</Link>
+                        Already have an account? <Link to="/">Sign in</Link>
                     </>
                 )}
             </p>

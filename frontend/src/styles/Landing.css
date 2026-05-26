@@ -1,0 +1,85 @@
+:root {
+  --cb-black: #000000;
+  --cb-orange: #ffb300;
+  --cb-orange-hover: #ffc233;
+  --cb-muted: #8a7a5c;
+  --cb-card: #111111;
+  --cb-border: #2a2a2a;
+}
+
+.landing {
+  min-height: 100vh;
+  background: var(--cb-black);
+  color: #f5f5f5;
+  padding: 2rem 1.5rem;
+}
+
+.landing-hero {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.landing-logo {
+  max-width: 280px;
+  width: 100%;
+  height: auto;
+}
+
+.landing-tagline {
+  margin-top: 1rem;
+  font-size: 1.125rem;
+  color: var(--cb-muted);
+  letter-spacing: 0.02em;
+}
+
+.landing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.landing-card {
+  display: block;
+  padding: 1.25rem 1.5rem;
+  background: var(--cb-card);
+  border: 1px solid var(--cb-border);
+  border-radius: 12px;
+  text-decoration: none;
+  color: inherit;
+  transition: border-color 0.2s, transform 0.15s;
+}
+
+.landing-card:hover {
+  border-color: var(--cb-orange);
+  transform: translateY(-2px);
+}
+
+.landing-card h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.1rem;
+  color: var(--cb-orange);
+}
+
+.landing-card p {
+  margin: 0;
+  font-size: 0.9rem;
+  color: #aaa;
+}
+
+.landing-card--donate {
+  border-color: rgba(255, 179, 0, 0.35);
+}
+
+.landing-login {
+  max-width: 400px;
+  margin: 2rem auto 0;
+}
+
+.landing-footer {
+  text-align: center;
+  margin-top: 3rem;
+  font-size: 0.85rem;
+  color: #666;
+}
