@@ -22,7 +22,9 @@ export default function UnderConstruction() {
 
   return (
     <div className="enter-code">
-      <img src={logo} alt="communiB" className="enter-code-logo" />
+      <div className="enter-code-logo-wrap">
+        <img src={logo} alt="communiB" className="enter-code-logo" />
+      </div>
       <h1>{content.title}</h1>
       <p className="enter-code-subtitle">{content.body}</p>
       <p className="enter-code-alt">

@@ -1,51 +1,59 @@
-:root {
-  --cb-black: #000000;
-  --cb-orange: #ffb300;
-  --cb-orange-hover: #ffc233;
-  --cb-muted: #8a7a5c;
-  --cb-card: #111111;
-  --cb-border: #2a2a2a;
-}
+@import "./theme.css";
 
 .enter-code {
   min-height: 100vh;
-  background: var(--cb-black, #000);
-  color: #f5f5f5;
+  background: var(--cb-bg);
+  color: var(--cb-text);
+  font-family: var(--cb-font);
   padding: 2rem 1.5rem;
   max-width: 480px;
   margin: 0 auto;
   text-align: center;
+  -webkit-font-smoothing: antialiased;
 }
 
 .enter-code-back {
   display: inline-block;
   margin-bottom: 1.5rem;
-  color: var(--cb-orange, #ffb300);
+  color: var(--cb-text-secondary);
   text-decoration: none;
-  font-size: 0.9rem;
+  font-size: 0.875rem;
+  font-weight: 500;
 }
 
 .enter-code-back:hover {
-  text-decoration: underline;
+  color: var(--cb-orange);
+}
+
+.enter-code-logo-wrap {
+  display: inline-block;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+  border-radius: var(--cb-radius);
+  background: var(--cb-bg-subtle);
+  border: 1px solid var(--cb-border);
 }
 
 .enter-code-logo {
-  max-width: 200px;
+  max-width: 180px;
   width: 100%;
   height: auto;
-  margin-bottom: 1.5rem;
+  display: block;
 }
 
 .enter-code h1 {
   margin: 0 0 0.75rem;
   font-size: 1.5rem;
-  color: var(--cb-orange, #ffb300);
+  font-weight: 700;
+  color: var(--cb-text);
+  letter-spacing: -0.02em;
 }
 
 .enter-code-subtitle {
-  color: #aaa;
-  line-height: 1.5;
+  color: var(--cb-text-secondary);
+  line-height: 1.6;
   margin-bottom: 2rem;
+  font-size: 0.9375rem;
 }
 
 .enter-code-form {
@@ -53,48 +61,59 @@
   flex-direction: column;
   gap: 0.75rem;
   margin-bottom: 1rem;
+  padding: 1.5rem;
+  background: var(--cb-bg);
+  border: 1px solid var(--cb-border);
+  border-radius: var(--cb-radius-lg);
+  box-shadow: var(--cb-shadow);
 }
 
 .enter-code-input {
   width: 100%;
   padding: 0.75rem 1rem;
-  border: 1px solid var(--cb-border, #2a2a2a);
-  border-radius: 8px;
-  background: var(--cb-card, #111);
-  color: #f5f5f5;
+  border: 1px solid var(--cb-border);
+  border-radius: 10px;
+  background: var(--cb-bg);
+  color: var(--cb-text);
   font-size: 1rem;
+  font-family: var(--cb-font);
   box-sizing: border-box;
+  transition: border-color 0.15s, box-shadow 0.15s;
 }
 
 .enter-code-input:focus {
   outline: none;
-  border-color: var(--cb-orange, #ffb300);
+  border-color: var(--cb-orange);
+  box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.2);
 }
 
 .enter-code-button {
   padding: 0.75rem 1rem;
-  background: var(--cb-orange, #ffb300);
-  color: #000;
+  background: var(--cb-orange);
+  color: #fff;
   border: none;
-  border-radius: 8px;
-  font-size: 1rem;
+  border-radius: 10px;
+  font-size: 0.9375rem;
   font-weight: 600;
+  font-family: var(--cb-font);
   cursor: pointer;
-  transition: background-color 0.2s;
+  transition: background-color 0.15s;
 }
 
 .enter-code-button:hover {
-  background: var(--cb-orange-hover, #ffc233);
+  background: var(--cb-orange-hover);
 }
 
 .enter-code-help {
   font-size: 0.875rem;
-  color: #888;
+  color: var(--cb-text-muted);
   margin-bottom: 1.5rem;
+  line-height: 1.5;
 }
 
 .enter-code-alt a {
-  color: var(--cb-orange, #ffb300);
+  color: var(--cb-orange);
+  font-weight: 600;
   text-decoration: none;
 }
 

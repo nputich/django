@@ -1,55 +1,74 @@
+@import "./theme.css";
+
 .form-container {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  align-items: stretch;
   margin: 0 auto;
-  padding: 1.5rem;
-  border-radius: 12px;
-  border: 1px solid var(--cb-border, #2a2a2a);
-  background: var(--cb-card, #111);
+  padding: 1.75rem;
+  border-radius: var(--cb-radius-lg);
+  border: 1px solid var(--cb-border);
+  background: var(--cb-bg);
   max-width: 400px;
   width: 100%;
   box-sizing: border-box;
+  box-shadow: var(--cb-shadow);
 }
 
 .form-container h1 {
-  margin: 0 0 1rem;
-  font-size: 1.25rem;
-  color: var(--cb-orange, #ffb300);
+  margin: 0 0 1.25rem;
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--cb-text);
+  text-align: center;
+  letter-spacing: -0.02em;
 }
 
 .form-input {
   width: 100%;
   padding: 0.75rem 1rem;
-  margin: 0.5rem 0;
-  border: 1px solid var(--cb-border, #2a2a2a);
-  border-radius: 8px;
-  background: #1a1a1a;
-  color: #f5f5f5;
+  margin: 0.375rem 0;
+  border: 1px solid var(--cb-border);
+  border-radius: 10px;
+  background: var(--cb-bg);
+  color: var(--cb-text);
+  font-size: 0.9375rem;
+  font-family: var(--cb-font);
   box-sizing: border-box;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.form-input::placeholder {
+  color: var(--cb-text-muted);
 }
 
 .form-input:focus {
   outline: none;
-  border-color: var(--cb-orange, #ffb300);
+  border-color: var(--cb-orange);
+  box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.2);
 }
 
 .form-button {
   width: 100%;
   padding: 0.75rem 1rem;
   margin: 1rem 0 0.5rem;
-  background-color: var(--cb-orange, #ffb300);
-  color: #000;
+  background-color: var(--cb-orange);
+  color: #fff;
   font-weight: 600;
+  font-size: 0.9375rem;
+  font-family: var(--cb-font);
   border: none;
-  border-radius: 8px;
+  border-radius: 10px;
   cursor: pointer;
-  transition: background-color 0.2s ease-in-out;
+  transition: background-color 0.15s, transform 0.1s;
 }
 
 .form-button:hover:not(:disabled) {
-  background-color: var(--cb-orange-hover, #ffc233);
+  background-color: var(--cb-orange-hover);
+}
+
+.form-button:active:not(:disabled) {
+  transform: scale(0.98);
 }
 
 .form-button:disabled {
@@ -60,14 +79,84 @@
 .form-footer {
   margin: 0.75rem 0 0;
   font-size: 0.875rem;
-  color: #aaa;
+  color: var(--cb-text-secondary);
+  text-align: center;
 }
 
 .form-footer a {
-  color: var(--cb-orange, #ffb300);
+  color: var(--cb-orange);
+  font-weight: 600;
   text-decoration: none;
 }
 
 .form-footer a:hover {
   text-decoration: underline;
+}
+
+/* Compact nav login — top right */
+.form-container--compact {
+  padding: 0;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  max-width: none;
+  width: auto;
+}
+
+.form-container--compact .form-input {
+  width: 7.5rem;
+  padding: 0.4rem 0.6rem;
+  margin: 0;
+  font-size: 0.75rem;
+  border-radius: 8px;
+}
+
+.form-container--compact .form-button {
+  width: auto;
+  padding: 0.4rem 0.75rem;
+  margin: 0;
+  font-size: 0.75rem;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.form-footer--compact {
+  margin: 0.25rem 0 0;
+  font-size: 0.6875rem;
+  text-align: right;
+}
+
+.form-container--compact {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.form-container--compact .form-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.35rem;
+}
+
+@media (max-width: 900px) {
+  .form-container--compact {
+    align-items: stretch;
+    width: 100%;
+  }
+
+  .form-container--compact .form-fields {
+    justify-content: stretch;
+  }
+
+  .form-container--compact .form-input {
+    flex: 1;
+    min-width: 0;
+    width: auto;
+  }
+
+  .form-footer--compact {
+    text-align: center;
+  }
 }

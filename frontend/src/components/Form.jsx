@@ -5,7 +5,7 @@ import { ACCESS_TOKEN, REFRESH_TOKEN } from "../constants";
 import "../styles/Form.css";
 import LoadingIndicator from "./LoadingIndicator";
 
-function Form({ route, method }) {
+function Form({ route, method, compact = false }) {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
@@ -33,8 +33,12 @@ function Form({ route, method }) {
     };
 
     return (
-        <form onSubmit={handleSubmit} className="form-container">
-            <h1>{name}</h1>
+        <form
+            onSubmit={handleSubmit}
+            className={`form-container${compact ? " form-container--compact" : ""}`}
+        >
+            {!compact && <h1>{name}</h1>}
+            <div className={compact ? "form-fields" : undefined}>
             <input
                 className="form-input"
                 type="text"
@@ -53,9 +57,10 @@ function Form({ route, method }) {
             />
             {loading && <LoadingIndicator />}
             <button className="form-button" type="submit" disabled={loading}>
-                {name}
+                {compact && method === "login" ? "Sign in" : name}
             </button>
-            <p className="form-footer">
+            </div>
+            <p className={`form-footer${compact ? " form-footer--compact" : ""}`}>
                 {method === "login" ? (
                     <>
                         New here? <Link to="/register">Register</Link>
