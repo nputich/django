@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import api from "../api";
-import Note from "../components/Note"
-import "../styles/Home.css"
+import Note from "../components/Note";
+import AppHeader from "../components/AppHeader";
+import "../styles/Home.css";
 
 function Home() {
     const [notes, setNotes] = useState([]);
@@ -47,7 +48,9 @@ function Home() {
     };
 
     return (
-        <div>
+        <div className="app-page">
+            <AppHeader />
+            <main className="app-content">
             <div>
                 <h2>Notes</h2>
                 {notes.map((note) => (
@@ -78,6 +81,7 @@ function Home() {
                 <br />
                 <input type="submit" value="Submit"></input>
             </form>
+            </main>
         </div>
     );
 }

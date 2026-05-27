@@ -28,7 +28,10 @@ function Login() {
           </span>
         </Link>
         <div className="landing-nav-right">
-          <nav className="landing-nav-links" aria-label="Quick links">
+          <nav className="landing-nav-links" aria-label="Main navigation">
+            <Link className="landing-nav-pill" to="/org">
+              Organizations
+            </Link>
             <a
               className="landing-nav-pill"
               href={YOUTUBE}
@@ -61,74 +64,6 @@ function Login() {
         </section>
 
         <CodeLookup />
-
-        <div className="landing-quick" role="navigation" aria-label="Explore">
-          <Link className="landing-quick-link" to="/org">
-            <span className="landing-quick-icon" aria-hidden>
-              ◉
-            </span>
-            Organizations
-          </Link>
-          <a
-            className="landing-quick-link"
-            href={YOUTUBE}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <span className="landing-quick-icon" aria-hidden>
-              ▶
-            </span>
-            YouTube
-          </a>
-          <a
-            className="landing-quick-link landing-quick-link--accent"
-            href={DONATE}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <span className="landing-quick-icon" aria-hidden>
-              ♥
-            </span>
-            Donate
-          </a>
-        </div>
-
-        <p className="landing-section-title">Discover</p>
-        <nav className="landing-grid" aria-label="Main navigation">
-          <Link className="landing-card" to="/org">
-            <span className="landing-card-icon" aria-hidden>
-              ◉
-            </span>
-            <h2>Organization accounts</h2>
-            <p>For organizations — coming soon</p>
-          </Link>
-
-          <a
-            className="landing-card"
-            href={YOUTUBE}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <span className="landing-card-icon" aria-hidden>
-              ▶
-            </span>
-            <h2>YouTube</h2>
-            <p>Videos and community updates</p>
-          </a>
-
-          <a
-            className="landing-card landing-card--donate"
-            href={DONATE}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <span className="landing-card-icon" aria-hidden>
-              ♥
-            </span>
-            <h2>Donate</h2>
-            <p>Support communiB via PayPal</p>
-          </a>
-        </nav>
       </main>
 
       <footer className="landing-footer">
