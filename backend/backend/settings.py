@@ -155,4 +155,6 @@ CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:8000",
     "http://localhost:8000",
     "https://django-backend-460809694305.us-central1.run.app",
+    "https://communib.com",
+    "https://www.communib.com",
 ]

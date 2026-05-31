@@ -21,7 +21,7 @@ function Form({ route, method, compact = false }) {
             if (method === "login") {
                 localStorage.setItem(ACCESS_TOKEN, res.data.access);
                 localStorage.setItem(REFRESH_TOKEN, res.data.refresh);
-                navigate("/app");
+                window.location.href = "/";
             } else {
                 navigate("/");
             }

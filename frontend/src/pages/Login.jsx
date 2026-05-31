@@ -1,8 +1,6 @@
-import { useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import Form from "../components/Form";
 import CodeLookup from "../components/CodeLookup";
-import { isAccessTokenValid, clearAuth } from "../auth";
 import logo from "../assets/logo-full.png";
 import "../styles/Landing.css";
 
@@ -10,16 +8,6 @@ const YOUTUBE = "https://www.youtube.com/@communib";
 const DONATE = "https://www.paypal.com/ncp/payment/YQWJCEH54LKU8";
 
 function Login() {
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    if (isAccessTokenValid()) {
-      navigate("/app", { replace: true });
-    } else {
-      clearAuth();
-    }
-  }, [navigate]);
-
   return (
     <div className="landing">
       <header className="landing-nav">

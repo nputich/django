@@ -1,29 +1,24 @@
-# Use a Node.js base image for building the Vue application
-FROM node:lts-alpine as build-stage
+# Build stage
+FROM node:lts-alpine AS build-stage
 
-# Set the working directory inside the container
 WORKDIR /app
 
-# Copy package.json and package-lock.json to install dependencies
 COPY package*.json ./
-
-# Install project dependencies
 RUN npm install
 
-# Copy the entire React application code
 COPY . .
 
-# Build the React application for production
+ARG VITE_API_URL=https://django-backend-460809694305.us-central1.run.app
+ENV VITE_API_URL=$VITE_API_URL
+
 RUN npm run build
 
-# Use a lightweight Nginx image to serve the built application
-FROM nginx:stable-alpine as production-stage
+# Production stage
+FROM nginx:stable-alpine AS production-stage
 
-# Copy the built React application from the build stage to Nginx's html directory
+# SPA routing + listen on port 80 (matches Cloud Run PORT=80)
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build-stage /app/dist /usr/share/nginx/html
 
-# Expose port 80 for web traffic
 EXPOSE 80
-
-# Start Nginx
 CMD ["nginx", "-g", "daemon off;"]
