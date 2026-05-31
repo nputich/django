@@ -20,3 +20,12 @@ export function isAccessTokenValid() {
     return false;
   }
 }
+
+/** Clear expired tokens; returns true if session is usable. */
+export function ensureValidSession() {
+  const token = getAccessToken();
+  if (!token) return false;
+  if (isAccessTokenValid()) return true;
+  clearAuth();
+  return false;
+}

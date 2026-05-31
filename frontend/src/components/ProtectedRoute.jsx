@@ -1,25 +1,25 @@
-import { Navigate } from "react-router-dom";
 import { jwtDecode } from "jwt-decode";
 import axios from "axios";
 import { REFRESH_TOKEN, ACCESS_TOKEN } from "../constants";
 import { clearAuth } from "../auth";
 import { useState, useEffect } from "react";
 
+function redirectHome() {
+    clearAuth();
+    window.location.replace("/");
+}
+
 function ProtectedRoute({ children }) {
     const [isAuthorized, setIsAuthorized] = useState(null);
 
     useEffect(() => {
-        auth().catch(() => {
-            clearAuth();
-            setIsAuthorized(false);
-        });
+        auth().catch(redirectHome);
     }, []);
 
     const refreshToken = async () => {
         const refresh = localStorage.getItem(REFRESH_TOKEN);
         if (!refresh) {
-            clearAuth();
-            setIsAuthorized(false);
+            redirectHome();
             return;
         }
 
@@ -32,13 +32,11 @@ function ProtectedRoute({ children }) {
                 localStorage.setItem(ACCESS_TOKEN, res.data.access);
                 setIsAuthorized(true);
             } else {
-                clearAuth();
-                setIsAuthorized(false);
+                redirectHome();
             }
         } catch (error) {
             console.log(error);
-            clearAuth();
-            setIsAuthorized(false);
+            redirectHome();
         }
     };
 
@@ -60,8 +58,7 @@ function ProtectedRoute({ children }) {
                 setIsAuthorized(true);
             }
         } catch {
-            clearAuth();
-            setIsAuthorized(false);
+            redirectHome();
         }
     };
 
@@ -69,7 +66,12 @@ function ProtectedRoute({ children }) {
         return <div>Loading...</div>;
     }
 
-    return isAuthorized ? children : <Navigate to="/" replace />;
+    if (!isAuthorized) {
+        redirectHome();
+        return null;
+    }
+
+    return children;
 }
 
 export default ProtectedRoute;

@@ -1,12 +1,11 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
 import api from "../api";
 import Note from "../components/Note";
 import AppHeader from "../components/AppHeader";
+import { clearAuth } from "../auth";
 import "../styles/Home.css";
 
 function Home() {
-    const navigate = useNavigate();
     const [notes, setNotes] = useState([]);
     const [content, setContent] = useState("");
     const [title, setTitle] = useState("");
@@ -15,16 +14,19 @@ function Home() {
         getNotes();
     }, []);
 
+    const handleAuthError = () => {
+        clearAuth();
+        window.location.replace("/");
+    };
+
     const getNotes = () => {
         api
             .get("/api/notes/")
             .then((res) => res.data)
-            .then((data) => {
-                setNotes(data);
-            })
+            .then((data) => setNotes(data))
             .catch((err) => {
                 if (err.response?.status === 401) {
-                    navigate("/", { replace: true });
+                    handleAuthError();
                     return;
                 }
                 const message =
@@ -43,7 +45,10 @@ function Home() {
                 else alert("Failed to delete note.");
                 getNotes();
             })
-            .catch((error) => alert(error));
+            .catch((err) => {
+                if (err.response?.status === 401) handleAuthError();
+                else alert(err.response?.data?.detail || "Failed to delete note.");
+            });
     };
 
     const createNote = (e) => {
@@ -55,7 +60,10 @@ function Home() {
                 else alert("Failed to make note.");
                 getNotes();
             })
-            .catch((err) => alert(err));
+            .catch((err) => {
+                if (err.response?.status === 401) handleAuthError();
+                else alert(err.response?.data?.detail || "Failed to create note.");
+            });
     };
 
     return (

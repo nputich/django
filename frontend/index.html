@@ -5,6 +5,27 @@
     <link rel="icon" type="image/png" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CommuniB</title>
+    <script>
+      // Runs before React — stops /app redirect loops and clears expired JWTs
+      (function () {
+        if (location.pathname === "/app") {
+          location.replace("/");
+          return;
+        }
+        try {
+          var token = localStorage.getItem("access");
+          if (!token) return;
+          var payload = JSON.parse(atob(token.split(".")[1]));
+          if (payload.exp * 1000 < Date.now()) {
+            localStorage.removeItem("access");
+            localStorage.removeItem("refresh");
+          }
+        } catch (e) {
+          localStorage.removeItem("access");
+          localStorage.removeItem("refresh");
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
