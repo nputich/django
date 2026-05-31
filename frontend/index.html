@@ -2,20 +2,25 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <link rel="icon" type="image/png" href="/favicon.png" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>CommuniB</title>
     <script>
-      // Runs before React — stops /app redirect loops and clears expired JWTs
       (function () {
-        if (location.pathname === "/app") {
-          location.replace("/");
-          return;
+        // Break /app redirect loops without a full reload
+        var path = location.pathname;
+        if (path === "/app" || path === "/login") {
+          history.replaceState(null, "", "/");
         }
+
+        // Clear expired or corrupt JWT so React never enters an auth loop
         try {
           var token = localStorage.getItem("access");
           if (!token) return;
-          var payload = JSON.parse(atob(token.split(".")[1]));
+          var payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
           if (payload.exp * 1000 < Date.now()) {
             localStorage.removeItem("access");
             localStorage.removeItem("refresh");

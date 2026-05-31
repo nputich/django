@@ -6,7 +6,9 @@ import { useState, useEffect } from "react";
 
 function redirectHome() {
     clearAuth();
-    window.location.replace("/");
+    if (window.location.pathname !== "/") {
+        window.location.replace("/");
+    }
 }
 
 function ProtectedRoute({ children }) {

@@ -16,7 +16,9 @@ function Home() {
 
     const handleAuthError = () => {
         clearAuth();
-        window.location.replace("/");
+        if (window.location.pathname !== "/") {
+            window.location.replace("/");
+        }
     };
 
     const getNotes = () => {
