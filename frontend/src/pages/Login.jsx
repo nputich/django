@@ -2,7 +2,7 @@ import { useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import Form from "../components/Form";
 import CodeLookup from "../components/CodeLookup";
-import { ACCESS_TOKEN } from "../constants";
+import { isAccessTokenValid, clearAuth } from "../auth";
 import logo from "../assets/logo-full.png";
 import "../styles/Landing.css";
 
@@ -13,8 +13,10 @@ function Login() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    if (localStorage.getItem(ACCESS_TOKEN)) {
+    if (isAccessTokenValid()) {
       navigate("/app", { replace: true });
+    } else {
+      clearAuth();
     }
   }, [navigate]);
 

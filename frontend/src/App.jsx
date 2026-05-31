@@ -7,9 +7,10 @@ import NotFound from "./pages/NotFound"
 import ProtectedRoute from "./components/ProtectedRoute"
 import EnterCode from "./pages/EnterCode"
 import UnderConstruction from "./pages/UnderConstruction"
+import { clearAuth } from "./auth"
 
 function Logout() {
-  localStorage.clear()
+  clearAuth()
   return <Navigate to="/" replace />
 }
 

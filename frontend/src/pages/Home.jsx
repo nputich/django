@@ -1,10 +1,12 @@
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../api";
 import Note from "../components/Note";
 import AppHeader from "../components/AppHeader";
 import "../styles/Home.css";
 
 function Home() {
+    const navigate = useNavigate();
     const [notes, setNotes] = useState([]);
     const [content, setContent] = useState("");
     const [title, setTitle] = useState("");
@@ -19,9 +21,18 @@ function Home() {
             .then((res) => res.data)
             .then((data) => {
                 setNotes(data);
-                console.log(data);
             })
-            .catch((err) => alert(err));
+            .catch((err) => {
+                if (err.response?.status === 401) {
+                    navigate("/", { replace: true });
+                    return;
+                }
+                const message =
+                    err.response?.data?.detail ||
+                    err.message ||
+                    "Failed to load notes.";
+                alert(message);
+            });
     };
 
     const deleteNote = (id) => {
