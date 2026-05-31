@@ -10,16 +10,16 @@ COPY package*.json ./
 # Install project dependencies
 RUN npm install
 
-# Copy the entire Vue.js application code
+# Copy the entire React application code
 COPY . .
 
-# Build the Vue.js application for production
+# Build the React application for production
 RUN npm run build
 
 # Use a lightweight Nginx image to serve the built application
 FROM nginx:stable-alpine as production-stage
 
-# Copy the built Vue.js application from the build stage to Nginx's html directory
+# Copy the built React application from the build stage to Nginx's html directory
 COPY --from=build-stage /app/dist /usr/share/nginx/html
 
 # Expose port 80 for web traffic
