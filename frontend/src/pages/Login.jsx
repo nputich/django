@@ -18,28 +18,33 @@ function Login() {
           </span>
         </Link>
         <div className="landing-nav-right">
-          <nav className="landing-nav-links" aria-label="Main navigation">
-            <Link className="landing-nav-pill" to="/org">
-              Organizations
-            </Link>
-            <a
-              className="landing-nav-pill"
-              href={YOUTUBE}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              YouTube
-            </a>
-            <a
-              className="landing-nav-pill landing-nav-pill--primary"
-              href={DONATE}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              Donate
-            </a>
-          </nav>
-          <Form route="/api/token/" method="login" compact />
+          <div className="landing-nav-toolbar">
+            <nav className="landing-nav-links" aria-label="Main navigation">
+              <Link className="landing-nav-pill" to="/org">
+                Organizations
+              </Link>
+              <a
+                className="landing-nav-pill"
+                href={YOUTUBE}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                YouTube
+              </a>
+              <a
+                className="landing-nav-pill landing-nav-pill--primary"
+                href={DONATE}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Donate
+              </a>
+            </nav>
+            <Form route="/api/token/" method="login" compact hideFooter />
+          </div>
+          <p className="landing-nav-register">
+            New here? <Link to="/register">Register</Link>
+          </p>
         </div>
       </header>
 

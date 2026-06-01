@@ -5,7 +5,7 @@ import { ACCESS_TOKEN, REFRESH_TOKEN } from "../constants";
 import "../styles/Form.css";
 import LoadingIndicator from "./LoadingIndicator";
 
-function Form({ route, method, compact = false }) {
+function Form({ route, method, compact = false, hideFooter = false }) {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
@@ -60,17 +60,19 @@ function Form({ route, method, compact = false }) {
                 {compact && method === "login" ? "Sign in" : name}
             </button>
             </div>
-            <p className={`form-footer${compact ? " form-footer--compact" : ""}`}>
-                {method === "login" ? (
-                    <>
-                        New here? <Link to="/register">Register</Link>
-                    </>
-                ) : (
-                    <>
-                        Already have an account? <Link to="/">Sign in</Link>
-                    </>
-                )}
-            </p>
+            {!hideFooter && (
+                <p className={`form-footer${compact ? " form-footer--compact" : ""}`}>
+                    {method === "login" ? (
+                        <>
+                            New here? <Link to="/register">Register</Link>
+                        </>
+                    ) : (
+                        <>
+                            Already have an account? <Link to="/">Sign in</Link>
+                        </>
+                    )}
+                </p>
+            )}
         </form>
     );
 }

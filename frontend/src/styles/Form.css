@@ -93,8 +93,10 @@
   text-decoration: underline;
 }
 
-/* Compact nav login — top right */
 .form-container--compact {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
   padding: 0;
   border: none;
   box-shadow: none;
@@ -120,43 +122,31 @@
   white-space: nowrap;
 }
 
+.form-container--compact .form-fields {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+}
+
 .form-footer--compact {
   margin: 0.25rem 0 0;
   font-size: 0.6875rem;
   text-align: right;
 }
 
-.form-container--compact {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-}
-
-.form-container--compact .form-fields {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.35rem;
-}
-
 @media (max-width: 900px) {
   .form-container--compact {
-    align-items: stretch;
     width: 100%;
   }
 
   .form-container--compact .form-fields {
-    justify-content: stretch;
+    justify-content: center;
   }
 
   .form-container--compact .form-input {
     flex: 1;
     min-width: 0;
     width: auto;
-  }
-
-  .form-footer--compact {
-    text-align: center;
   }
 }
