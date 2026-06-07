@@ -228,3 +228,8 @@ chrome_hits.txt
 .env.local
 .env.production.local
 .env.*.local
+
+venv
+venv/
+.venv
+.venv/
