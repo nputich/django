@@ -3,6 +3,7 @@ import Form from "../components/Form";
 import CodeLookup from "../components/CodeLookup";
 import logo from "../assets/logo-full.png";
 import "../styles/Landing.css";
+import "../styles/CodeResults.css";
 
 const YOUTUBE = "https://www.youtube.com/@communib";
 const DONATE = "https://www.paypal.com/ncp/payment/YQWJCEH54LKU8";

@@ -15,10 +15,16 @@ from datetime import timedelta
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = BASE_DIR.parent
+
+APP_ENV = os.getenv("APP_ENV", "local")
+env_file = PROJECT_ROOT / f".env.{APP_ENV}"
+if env_file.is_file():
+    load_dotenv(env_file)
+else:
+    load_dotenv(PROJECT_ROOT / ".env")
 
 
 # Quick-start development settings - unsuitable for production

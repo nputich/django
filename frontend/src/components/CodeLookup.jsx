@@ -1,15 +1,35 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
-
+import { Link, useNavigate } from "react-router-dom";
+import api from "../api";
 export default function CodeLookup({ className = "" }) {
-  const [code, setCode] = useState("");
-
-  const handleSearch = (e) => {
+  const [query, setQuery] = useState("");
+  const [results, setResults] = useState([]);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const handleSearch = async (e) => {
     e.preventDefault();
-    // TODO: wire to API when backend exists
-    alert(`Search for "${code}" — not connected yet.`);
+    setError("");
+    setResults([]);
+    setLoading(true);
+    try {
+      const res = await api.get(
+        `/api/codes/${encodeURIComponent(query.trim())}/resolve/`
+      );
+      setResults(res.data.results ?? []);
+      if ((res.data.results ?? []).length === 0) {
+        setError("No results.");
+      }
+    } catch (err) {
+      setResults([]);
+      setError(err.response?.data?.detail || "No results.");
+    } finally {
+      setLoading(false);
+    }
   };
-
+  const handleSelect = (item) => {
+    navigate(item.path);
+  };
   return (
     <div className={`landing-code-lookup ${className}`.trim()}>
       <form className="landing-code-form" onSubmit={handleSearch}>
@@ -17,18 +37,50 @@ export default function CodeLookup({ className = "" }) {
           type="search"
           className="landing-code-input"
           placeholder="Enter community or organization code"
-          value={code}
-          onChange={(e) => setCode(e.target.value)}
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
           aria-label="Code"
         />
-        <button type="submit" className="landing-code-button">
-          Search
+        <button
+          type="submit"
+          className="landing-code-button"
+          disabled={loading || !query.trim()}
+        >
+          {loading ? "Searching..." : "Search"}
         </button>
       </form>
       <p className="landing-code-help">
-        Codes are provided by your organization or community leader.{" "}
+        Select a result below to continue.{" "}
         <Link to="/search-another-way">Search another way</Link>
       </p>
+      {error && <p className="landing-code-error">{error}</p>}
+      {results.length > 0 && (
+        <div className="code-results">
+          <p className="code-results-heading">
+            {results.length} result{results.length === 1 ? "" : "s"} for &ldquo;{query}&rdquo;
+          </p>
+          <ul className="code-results-list">
+            {results.map((item) => (
+              <li key={item.target_id}>
+                <button
+                  type="button"
+                  className="code-results-item"
+                  onClick={() => handleSelect(item)}
+                >
+                  <span className="code-results-top">
+                    <strong>{item.label}</strong>
+                    <span className="code-results-type">{item.type}</span>
+                  </span>
+                  <span className="code-results-desc">{item.description}</span>
+                  {item.organization_name && (
+                    <span className="code-results-org">{item.organization_name}</span>
+                  )}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   );
 }
