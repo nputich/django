@@ -1,12 +1,11 @@
 import { Link } from "react-router-dom";
 import Form from "../components/Form";
 import CodeLookup from "../components/CodeLookup";
+import SiteNavLinks from "../components/SiteNavLinks";
+import SiteFooter from "../components/SiteFooter";
 import logo from "../assets/logo-full.png";
 import "../styles/Landing.css";
 import "../styles/CodeResults.css";
-
-const YOUTUBE = "https://www.youtube.com/@communib";
-const DONATE = "https://www.paypal.com/ncp/payment/YQWJCEH54LKU8";
 
 function Login() {
   return (
@@ -20,27 +19,7 @@ function Login() {
         </Link>
         <div className="landing-nav-right">
           <div className="landing-nav-toolbar">
-            <nav className="landing-nav-links" aria-label="Main navigation">
-              <Link className="landing-nav-pill" to="/org">
-                Organizations
-              </Link>
-              <a
-                className="landing-nav-pill"
-                href={YOUTUBE}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                YouTube
-              </a>
-              <a
-                className="landing-nav-pill landing-nav-pill--primary"
-                href={DONATE}
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Donate
-              </a>
-            </nav>
+            <SiteNavLinks />
             <Form route="/api/token/" method="login" compact hideFooter />
           </div>
           <p className="landing-nav-register">
@@ -54,17 +33,19 @@ function Login() {
           <div className="landing-logo-wrap">
             <img src={logo} alt="communiB" className="landing-logo" />
           </div>
-          <p className="landing-tagline">
+          <div className="landing-tagline">
             <strong>Better communities start here.</strong>
-          </p>
+            <p>
+              Connect with your organization, participate in surveys, share
+              feedback, and help shape decisions that matter.
+            </p>
+          </div>
         </section>
 
         <CodeLookup />
       </main>
 
-      <footer className="landing-footer">
-        <p>© {new Date().getFullYear()} communiB</p>
-      </footer>
+      <SiteFooter />
     </div>
   );
 }

@@ -1,13 +1,16 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
 from .models import (
+    AccessCode,
+    Meeting,
     Note,
+    Organization,
+    OrganizationBoard,
+    OrganizationMembership,
+    BoardPost,
     Survey,
     SurveyQuestion,
     SurveyAnswer,
-    Organization,
-    OrganizationBoard,
-    BoardPost,
 )
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -85,3 +88,107 @@ class OrganizationHubSerializer(serializers.ModelSerializer):
         ]
     def get_has_board(self, obj):
         return hasattr(obj, "board")
+
+
+class MyOrganizationSerializer(serializers.ModelSerializer):
+    role = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Organization
+        fields = ["id", "name", "slug", "description", "is_verified", "role"]
+
+    def get_role(self, obj):
+        user = self.context["request"].user
+        membership = OrganizationMembership.objects.filter(
+            organization=obj, user=user
+        ).first()
+        return membership.role if membership else None
+
+
+class DashboardAccessCodeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AccessCode
+        fields = ["id", "code", "label", "is_active", "is_primary"]
+
+
+class DashboardSurveySerializer(serializers.ModelSerializer):
+    access_codes = DashboardAccessCodeSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Survey
+        fields = [
+            "id",
+            "title",
+            "description",
+            "is_active",
+            "is_anonymous",
+            "created_at",
+            "access_codes",
+        ]
+
+
+class DashboardMeetingSerializer(serializers.ModelSerializer):
+    access_codes = DashboardAccessCodeSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Meeting
+        fields = [
+            "id",
+            "title",
+            "description",
+            "access_mode",
+            "status",
+            "created_at",
+            "access_codes",
+        ]
+
+
+class OrganizationDashboardSerializer(serializers.ModelSerializer):
+    surveys = DashboardSurveySerializer(many=True, read_only=True)
+    meetings = DashboardMeetingSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Organization
+        fields = ["id", "name", "slug", "description", "is_verified", "surveys", "meetings"]
+
+
+class SurveyQuestionCreateSerializer(serializers.Serializer):
+    order = serializers.IntegerField(min_value=0, default=0)
+    text = serializers.CharField()
+    question_type = serializers.ChoiceField(
+        choices=SurveyQuestion.QuestionType.choices,
+        default=SurveyQuestion.QuestionType.TEXT,
+    )
+    choices = serializers.ListField(
+        child=serializers.CharField(), required=False, default=list
+    )
+
+
+class DashboardSurveyCreateSerializer(serializers.Serializer):
+    title = serializers.CharField(max_length=200)
+    description = serializers.CharField(required=False, allow_blank=True, default="")
+    is_anonymous = serializers.BooleanField(default=True)
+    access_code = serializers.CharField(
+        required=False, allow_blank=True, max_length=32
+    )
+    label = serializers.CharField(required=False, allow_blank=True, max_length=200)
+    search_description = serializers.CharField(
+        required=False, allow_blank=True, max_length=500
+    )
+    questions = SurveyQuestionCreateSerializer(many=True, min_length=1)
+
+
+class DashboardMeetingCreateSerializer(serializers.Serializer):
+    title = serializers.CharField(max_length=200)
+    description = serializers.CharField(required=False, allow_blank=True, default="")
+    access_mode = serializers.ChoiceField(
+        choices=Meeting.AccessMode.choices,
+        default=Meeting.AccessMode.PUBLIC,
+    )
+    access_code = serializers.CharField(
+        required=False, allow_blank=True, max_length=32
+    )
+    label = serializers.CharField(required=False, allow_blank=True, max_length=200)
+    search_description = serializers.CharField(
+        required=False, allow_blank=True, max_length=500
+    )

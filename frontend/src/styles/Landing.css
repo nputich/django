@@ -62,8 +62,11 @@
 
 .landing-nav-links {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: flex-end;
+  gap: 0.35rem;
+  max-width: 52rem;
 }
 
 .landing-nav-register {
@@ -278,8 +281,17 @@
 }
 
 .landing-tagline strong {
+  display: block;
+  margin-bottom: 0.5rem;
   color: var(--cb-text);
   font-weight: 600;
+}
+
+.landing-tagline p {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 500;
+  color: var(--cb-text-secondary);
 }
 
 /* Quick actions — horizontal social-style strip */
@@ -424,6 +436,35 @@
 
 .landing-footer p {
   margin: 0;
+}
+
+.landing-footer-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem 1.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.landing-footer-links a {
+  color: var(--cb-text-secondary);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.landing-footer-links a:hover {
+  color: var(--cb-orange);
+  text-decoration: underline;
+}
+
+.static-page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.static-page .enter-code {
+  flex: 1;
 }
 
 .register-back {
