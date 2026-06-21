@@ -77,6 +77,7 @@ def build_access_code_result(access_code):
         return None
     return {
         "target_id": access_code.id,
+        "code": access_code.code,
         "label": label,
         "description": description,
         "type": type_slug,
@@ -90,22 +91,23 @@ def build_access_code_result(access_code):
     }
 class ResolveCodeView(APIView):
     permission_classes = [AllowAny]
+    authentication_classes = []
+    MATCH_LIMIT = 10
+
     def get(self, request, query):
-        q = query.strip()
+        q = query.strip().upper()
         if not q:
-            return Response(
-                {"detail": "Enter a code.", "results": []},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+            return Response({"query": "", "match_count": 0, "results": []})
+
         codes = (
-            AccessCode.objects.filter(code__iexact=q, is_active=True)
+            AccessCode.objects.filter(code__istartswith=q, is_active=True)
             .select_related(
                 "organization",
                 "resource_type",
                 "survey",
                 "meeting",
             )
-            .order_by("sort_order", "id")
+            .order_by("sort_order", "code", "id")
         )
         now = timezone.now()
         results = []
@@ -115,19 +117,16 @@ class ResolveCodeView(APIView):
             item = build_access_code_result(access_code)
             if item:
                 results.append(item)
+            if len(results) >= self.MATCH_LIMIT:
+                break
         results.sort(
             key=lambda r: (
                 not r["is_primary"],
                 not r["is_verified"],
                 r["sort_order"],
-                r["label"].lower(),
+                r["code"],
             )
         )
-        if not results:
-            return Response(
-                {"detail": "No results.", "query": q, "match_count": 0, "results": []},
-                status=status.HTTP_404_NOT_FOUND,
-            )
         return Response(
             {
                 "query": q,

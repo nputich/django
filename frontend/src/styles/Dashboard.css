@@ -152,6 +152,11 @@
   gap: 1.25rem;
 }
 
+#survey-code,
+#meeting-code {
+  text-transform: uppercase;
+}
+
 .dashboard-field label {
   display: block;
   margin-bottom: 0.375rem;

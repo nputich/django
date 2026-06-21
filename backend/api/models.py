@@ -182,6 +182,8 @@ class AccessCode(models.Model):
             if duplicate.exists():
                 raise ValidationError("This code is already used by another survey or meeting.")
     def save(self, *args, **kwargs):
+        if self.code:
+            self.code = self.code.strip().upper()
         self.full_clean()
         super().save(*args, **kwargs)
 

@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 
 from .models import AccessCode, Organization, OrganizationMembership, ResourceType
 
-CODE_PATTERN = re.compile(r"^[A-Za-z0-9-]{3,32}$")
+CODE_PATTERN = re.compile(r"^[A-Z0-9-]{3,32}$")
 
 
 def normalize_access_code(code: str) -> str:
@@ -17,7 +17,7 @@ def validate_access_code_format(code: str) -> str:
     normalized = normalize_access_code(code)
     if not CODE_PATTERN.match(normalized):
         raise ValidationError(
-            "Access code must be 3–32 characters and use only letters, numbers, and hyphens."
+            "Access code must be 3–32 characters and use only uppercase letters, numbers, and hyphens."
         )
     return normalized
 

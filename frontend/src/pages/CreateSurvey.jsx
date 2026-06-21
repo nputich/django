@@ -2,6 +2,7 @@ import { useCallback, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import api from "../api";
 import AppHeader from "../components/AppHeader";
+import { normalizeAccessCode } from "../accessCode";
 import "../styles/Dashboard.css";
 
 function emptyQuestion(order) {
@@ -141,14 +142,14 @@ export default function CreateSurvey() {
               id="survey-code"
               value={accessCode}
               onChange={(e) => {
-                setAccessCode(e.target.value);
+                setAccessCode(normalizeAccessCode(e.target.value));
                 setCodeStatus(null);
               }}
               onBlur={() => checkCode(accessCode)}
               placeholder="Leave blank to auto-generate"
             />
             <small>
-              3–32 characters, letters, numbers, and hyphens. Must not be in
+              3–32 characters, uppercase letters, numbers, and hyphens. Must not be in
               use by an active survey.
             </small>
             {codeStatus && (

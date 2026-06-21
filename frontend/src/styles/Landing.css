@@ -319,6 +319,7 @@
   font-size: 0.9375rem;
   font-family: var(--cb-font);
   color: var(--cb-text);
+  text-transform: uppercase;
 }
 
 .landing-code-input:focus {
