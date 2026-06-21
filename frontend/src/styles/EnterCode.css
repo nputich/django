@@ -1,47 +1,13 @@
 @import "./theme.css";
 
-.enter-code {
-  min-height: 100vh;
-  background: var(--cb-bg);
-  color: var(--cb-text);
-  font-family: var(--cb-font);
-  padding: 2rem 1.5rem;
-  max-width: 480px;
-  margin: 0 auto;
+/* Centered content pages (enter code, register, under construction) */
+.enter-code-page {
+  max-width: 560px;
   text-align: center;
-  -webkit-font-smoothing: antialiased;
+  padding-top: 1.5rem;
 }
 
-.enter-code-back {
-  display: inline-block;
-  margin-bottom: 1.5rem;
-  color: var(--cb-text-secondary);
-  text-decoration: none;
-  font-size: 0.875rem;
-  font-weight: 500;
-}
-
-.enter-code-back:hover {
-  color: var(--cb-orange);
-}
-
-.enter-code-logo-wrap {
-  display: inline-block;
-  padding: 0.75rem 1rem;
-  margin-bottom: 1.5rem;
-  border-radius: var(--cb-radius);
-  background: var(--cb-bg-subtle);
-  border: 1px solid var(--cb-border);
-}
-
-.enter-code-logo {
-  max-width: 180px;
-  width: 100%;
-  height: auto;
-  display: block;
-}
-
-.enter-code h1 {
+.enter-code-title {
   margin: 0 0 0.75rem;
   font-size: 1.5rem;
   font-weight: 700;
@@ -52,8 +18,41 @@
 .enter-code-subtitle {
   color: var(--cb-text-secondary);
   line-height: 1.6;
-  margin-bottom: 2rem;
+  margin: 0 0 1.5rem;
   font-size: 0.9375rem;
+}
+
+.enter-code-alt {
+  margin-top: 1.5rem;
+  font-size: 0.875rem;
+}
+
+.enter-code-alt a {
+  color: var(--cb-orange);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.enter-code-alt a:hover {
+  text-decoration: underline;
+}
+
+.register-back {
+  text-align: center;
+  margin-top: 1.5rem;
+}
+
+/* Legacy standalone enter-code layout (unused — kept for reference) */
+.enter-code {
+  min-height: 100vh;
+  background: var(--cb-bg);
+  color: var(--cb-text);
+  font-family: var(--cb-font);
+  padding: 2rem 1.5rem;
+  max-width: 480px;
+  margin: 0 auto;
+  text-align: center;
+  -webkit-font-smoothing: antialiased;
 }
 
 .enter-code-form {
@@ -109,14 +108,4 @@
   color: var(--cb-text-muted);
   margin-bottom: 1.5rem;
   line-height: 1.5;
-}
-
-.enter-code-alt a {
-  color: var(--cb-orange);
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.enter-code-alt a:hover {
-  text-decoration: underline;
 }

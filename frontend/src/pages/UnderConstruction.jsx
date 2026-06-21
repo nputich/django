@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
-import logo from "../assets/logo-full.png";
-import SiteFooter from "../components/SiteFooter";
+import MarketingLayout from "../components/MarketingLayout";
+import SiteLogo from "../components/SiteLogo";
 import "../styles/Landing.css";
 import "../styles/EnterCode.css";
 
@@ -73,20 +73,15 @@ export default function UnderConstruction() {
   const content = MESSAGES[pathname] ?? DEFAULT;
 
   return (
-    <div className="static-page">
-      <div className="enter-code">
-        <div className="enter-code-logo-wrap">
-          <img src={logo} alt="communiB" className="enter-code-logo" />
-        </div>
-        <h1>{content.title}</h1>
-        <p className="enter-code-subtitle">{content.body}</p>
-        <p className="enter-code-alt">
-          <Link to={content.back.to}>{content.back.label}</Link>
-          {" · "}
-          <Link to="/">Home</Link>
-        </p>
-      </div>
-      <SiteFooter />
-    </div>
+    <MarketingLayout mainClassName="landing-main enter-code-page">
+      <SiteLogo variant="compact" />
+      <h1 className="enter-code-title">{content.title}</h1>
+      <p className="enter-code-subtitle">{content.body}</p>
+      <p className="enter-code-alt">
+        <Link to={content.back.to}>{content.back.label}</Link>
+        {" · "}
+        <Link to="/">Home</Link>
+      </p>
+    </MarketingLayout>
   );
 }

@@ -23,17 +23,22 @@
   z-index: 10;
 }
 
+.landing-nav--end {
+  justify-content: flex-end;
+}
+
+.landing-nav--end .landing-nav-right {
+  align-items: flex-end;
+  width: auto;
+}
+
 .landing-nav-brand {
   display: flex;
   align-items: center;
   gap: 0.75rem;
   text-decoration: none;
   color: inherit;
-}
-
-.landing-nav-logo {
-  height: 40px;
-  width: auto;
+  flex-shrink: 0;
 }
 
 .landing-nav-name {
@@ -257,19 +262,77 @@
 }
 
 .landing-logo-wrap {
-  display: inline-block;
-  padding: 1rem 1.5rem;
-  margin-bottom: 1rem;
-  border-radius: var(--cb-radius-lg);
-  background: var(--cb-bg-subtle);
-  border: 1px solid var(--cb-border);
+  display: flex;
+  justify-content: center;
+  margin: 0 auto 1.5rem;
+  padding: 0;
+}
+
+.site-logo-link {
+  display: block;
+  line-height: 0;
+  text-decoration: none;
 }
 
 .landing-logo {
-  max-width: 260px;
-  width: 100%;
+  width: min(480px, 92vw);
+  max-height: 340px;
   height: auto;
+  object-fit: contain;
   display: block;
+}
+
+@media (max-width: 640px) {
+  .landing-logo {
+    width: min(400px, 94vw);
+    max-height: 300px;
+  }
+}
+
+@media (min-width: 900px) {
+  .landing-logo {
+    width: min(560px, 55vw);
+    max-height: 400px;
+  }
+}
+
+/* Secondary pages — centered compact logo (enter code, register, static) */
+.site-logo-wrap {
+  display: flex;
+  justify-content: center;
+  margin: 0 auto 1.25rem;
+}
+
+.site-logo {
+  width: min(260px, 65vw);
+  max-height: 180px;
+  height: auto;
+  object-fit: contain;
+  display: block;
+}
+
+.site-logo--compact {
+  width: min(280px, 78vw);
+  max-height: 190px;
+}
+
+@media (max-width: 640px) {
+  .site-logo--compact {
+    width: min(260px, 88vw);
+    max-height: 170px;
+  }
+}
+
+@media (min-width: 900px) {
+  .site-logo--compact {
+    width: min(320px, 32vw);
+    max-height: 220px;
+  }
+}
+
+.landing-hero-register {
+  text-align: center;
+  margin-top: 0.5rem;
 }
 
 .landing-tagline {
@@ -457,21 +520,6 @@
   text-decoration: underline;
 }
 
-.static-page {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-}
-
-.static-page .enter-code {
-  flex: 1;
-}
-
-.register-back {
-  text-align: center;
-  margin-top: 1.5rem;
-}
-
 @media (max-width: 900px) {
   .landing-nav {
     flex-direction: column;
@@ -497,6 +545,15 @@
 
   .landing-nav-register {
     text-align: center;
+  }
+
+  .landing-nav--end {
+    align-items: stretch;
+  }
+
+  .landing-nav--end .landing-nav-right {
+    align-items: stretch;
+    width: 100%;
   }
 }
 

@@ -1,23 +1,23 @@
 import { Link } from "react-router-dom";
-import logo from "../assets/logo-full.png";
 import CodeLookup from "../components/CodeLookup";
+import MarketingLayout from "../components/MarketingLayout";
+import SiteLogo from "../components/SiteLogo";
 import "../styles/Landing.css";
+import "../styles/CodeResults.css";
 import "../styles/EnterCode.css";
 
 export default function EnterCode() {
   return (
-    <div className="enter-code">
-      <Link to="/" className="enter-code-back">
-        ← Back to home
-      </Link>
-      <div className="enter-code-logo-wrap">
-        <img src={logo} alt="communiB" className="enter-code-logo" />
-      </div>
-      <h1>Enter a code</h1>
+    <MarketingLayout mainClassName="landing-main enter-code-page">
+      <SiteLogo variant="compact" />
+      <h1 className="enter-code-title">Enter a code</h1>
       <p className="enter-code-subtitle">
         Enter your community or organization code below.
       </p>
       <CodeLookup className="landing-code-lookup--standalone" />
-    </div>
+      <p className="enter-code-alt">
+        <Link to="/">← Back to home</Link>
+      </p>
+    </MarketingLayout>
   );
 }
