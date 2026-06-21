@@ -13,6 +13,7 @@ from .models import (
     Survey,
     SurveyAnswer,
     SurveyQuestion,
+    ContactSubmission,
 )
 @admin.register(Note)
 class NoteAdmin(admin.ModelAdmin):
@@ -57,3 +58,8 @@ class AccessCodeAdmin(admin.ModelAdmin):
     list_display = ("code", "resource_type", "organization", "label", "is_primary", "is_active")
     list_filter = ("resource_type", "is_active")
     search_fields = ("code", "label", "organization__name")
+@admin.register(ContactSubmission)
+class ContactSubmissionAdmin(admin.ModelAdmin):
+    list_display = ("subject", "name", "email", "created_at")
+    search_fields = ("name", "email", "subject", "message")
+    readonly_fields = ("name", "email", "subject", "message", "created_at")

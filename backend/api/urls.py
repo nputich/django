@@ -28,4 +28,5 @@ urlpatterns = [
         views.AccessCodeCheckView.as_view(),
         name="access-code-check",
     ),
+    path("contact/", views.ContactSubmitView.as_view(), name="contact-submit"),
 ]

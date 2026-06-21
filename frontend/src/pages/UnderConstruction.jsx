@@ -12,7 +12,7 @@ const DEFAULT = {
 
 const MESSAGES = {
   "/about": {
-    title: "About us",
+    title: "About Us",
     body: "Learn more about communiB and our mission. This page is coming soon.",
     back: { to: "/", label: "← Back to home" },
   },
@@ -41,8 +41,18 @@ const MESSAGES = {
     body: "News and updates from communiB will appear here soon.",
     back: { to: "/", label: "← Back to home" },
   },
+  "/knowledge-center": {
+    title: "Knowledge Center",
+    body: "Guides, updates, and resources from communiB. Coming soon.",
+    back: { to: "/", label: "← Back to home" },
+  },
+  "/explore-communities": {
+    title: "Explore Communities",
+    body: "Browse and discover communities on communiB. Coming soon.",
+    back: { to: "/", label: "← Back to home" },
+  },
   "/org": {
-    title: "Organizations",
+    title: "Organization Accounts",
     body: "Organization sign-up and management are not available yet. Please check back later.",
     back: { to: "/", label: "← Back to home" },
   },
@@ -52,8 +62,8 @@ const MESSAGES = {
     back: { to: "/", label: "← Back to home" },
   },
   "/terms": {
-    title: "Terms and Conditions",
-    body: "Terms and conditions are being finalized. Please check back soon.",
+    title: "Terms of Service",
+    body: "Terms of service are being finalized. Please check back soon.",
     back: { to: "/", label: "← Back to home" },
   },
   "/careers": {
@@ -74,7 +84,7 @@ export default function UnderConstruction() {
 
   return (
     <MarketingLayout mainClassName="landing-main enter-code-page">
-      <SiteLogo variant="compact" />
+      <SiteLogo />
       <h1 className="enter-code-title">{content.title}</h1>
       <p className="enter-code-subtitle">{content.body}</p>
       <p className="enter-code-alt">

@@ -50,7 +50,6 @@ export default function CodeLookup({ className = "" }) {
         </button>
       </form>
       <p className="landing-code-help">
-        Select a result below to continue.{" "}
         <Link to="/search-another-way">Search another way</Link>
       </p>
       {error && <p className="landing-code-error">{error}</p>}

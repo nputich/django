@@ -192,3 +192,10 @@ class DashboardMeetingCreateSerializer(serializers.Serializer):
     search_description = serializers.CharField(
         required=False, allow_blank=True, max_length=500
     )
+
+
+class ContactSubmissionSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=200)
+    email = serializers.EmailField(max_length=254)
+    subject = serializers.CharField(max_length=200)
+    message = serializers.CharField(max_length=2000)

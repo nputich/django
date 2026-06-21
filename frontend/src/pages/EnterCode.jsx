@@ -8,13 +8,11 @@ import "../styles/EnterCode.css";
 
 export default function EnterCode() {
   return (
-    <MarketingLayout mainClassName="landing-main enter-code-page">
-      <SiteLogo variant="compact" />
-      <h1 className="enter-code-title">Enter a code</h1>
-      <p className="enter-code-subtitle">
-        Enter your community or organization code below.
-      </p>
-      <CodeLookup className="landing-code-lookup--standalone" />
+    <MarketingLayout mainClassName="landing-main landing-main--home">
+      <section className="landing-hero">
+        <SiteLogo />
+      </section>
+      <CodeLookup />
       <p className="enter-code-alt">
         <Link to="/">← Back to home</Link>
       </p>

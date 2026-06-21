@@ -4,11 +4,13 @@ from django.db import transaction
 from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.conf import settings
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .models import AccessCode, Meeting, Note, Organization, Survey, SurveyAnswer, SurveyQuestion
+from .contact_email import send_contact_notification
+from .models import AccessCode, ContactSubmission, Meeting, Note, Organization, Survey, SurveyAnswer, SurveyQuestion
 from .org_access import (
     get_admin_organization,
     get_resource_type,
@@ -19,6 +21,7 @@ from .org_access import (
     validate_access_code_format,
 )
 from .serializers import (
+    ContactSubmissionSerializer,
     DashboardMeetingCreateSerializer,
     DashboardSurveyCreateSerializer,
     MyOrganizationSerializer,
@@ -367,5 +370,44 @@ class OrganizationMeetingCreateView(APIView):
                     "label": access_code.label,
                 },
             },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class ContactSubmitView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def post(self, request):
+        serializer = ContactSubmissionSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        name = data["name"].strip()
+        email = data["email"].strip()
+        subject = data["subject"].strip()
+        message = data["message"].strip()
+        ContactSubmission.objects.create(
+            name=name,
+            email=email,
+            subject=subject,
+            message=message,
+        )
+        try:
+            send_contact_notification(
+                name=name,
+                email=email,
+                subject=subject,
+                message=message,
+            )
+        except Exception:
+            if settings.DEBUG:
+                pass
+            else:
+                return Response(
+                    {"detail": "Your message was saved but email could not be sent. Please try again later."},
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+        return Response(
+            {"detail": "Thank you — your message has been sent."},
             status=status.HTTP_201_CREATED,
         )

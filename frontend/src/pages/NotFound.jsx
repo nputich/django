@@ -7,7 +7,7 @@ import "../styles/EnterCode.css";
 function NotFound() {
   return (
     <MarketingLayout mainClassName="landing-main enter-code-page">
-      <SiteLogo variant="compact" />
+      <SiteLogo />
       <h1 className="enter-code-title">Page not found</h1>
       <p className="enter-code-subtitle">
         The page you are looking for does not exist or has moved.

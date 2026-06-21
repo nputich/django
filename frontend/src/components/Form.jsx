@@ -5,7 +5,7 @@ import { ACCESS_TOKEN, REFRESH_TOKEN } from "../constants";
 import "../styles/Form.css";
 import LoadingIndicator from "./LoadingIndicator";
 
-function Form({ route, method, compact = false, hideFooter = false }) {
+function Form({ route, method, compact = false, header = false, hideFooter = false }) {
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
@@ -35,9 +35,18 @@ function Form({ route, method, compact = false, hideFooter = false }) {
     return (
         <form
             onSubmit={handleSubmit}
-            className={`form-container${compact ? " form-container--compact" : ""}`}
+            className={[
+                "form-container",
+                compact ? "form-container--compact" : "",
+                header ? "form-container--header-login" : "",
+            ]
+                .filter(Boolean)
+                .join(" ")}
         >
-            {!compact && <h1>{name}</h1>}
+            {!compact && !header && <h1>{name}</h1>}
+            {header && method === "login" && (
+                <div className="form-header-login-title">Login</div>
+            )}
             <div className={compact ? "form-fields" : undefined}>
             <input
                 className="form-input"
@@ -57,7 +66,7 @@ function Form({ route, method, compact = false, hideFooter = false }) {
             />
             {loading && <LoadingIndicator />}
             <button className="form-button" type="submit" disabled={loading}>
-                {compact && method === "login" ? "Sign in" : name}
+                {method === "login" ? "Sign in" : name}
             </button>
             </div>
             {!hideFooter && (

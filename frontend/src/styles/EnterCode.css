@@ -2,9 +2,9 @@
 
 /* Centered content pages (enter code, register, under construction) */
 .enter-code-page {
-  max-width: 560px;
+  max-width: 640px;
   text-align: center;
-  padding-top: 1.5rem;
+  padding-top: 1rem;
 }
 
 .enter-code-title {

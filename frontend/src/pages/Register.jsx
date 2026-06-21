@@ -11,7 +11,7 @@ function Register() {
       showLogin={false}
       mainClassName="landing-main landing-main--centered"
     >
-      <SiteLogo variant="compact" />
+      <SiteLogo />
       <div className="landing-login-wrap">
         <p className="landing-login-label">Create your account</p>
         <Form route="/api/user/register/" method="register" />
