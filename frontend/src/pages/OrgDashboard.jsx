@@ -9,11 +9,12 @@ export default function OrgDashboard() {
   const [org, setOrg] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [startingId, setStartingId] = useState(null);
 
-  useEffect(() => {
+  const loadDashboard = () => {
     setLoading(true);
     setError("");
-    api
+    return api
       .get(`/api/organizations/${slug}/dashboard/`)
       .then((res) => setOrg(res.data))
       .catch((err) => {
@@ -23,7 +24,23 @@ export default function OrgDashboard() {
         );
       })
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadDashboard();
   }, [slug]);
+
+  const handleStartMeeting = async (meetingId) => {
+    setStartingId(meetingId);
+    try {
+      await api.post(`/api/organizations/${slug}/meetings/${meetingId}/start/`);
+      await loadDashboard();
+    } catch (err) {
+      setError(err.response?.data?.detail || "Could not start meeting.");
+    } finally {
+      setStartingId(null);
+    }
+  };
 
   return (
     <div className="dashboard">
@@ -108,6 +125,24 @@ export default function OrgDashboard() {
                           {meeting.access_mode} · {meeting.status} ·{" "}
                           <Link to={`/m/${meeting.id}`}>Open meeting</Link>
                         </p>
+                        {meeting.status === "scheduled" && (
+                          <button
+                            type="button"
+                            className="dashboard-btn dashboard-btn--primary"
+                            style={{ marginTop: "0.5rem" }}
+                            disabled={startingId === meeting.id}
+                            onClick={() => handleStartMeeting(meeting.id)}
+                          >
+                            {startingId === meeting.id ? "Starting..." : "Start meeting"}
+                          </button>
+                        )}
+                        <Link
+                          to={`/dashboard/${slug}/meetings/${meeting.id}/host`}
+                          className="dashboard-btn"
+                          style={{ marginTop: "0.5rem", display: "inline-flex" }}
+                        >
+                          Host controls
+                        </Link>
                       </div>
                       <div>
                         {(meeting.access_codes ?? []).map((code) => (

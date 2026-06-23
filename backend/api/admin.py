@@ -3,61 +3,154 @@ from .models import (
     AccessCode,
     BoardPost,
     Meeting,
+    MeetingAttendance,
     MeetingQuestion,
     MeetingResponse,
+    MeetingResponseAI,
+    MeetingSession,
+    MeetingSlide,
     Note,
     Organization,
     OrganizationBoard,
     OrganizationMembership,
+    ParticipantProfileValue,
+    PoliticalClassification,
     ResourceType,
     Survey,
     SurveyAnswer,
     SurveyQuestion,
     ContactSubmission,
 )
+
+
 @admin.register(Note)
 class NoteAdmin(admin.ModelAdmin):
     list_display = ("title", "author", "created_at")
+
+
 @admin.register(Organization)
 class OrganizationAdmin(admin.ModelAdmin):
     list_display = ("name", "slug", "is_active", "is_verified")
     prepopulated_fields = {"slug": ("name",)}
+
+
 @admin.register(ResourceType)
 class ResourceTypeAdmin(admin.ModelAdmin):
     list_display = ("slug", "name", "is_active")
+
+
 @admin.register(OrganizationMembership)
 class OrganizationMembershipAdmin(admin.ModelAdmin):
     list_display = ("organization", "user", "role")
+
+
 class SurveyQuestionInline(admin.TabularInline):
     model = SurveyQuestion
     extra = 1
+
+
 @admin.register(Survey)
 class SurveyAdmin(admin.ModelAdmin):
     list_display = ("title", "organization", "is_active")
     inlines = [SurveyQuestionInline]
+
+
 @admin.register(SurveyAnswer)
 class SurveyAnswerAdmin(admin.ModelAdmin):
     list_display = ("survey", "question", "response_session", "created_at")
+
+
+class MeetingSlideInline(admin.TabularInline):
+    model = MeetingSlide
+    extra = 1
+    fields = ("order", "slide_type", "title", "prompt", "question_format", "is_active")
+
+
+class MeetingSessionInline(admin.TabularInline):
+    model = MeetingSession
+    extra = 0
+    readonly_fields = ("session_number", "status", "started_at", "ended_at", "created_at")
+    fields = ("session_number", "status", "current_slide", "started_at", "ended_at")
+
+
 @admin.register(Meeting)
 class MeetingAdmin(admin.ModelAdmin):
-    list_display = ("title", "organization", "access_mode", "status")
+    list_display = (
+        "title",
+        "organization",
+        "access_mode",
+        "status",
+        "scheduled_start_at",
+        "is_anonymous",
+        "ai_mode",
+    )
+    list_filter = ("status", "access_mode", "ai_mode", "is_anonymous")
+    inlines = [MeetingSlideInline, MeetingSessionInline]
+
+
+@admin.register(MeetingSlide)
+class MeetingSlideAdmin(admin.ModelAdmin):
+    list_display = ("meeting", "slide_type", "order", "title", "is_active")
+
+
+@admin.register(MeetingSession)
+class MeetingSessionAdmin(admin.ModelAdmin):
+    list_display = ("meeting", "session_number", "status", "current_slide", "started_at")
+
+
+@admin.register(MeetingAttendance)
+class MeetingAttendanceAdmin(admin.ModelAdmin):
+    list_display = ("session", "participant_id", "status", "joined_at", "left_at")
+
+
+@admin.register(ParticipantProfileValue)
+class ParticipantProfileValueAdmin(admin.ModelAdmin):
+    list_display = ("attendance", "field_key", "field_label", "created_at")
+
+
 @admin.register(MeetingQuestion)
 class MeetingQuestionAdmin(admin.ModelAdmin):
     list_display = ("meeting", "text", "is_active", "created_at")
+
+
 @admin.register(MeetingResponse)
 class MeetingResponseAdmin(admin.ModelAdmin):
-    list_display = ("meeting", "question", "normalization_status", "created_at")
+    list_display = ("meeting", "slide", "participant_id", "normalization_status", "created_at")
+
+
+@admin.register(MeetingResponseAI)
+class MeetingResponseAIAdmin(admin.ModelAdmin):
+    list_display = ("response", "sentiment", "confidence", "processed_at")
+
+
+@admin.register(PoliticalClassification)
+class PoliticalClassificationAdmin(admin.ModelAdmin):
+    list_display = (
+        "response",
+        "major_issue_bucket",
+        "specific_issue_bucket",
+        "concern_bucket",
+        "source",
+    )
+
+
 @admin.register(OrganizationBoard)
 class OrganizationBoardAdmin(admin.ModelAdmin):
     list_display = ("organization", "title")
+
+
 @admin.register(BoardPost)
 class BoardPostAdmin(admin.ModelAdmin):
     list_display = ("board", "title", "author", "created_at")
+
+
 @admin.register(AccessCode)
 class AccessCodeAdmin(admin.ModelAdmin):
     list_display = ("code", "resource_type", "organization", "label", "is_primary", "is_active")
     list_filter = ("resource_type", "is_active")
     search_fields = ("code", "label", "organization__name")
+
+
 @admin.register(ContactSubmission)
 class ContactSubmissionAdmin(admin.ModelAdmin):
     list_display = ("subject", "name", "email", "created_at")

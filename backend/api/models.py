@@ -79,6 +79,12 @@ class Meeting(models.Model):
         PUBLIC = "public", "Public"
         SEMI_PUBLIC = "semi_public", "Semi-public"
         PRIVATE = "private", "Private"
+
+    class AIMode(models.TextChoices):
+        NONE = "none", "No AI"
+        SELF_HOSTED = "self_hosted", "Self-Hosted AI"
+        PAID = "paid", "Paid AI Model"
+
     organization = models.ForeignKey(
         Organization, on_delete=models.CASCADE, related_name="meetings"
     )
@@ -88,13 +94,147 @@ class Meeting(models.Model):
         max_length=20, choices=AccessMode.choices, default=AccessMode.PUBLIC
     )
     private_code_hash = models.CharField(max_length=128, blank=True)
+    scheduled_start_at = models.DateTimeField(null=True, blank=True)
+    allow_start_early = models.BooleanField(default=False)
+    is_anonymous = models.BooleanField(default=False)
+    ai_mode = models.CharField(
+        max_length=20, choices=AIMode.choices, default=AIMode.NONE
+    )
     status = models.CharField(max_length=20, default="scheduled")
     started_at = models.DateTimeField(null=True, blank=True)
     ended_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
     def __str__(self):
         return self.title
+
+
+class MeetingSlide(models.Model):
+    """Ordered slide in a meeting deck (info, questions, issue cards)."""
+
+    class SlideType(models.TextChoices):
+        PARTICIPANT_INFO = "participant_info", "Participant information"
+        STANDARD = "standard", "Standard question"
+        ISSUE_CARD = "issue_card", "Issue card"
+        POLITICAL_ISSUE_CARD = "political_issue_card", "Political issue card"
+
+    class QuestionFormat(models.TextChoices):
+        TEXT = "text", "Free text"
+        SINGLE_CHOICE = "single_choice", "Single choice"
+        MULTI_CHOICE = "multi_choice", "Multiple choice"
+
+    meeting = models.ForeignKey(
+        Meeting, on_delete=models.CASCADE, related_name="slides"
+    )
+    order = models.PositiveIntegerField(default=0)
+    slide_type = models.CharField(max_length=30, choices=SlideType.choices)
+    title = models.CharField(max_length=300, blank=True)
+    prompt = models.TextField(blank=True)
+    question_format = models.CharField(
+        max_length=20,
+        choices=QuestionFormat.choices,
+        blank=True,
+        default="",
+    )
+    choices = models.JSONField(default=list, blank=True)
+    config = models.JSONField(default=dict, blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["order", "id"]
+
+    def __str__(self):
+        label = self.title or self.prompt or self.slide_type
+        return f"{self.meeting.title} — {label[:50]}"
+
+
+class MeetingSession(models.Model):
+    """One run of a meeting (supports restart in later phases)."""
+
+    class Status(models.TextChoices):
+        SCHEDULED = "scheduled", "Scheduled"
+        LIVE = "live", "Live"
+        PAUSED = "paused", "Paused"
+        ENDED = "ended", "Ended"
+
+    meeting = models.ForeignKey(
+        Meeting, on_delete=models.CASCADE, related_name="sessions"
+    )
+    session_number = models.PositiveIntegerField(default=1)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.SCHEDULED
+    )
+    current_slide = models.ForeignKey(
+        MeetingSlide,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    started_from_slide = models.ForeignKey(
+        MeetingSlide,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    started_at = models.DateTimeField(null=True, blank=True)
+    ended_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-session_number", "-id"]
+        unique_together = ("meeting", "session_number")
+
+    def __str__(self):
+        return f"{self.meeting.title} session #{self.session_number}"
+
+
+class MeetingAttendance(models.Model):
+    class Status(models.TextChoices):
+        JOINED = "joined", "Joined"
+        LEFT = "left", "Left"
+
+    session = models.ForeignKey(
+        MeetingSession, on_delete=models.CASCADE, related_name="attendances"
+    )
+    attendance_id = models.UUIDField(unique=True, db_index=True)
+    participant_id = models.UUIDField(db_index=True)
+    user = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL
+    )
+    joined_at = models.DateTimeField(auto_now_add=True)
+    left_at = models.DateTimeField(null=True, blank=True)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.JOINED
+    )
+
+    class Meta:
+        verbose_name_plural = "Meeting attendances"
+
+    def __str__(self):
+        return f"{self.session} — {self.participant_id}"
+
+
+class ParticipantProfileValue(models.Model):
+    """Voluntary participant info — stored separately from anonymous responses."""
+
+    attendance = models.ForeignKey(
+        MeetingAttendance, on_delete=models.CASCADE, related_name="profile_values"
+    )
+    field_key = models.CharField(max_length=100)
+    field_label = models.CharField(max_length=200)
+    value = models.JSONField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("attendance", "field_key")
+
+
 class MeetingQuestion(models.Model):
+    """Legacy Q&A model — superseded by MeetingSlide in Phase 1+."""
+
     meeting = models.ForeignKey(
         Meeting, on_delete=models.CASCADE, related_name="questions"
     )
@@ -104,17 +244,86 @@ class MeetingQuestion(models.Model):
     )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
 class MeetingResponse(models.Model):
     meeting = models.ForeignKey(
         Meeting, on_delete=models.CASCADE, related_name="responses"
     )
-    question = models.ForeignKey(MeetingQuestion, on_delete=models.CASCADE)
+    session = models.ForeignKey(
+        MeetingSession,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="responses",
+    )
+    slide = models.ForeignKey(
+        MeetingSlide,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="responses",
+    )
+    attendance = models.ForeignKey(
+        MeetingAttendance,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="responses",
+    )
+    question = models.ForeignKey(
+        MeetingQuestion,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+    )
     user = models.ForeignKey(
         User, null=True, blank=True, on_delete=models.SET_NULL
     )
-    raw_text = models.TextField()
+    participant_id = models.UUIDField(null=True, blank=True, db_index=True)
+    response_text = models.TextField(blank=True)
+    selected_options = models.JSONField(default=list, blank=True)
+    raw_text = models.TextField(blank=True)
     normalized_text = models.TextField(blank=True)
     normalization_status = models.CharField(max_length=20, default="pending")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class MeetingResponseAI(models.Model):
+    """AI enrichments — populated only when meeting.ai_mode is enabled."""
+
+    response = models.OneToOneField(
+        MeetingResponse, on_delete=models.CASCADE, related_name="ai"
+    )
+    ai_summary = models.TextField(blank=True)
+    ai_tags = models.JSONField(default=list, blank=True)
+    sentiment = models.CharField(max_length=50, blank=True)
+    support_level = models.CharField(max_length=50, blank=True)
+    opposition_level = models.CharField(max_length=50, blank=True)
+    action_item = models.TextField(blank=True)
+    decision_made = models.TextField(blank=True)
+    unresolved_question = models.TextField(blank=True)
+    confidence = models.FloatField(null=True, blank=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+
+
+class PoliticalClassification(models.Model):
+    """One path in a political issue taxonomy — multiple rows per response allowed."""
+
+    class Source(models.TextChoices):
+        MANUAL = "manual", "Manual"
+        AI = "ai", "AI"
+
+    response = models.ForeignKey(
+        MeetingResponse, on_delete=models.CASCADE, related_name="political_classifications"
+    )
+    major_issue_bucket = models.CharField(max_length=200, blank=True)
+    specific_issue_bucket = models.CharField(max_length=200, blank=True)
+    concern_bucket = models.CharField(max_length=500, blank=True)
+    source = models.CharField(
+        max_length=20, choices=Source.choices, default=Source.AI
+    )
+    confidence = models.FloatField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 class OrganizationBoard(models.Model):
     organization = models.OneToOneField(

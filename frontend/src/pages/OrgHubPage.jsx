@@ -61,6 +61,11 @@ export default function OrgHubPage() {
               <li key={m.id}>
                 <Link to={`/m/${m.id}`}>{m.title}</Link>
                 {m.description && <p>{m.description}</p>}
+                <p className="resource-meta">
+                  {m.status}
+                  {m.scheduled_start_at &&
+                    ` · ${new Date(m.scheduled_start_at).toLocaleString()}`}
+                </p>
               </li>
             ))}
           </ul>

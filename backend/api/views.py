@@ -10,7 +10,46 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from .contact_email import send_contact_notification
-from .models import AccessCode, ContactSubmission, Meeting, Note, Organization, Survey, SurveyAnswer, SurveyQuestion
+from .models import AccessCode, ContactSubmission, Meeting, MeetingAttendance, MeetingSession, MeetingSlide, Note, Organization, Survey, SurveyAnswer, SurveyQuestion
+from .meeting_access import (
+    can_start_meeting,
+    end_meeting_session,
+    get_latest_session,
+    get_slide_by_id,
+    go_to_next_slide,
+    go_to_previous_slide,
+    go_to_slide,
+    meeting_join_error,
+    pause_meeting_session,
+    restart_meeting_session,
+    resume_meeting_session,
+    session_is_joinable,
+    start_meeting_session,
+)
+from .meeting_export import (
+    MEETING_DF_COLUMNS,
+    PROFILE_EXPORT_COLUMNS,
+    build_meeting_df,
+    build_profile_export,
+    csv_http_response,
+    meeting_export_summary,
+    render_csv,
+)
+from .meeting_service import (
+    append_meeting_slides,
+    create_initial_session,
+    create_meeting_slides,
+    get_attendance,
+    get_organizer_live_payload,
+    get_session_stats,
+    join_session,
+    leave_attendance,
+    participant_completed_slide_ids,
+    replace_meeting_slides,
+    submit_participant_profile,
+    submit_slide_response,
+)
+from .meeting_ai import process_meeting_ai, schedule_response_ai_processing
 from .org_access import (
     get_admin_organization,
     get_resource_type,
@@ -23,7 +62,18 @@ from .org_access import (
 from .serializers import (
     ContactSubmissionSerializer,
     DashboardMeetingCreateSerializer,
+    DashboardMeetingUpdateSerializer,
     DashboardSurveyCreateSerializer,
+    MeetingDetailSerializer,
+    MeetingJoinSerializer,
+    MeetingLeaveSerializer,
+    MeetingProfileSubmitSerializer,
+    MeetingRespondSerializer,
+    MeetingSessionPublicSerializer,
+    MeetingStartSerializer,
+    MeetingGoToSlideSerializer,
+    MeetingRestartSerializer,
+    MeetingAddSlidesSerializer,
     MyOrganizationSerializer,
     NoteSerializer,
     OrganizationDashboardSerializer,
@@ -340,8 +390,14 @@ class OrganizationMeetingCreateView(APIView):
             title=data["title"],
             description=data.get("description", ""),
             access_mode=data.get("access_mode", Meeting.AccessMode.PUBLIC),
+            scheduled_start_at=data.get("scheduled_start_at"),
+            allow_start_early=data.get("allow_start_early", False),
+            is_anonymous=data.get("is_anonymous", False),
+            ai_mode=data.get("ai_mode", Meeting.AIMode.NONE),
             status="scheduled",
         )
+        create_meeting_slides(meeting, data["slides"])
+        create_initial_session(meeting)
         access_code = AccessCode.objects.create(
             code=code,
             organization=organization,
@@ -361,6 +417,10 @@ class OrganizationMeetingCreateView(APIView):
                     "title": meeting.title,
                     "description": meeting.description,
                     "access_mode": meeting.access_mode,
+                    "scheduled_start_at": meeting.scheduled_start_at,
+                    "allow_start_early": meeting.allow_start_early,
+                    "is_anonymous": meeting.is_anonymous,
+                    "ai_mode": meeting.ai_mode,
                     "path": f"/m/{meeting.id}",
                 },
                 "access_code": {
@@ -370,6 +430,568 @@ class OrganizationMeetingCreateView(APIView):
                 },
             },
             status=status.HTTP_201_CREATED,
+        )
+
+
+class MeetingDetailView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request, pk):
+        meeting = get_object_or_404(
+            Meeting.objects.select_related("organization").prefetch_related(
+                "slides", "access_codes"
+            ),
+            pk=pk,
+        )
+        return Response(MeetingDetailSerializer(meeting).data)
+
+
+class OrganizationMeetingDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, slug, pk):
+        try:
+            organization = get_admin_organization(request.user, slug)
+        except Organization.DoesNotExist:
+            return Response(
+                {"detail": "Organization not found or you are not an admin."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        meeting = get_object_or_404(
+            Meeting.objects.prefetch_related("slides", "access_codes"),
+            pk=pk,
+            organization=organization,
+        )
+        return Response(MeetingDetailSerializer(meeting).data)
+
+    @transaction.atomic
+    def patch(self, request, slug, pk):
+        try:
+            organization = get_admin_organization(request.user, slug)
+        except Organization.DoesNotExist:
+            return Response(
+                {"detail": "Organization not found or you are not an admin."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        meeting = get_object_or_404(Meeting, pk=pk, organization=organization)
+        if meeting.status in ("live", "paused"):
+            return Response(
+                {"detail": "Cannot edit a live or paused meeting. End it first."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        serializer = DashboardMeetingUpdateSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        for field in (
+            "title",
+            "description",
+            "scheduled_start_at",
+            "allow_start_early",
+            "is_anonymous",
+            "ai_mode",
+        ):
+            if field in data:
+                setattr(meeting, field, data[field])
+        meeting.save()
+
+        if "slides" in data:
+            replace_meeting_slides(meeting, data["slides"])
+            session = meeting.sessions.order_by("-session_number").first()
+            if session and session.status == MeetingSession.Status.SCHEDULED:
+                first_slide = meeting.slides.filter(is_active=True).order_by("order", "id").first()
+                session.current_slide = first_slide
+                session.started_from_slide = first_slide
+                session.save(update_fields=["current_slide", "started_from_slide"])
+
+        meeting = Meeting.objects.prefetch_related("slides", "access_codes").get(pk=meeting.pk)
+        return Response(MeetingDetailSerializer(meeting).data)
+
+
+def _serialize_session(session: MeetingSession) -> dict:
+    stats = get_session_stats(session)
+    data = MeetingSessionPublicSerializer(session).data
+    data["attendance_count"] = stats["attendance_count"]
+    data["current_slide_response_count"] = stats["current_slide_response_count"]
+    return data
+
+
+def _get_org_meeting_admin(request, slug, pk):
+    try:
+        organization = get_admin_organization(request.user, slug)
+    except Organization.DoesNotExist:
+        return None, Response(
+            {"detail": "Organization not found or you are not an admin."},
+            status=status.HTTP_404_NOT_FOUND,
+        )
+    meeting = get_object_or_404(Meeting, pk=pk, organization=organization)
+    return meeting, None
+
+
+def _control_session_response(meeting, session, detail: str):
+    session = MeetingSession.objects.select_related("current_slide").get(pk=session.pk)
+    return Response(
+        {
+            "detail": detail,
+            "meeting_status": meeting.status,
+            "session": _serialize_session(session),
+            "live": get_organizer_live_payload(meeting, session),
+        }
+    )
+
+
+class MeetingSessionView(APIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request, pk):
+        meeting = get_object_or_404(Meeting, pk=pk)
+        session = get_latest_session(meeting)
+        if not session:
+            return Response({"detail": "No session found for this meeting."}, status=404)
+        session = MeetingSession.objects.select_related("current_slide").get(pk=session.pk)
+        return Response(_serialize_session(session))
+
+
+class MeetingJoinView(APIView):
+    permission_classes = [AllowAny]
+
+    @transaction.atomic
+    def post(self, request, pk):
+        meeting = get_object_or_404(Meeting.objects.select_related("organization"), pk=pk)
+        serializer = MeetingJoinSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        private_code = serializer.validated_data.get("private_code", "")
+
+        join_error = meeting_join_error(meeting, request.user, private_code)
+        if join_error:
+            return Response({"detail": join_error}, status=status.HTTP_403_FORBIDDEN)
+
+        session = get_latest_session(meeting)
+        if not session:
+            session = create_initial_session(meeting)
+        if not session_is_joinable(session):
+            return Response(
+                {"detail": "This meeting has not started yet.", "session_status": session.status},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        user = request.user if request.user.is_authenticated else None
+
+        existing_id = serializer.validated_data.get("attendance_id")
+        if existing_id:
+            attendance = MeetingAttendance.objects.filter(
+                session=session,
+                attendance_id=existing_id,
+                status=MeetingAttendance.Status.JOINED,
+            ).first()
+            if attendance:
+                completed_slide_ids = participant_completed_slide_ids(
+                    session, attendance.participant_id
+                )
+                payload = {
+                    "attendance_id": str(attendance.attendance_id),
+                    "participant_id": str(attendance.participant_id),
+                    "is_anonymous": meeting.is_anonymous,
+                    "session": _serialize_session(session),
+                    "completed_slide_ids": completed_slide_ids,
+                    "rejoined": True,
+                }
+                if not meeting.is_anonymous and attendance.user:
+                    payload["display_name"] = attendance.user.get_username()
+                return Response(payload)
+
+        attendance = join_session(meeting, session, user=user)
+        completed_slide_ids = participant_completed_slide_ids(session, attendance.participant_id)
+
+        payload = {
+            "attendance_id": str(attendance.attendance_id),
+            "participant_id": str(attendance.participant_id),
+            "is_anonymous": meeting.is_anonymous,
+            "session": _serialize_session(session),
+            "completed_slide_ids": completed_slide_ids,
+        }
+        if not meeting.is_anonymous and user:
+            payload["display_name"] = user.get_username()
+        return Response(payload, status=status.HTTP_201_CREATED)
+
+
+class MeetingProfileSubmitView(APIView):
+    permission_classes = [AllowAny]
+
+    @transaction.atomic
+    def post(self, request, pk):
+        meeting = get_object_or_404(Meeting, pk=pk)
+        serializer = MeetingProfileSubmitSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        session = get_latest_session(meeting)
+        if not session or not session_is_joinable(session):
+            return Response({"detail": "Meeting is not active."}, status=409)
+
+        try:
+            attendance = get_attendance(session, str(data["attendance_id"]))
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=400)
+
+        slide = get_object_or_404(MeetingSlide, pk=data["slide_id"], meeting=meeting)
+        try:
+            submit_participant_profile(attendance, slide, data["fields"])
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=400)
+
+        return Response({"detail": "Profile saved.", "slide_id": slide.id})
+
+
+class MeetingRespondView(APIView):
+    permission_classes = [AllowAny]
+
+    @transaction.atomic
+    def post(self, request, pk):
+        meeting = get_object_or_404(Meeting, pk=pk)
+        serializer = MeetingRespondSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        session = get_latest_session(meeting)
+        if not session or not session_is_joinable(session):
+            return Response({"detail": "Meeting is not active."}, status=409)
+
+        try:
+            attendance = get_attendance(session, str(data["attendance_id"]))
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=400)
+
+        slide = get_object_or_404(MeetingSlide, pk=data["slide_id"], meeting=meeting)
+        try:
+            response = submit_slide_response(
+                meeting,
+                session,
+                attendance,
+                slide,
+                response_text=data.get("response_text", ""),
+                selected_options=data.get("selected_options", []),
+            )
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=400)
+
+        schedule_response_ai_processing(response)
+
+        return Response(
+            {
+                "detail": "Response saved.",
+                "slide_id": slide.id,
+                "response_id": response.id,
+                "ai_processing": meeting.ai_mode != Meeting.AIMode.NONE,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class MeetingLeaveView(APIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, pk):
+        meeting = get_object_or_404(Meeting, pk=pk)
+        serializer = MeetingLeaveSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        session = get_latest_session(meeting)
+        if not session:
+            return Response({"detail": "No active session."}, status=404)
+        try:
+            attendance = get_attendance(session, str(serializer.validated_data["attendance_id"]))
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=400)
+        leave_attendance(attendance)
+        return Response({"detail": "You have left the meeting."})
+
+
+class OrganizationMeetingStartView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, slug, pk):
+        meeting, err = _get_org_meeting_admin(request, slug, pk)
+        if err:
+            return err
+        serializer = MeetingStartSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        session = get_latest_session(meeting)
+        if not session:
+            session = create_initial_session(meeting)
+
+        start_error = can_start_meeting(meeting, session)
+        if start_error:
+            return Response({"detail": start_error}, status=400)
+
+        from_slide = None
+        slide_id = serializer.validated_data.get("slide_id")
+        if slide_id:
+            try:
+                from_slide = get_slide_by_id(meeting, slide_id)
+            except MeetingSlide.DoesNotExist:
+                return Response({"detail": "Invalid slide_id."}, status=400)
+
+        try:
+            session = start_meeting_session(meeting, session, from_slide=from_slide)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=400)
+
+        return _control_session_response(meeting, session, "Meeting started.")
+
+
+class OrganizationMeetingLiveView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, slug, pk):
+        meeting, err = _get_org_meeting_admin(request, slug, pk)
+        if err:
+            return err
+        session = get_latest_session(meeting)
+        if not session:
+            return Response({"detail": "No session found."}, status=404)
+        session = MeetingSession.objects.select_related("current_slide").get(pk=session.pk)
+        return Response(get_organizer_live_payload(meeting, session))
+
+
+class OrganizationMeetingPauseView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, slug, pk):
+        meeting, err = _get_org_meeting_admin(request, slug, pk)
+        if err:
+            return err
+        session = get_latest_session(meeting)
+        if not session:
+            return Response({"detail": "No session found."}, status=404)
+        try:
+            session = pause_meeting_session(meeting, session)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=400)
+        return _control_session_response(meeting, session, "Meeting paused.")
+
+
+class OrganizationMeetingResumeView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, slug, pk):
+        meeting, err = _get_org_meeting_admin(request, slug, pk)
+        if err:
+            return err
+        session = get_latest_session(meeting)
+        if not session:
+            return Response({"detail": "No session found."}, status=404)
+        try:
+            session = resume_meeting_session(meeting, session)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=400)
+        return _control_session_response(meeting, session, "Meeting resumed.")
+
+
+class OrganizationMeetingEndView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, slug, pk):
+        meeting, err = _get_org_meeting_admin(request, slug, pk)
+        if err:
+            return err
+        session = get_latest_session(meeting)
+        if not session:
+            return Response({"detail": "No session found."}, status=404)
+        try:
+            session = end_meeting_session(meeting, session)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=400)
+        if meeting.ai_mode != Meeting.AIMode.NONE:
+            session_id = session.id
+            transaction.on_commit(
+                lambda: process_meeting_ai(meeting, str(session_id))
+            )
+        return _control_session_response(meeting, session, "Meeting ended.")
+
+
+class OrganizationMeetingNextSlideView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, slug, pk):
+        meeting, err = _get_org_meeting_admin(request, slug, pk)
+        if err:
+            return err
+        session = get_latest_session(meeting)
+        if not session:
+            return Response({"detail": "No session found."}, status=404)
+        try:
+            session = go_to_next_slide(meeting, session)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=400)
+        return _control_session_response(meeting, session, "Advanced to next slide.")
+
+
+class OrganizationMeetingPrevSlideView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, slug, pk):
+        meeting, err = _get_org_meeting_admin(request, slug, pk)
+        if err:
+            return err
+        session = get_latest_session(meeting)
+        if not session:
+            return Response({"detail": "No session found."}, status=404)
+        try:
+            session = go_to_previous_slide(meeting, session)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=400)
+        return _control_session_response(meeting, session, "Moved to previous slide.")
+
+
+class OrganizationMeetingGoToSlideView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, slug, pk):
+        meeting, err = _get_org_meeting_admin(request, slug, pk)
+        if err:
+            return err
+        serializer = MeetingGoToSlideSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        session = get_latest_session(meeting)
+        if not session:
+            return Response({"detail": "No session found."}, status=404)
+        try:
+            slide = get_slide_by_id(meeting, serializer.validated_data["slide_id"])
+            session = go_to_slide(meeting, session, slide)
+        except MeetingSlide.DoesNotExist:
+            return Response({"detail": "Invalid slide_id."}, status=400)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=400)
+        return _control_session_response(meeting, session, "Slide updated.")
+
+
+class OrganizationMeetingRestartView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, slug, pk):
+        meeting, err = _get_org_meeting_admin(request, slug, pk)
+        if err:
+            return err
+        serializer = MeetingRestartSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        session = get_latest_session(meeting)
+        if not session:
+            session = create_initial_session(meeting)
+
+        from_slide = None
+        slide_id = serializer.validated_data.get("slide_id")
+        if slide_id:
+            try:
+                from_slide = get_slide_by_id(meeting, slide_id)
+            except MeetingSlide.DoesNotExist:
+                return Response({"detail": "Invalid slide_id."}, status=400)
+
+        try:
+            session = restart_meeting_session(meeting, session, from_slide=from_slide)
+        except ValueError as exc:
+            return Response({"detail": str(exc)}, status=400)
+        return _control_session_response(meeting, session, "Meeting restarted.")
+
+
+class OrganizationMeetingAddSlidesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, slug, pk):
+        meeting, err = _get_org_meeting_admin(request, slug, pk)
+        if err:
+            return err
+        session = get_latest_session(meeting)
+        if not session or session.status not in (
+            MeetingSession.Status.LIVE,
+            MeetingSession.Status.PAUSED,
+        ):
+            return Response(
+                {"detail": "Slides can only be added during a live or paused meeting."},
+                status=400,
+            )
+        serializer = MeetingAddSlidesSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        append_meeting_slides(meeting, serializer.validated_data["slides"])
+        session = MeetingSession.objects.select_related("current_slide").get(pk=session.pk)
+        return _control_session_response(meeting, session, "Slides added.")
+
+
+class OrganizationMeetingExportView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, slug, pk):
+        meeting, err = _get_org_meeting_admin(request, slug, pk)
+        if err:
+            return err
+
+        export_type = request.query_params.get("type", "responses").lower()
+        fmt = request.query_params.get("format", "json").lower()
+        session_id = request.query_params.get("session_id", "all")
+
+        if export_type == "summary":
+            return Response(meeting_export_summary(meeting))
+
+        if export_type == "profiles":
+            rows = build_profile_export(meeting, session_id)
+            columns = PROFILE_EXPORT_COLUMNS
+            basename = f"meeting-{meeting.id}-profiles"
+        else:
+            rows = build_meeting_df(meeting, session_id)
+            columns = MEETING_DF_COLUMNS
+            basename = f"meeting-{meeting.id}-responses"
+
+        if fmt == "csv":
+            suffix = session_id if session_id != "all" else "all-sessions"
+            filename = f"{basename}-session-{suffix}.csv"
+            return csv_http_response(filename, render_csv(rows, columns))
+
+        return Response(
+            {
+                "meeting_id": meeting.id,
+                "meeting_title": meeting.title,
+                "is_anonymous": meeting.is_anonymous,
+                "session_id": session_id,
+                "row_count": len(rows),
+                "columns": columns,
+                "rows": rows,
+            }
+        )
+
+
+class OrganizationMeetingProcessAIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, slug, pk):
+        meeting, err = _get_org_meeting_admin(request, slug, pk)
+        if err:
+            return err
+
+        if meeting.ai_mode == Meeting.AIMode.NONE:
+            return Response(
+                {"detail": "AI mode is disabled for this meeting."},
+                status=400,
+            )
+
+        session_id = request.data.get("session_id") or request.query_params.get("session_id", "all")
+        outcome = process_meeting_ai(meeting, str(session_id))
+        return Response(
+            {
+                "detail": "AI processing complete.",
+                "ai_mode": meeting.ai_mode,
+                **outcome,
+            }
         )
 
 

@@ -3,6 +3,8 @@ from rest_framework import serializers
 from .models import (
     AccessCode,
     Meeting,
+    MeetingSession,
+    MeetingSlide,
     Note,
     Organization,
     OrganizationBoard,
@@ -75,14 +77,18 @@ class OrganizationHubSerializer(serializers.ModelSerializer):
         qs = obj.surveys.filter(is_active=True)
         return OrganizationHubSurveySerializer(qs, many=True).data
     def get_meetings(self, obj):
-        from .models import Meeting
-        qs = Meeting.objects.filter(organization=obj, status__in=["scheduled", "live"])
+        qs = Meeting.objects.filter(
+            organization=obj, status__in=["scheduled", "live", "paused"]
+        ).order_by("scheduled_start_at", "-created_at")
         return [
             {
                 "id": m.id,
                 "title": m.title,
                 "description": m.description,
                 "access_mode": m.access_mode,
+                "status": m.status,
+                "scheduled_start_at": m.scheduled_start_at,
+                "is_anonymous": m.is_anonymous,
             }
             for m in qs
         ]
@@ -127,6 +133,61 @@ class DashboardSurveySerializer(serializers.ModelSerializer):
         ]
 
 
+class MeetingSlideSerializer(serializers.ModelSerializer):
+    participant_fields = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MeetingSlide
+        fields = [
+            "id",
+            "order",
+            "slide_type",
+            "title",
+            "prompt",
+            "question_format",
+            "choices",
+            "config",
+            "participant_fields",
+            "is_active",
+        ]
+
+    def get_participant_fields(self, obj):
+        if obj.slide_type == MeetingSlide.SlideType.PARTICIPANT_INFO:
+            return obj.config.get("fields", [])
+        return []
+
+
+class MeetingDetailSerializer(serializers.ModelSerializer):
+    slides = MeetingSlideSerializer(many=True, read_only=True)
+    organization_name = serializers.CharField(source="organization.name", read_only=True)
+    organization_slug = serializers.CharField(source="organization.slug", read_only=True)
+    community_code = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Meeting
+        fields = [
+            "id",
+            "title",
+            "description",
+            "organization_name",
+            "organization_slug",
+            "access_mode",
+            "status",
+            "scheduled_start_at",
+            "allow_start_early",
+            "is_anonymous",
+            "ai_mode",
+            "community_code",
+            "slides",
+        ]
+
+    def get_community_code(self, obj):
+        code = obj.access_codes.filter(is_active=True, is_primary=True).first()
+        if not code:
+            code = obj.access_codes.filter(is_active=True).first()
+        return code.code if code else None
+
+
 class DashboardMeetingSerializer(serializers.ModelSerializer):
     access_codes = DashboardAccessCodeSerializer(many=True, read_only=True)
 
@@ -138,6 +199,10 @@ class DashboardMeetingSerializer(serializers.ModelSerializer):
             "description",
             "access_mode",
             "status",
+            "scheduled_start_at",
+            "allow_start_early",
+            "is_anonymous",
+            "ai_mode",
             "created_at",
             "access_codes",
         ]
@@ -178,12 +243,96 @@ class DashboardSurveyCreateSerializer(serializers.Serializer):
     questions = SurveyQuestionCreateSerializer(many=True, min_length=1)
 
 
+class ParticipantInfoFieldCreateSerializer(serializers.Serializer):
+    key = serializers.CharField(max_length=100)
+    label = serializers.CharField(max_length=200)
+    required = serializers.BooleanField(default=False)
+    field_type = serializers.ChoiceField(
+        choices=["text", "single_select", "multi_select"]
+    )
+    options = serializers.ListField(
+        child=serializers.CharField(), required=False, default=list
+    )
+
+
+class MeetingSlideCreateSerializer(serializers.Serializer):
+    order = serializers.IntegerField(min_value=0, default=0)
+    slide_type = serializers.ChoiceField(choices=MeetingSlide.SlideType.choices)
+    title = serializers.CharField(required=False, allow_blank=True, max_length=300)
+    prompt = serializers.CharField(required=False, allow_blank=True)
+    question_format = serializers.ChoiceField(
+        choices=MeetingSlide.QuestionFormat.choices,
+        required=False,
+        allow_blank=True,
+    )
+    choices = serializers.ListField(
+        child=serializers.CharField(), required=False, default=list
+    )
+    fields = ParticipantInfoFieldCreateSerializer(many=True, required=False, default=list)
+
+    def validate(self, attrs):
+        slide_type = attrs["slide_type"]
+        prompt = attrs.get("prompt", "").strip()
+        title = attrs.get("title", "").strip()
+        question_format = attrs.get("question_format", "")
+        choices = attrs.get("choices") or []
+        fields = attrs.get("fields") or []
+
+        if slide_type == MeetingSlide.SlideType.PARTICIPANT_INFO:
+            if not fields:
+                raise serializers.ValidationError(
+                    {"fields": "Participant info slides need at least one field."}
+                )
+            keys = [f["key"] for f in fields]
+            if len(keys) != len(set(keys)):
+                raise serializers.ValidationError(
+                    {"fields": "Field keys must be unique within the slide."}
+                )
+            for field in fields:
+                if field["field_type"] in ("single_select", "multi_select") and not field.get("options"):
+                    raise serializers.ValidationError(
+                        {"fields": f"Select field '{field['key']}' needs options."}
+                    )
+        elif slide_type == MeetingSlide.SlideType.STANDARD:
+            if not prompt and not title:
+                raise serializers.ValidationError(
+                    {"prompt": "Standard slides need a prompt or title."}
+                )
+            if not question_format:
+                raise serializers.ValidationError(
+                    {"question_format": "Standard slides require a question format."}
+                )
+            if question_format in (
+                MeetingSlide.QuestionFormat.SINGLE_CHOICE,
+                MeetingSlide.QuestionFormat.MULTI_CHOICE,
+            ) and len(choices) < 2:
+                raise serializers.ValidationError(
+                    {"choices": "Choice questions need at least two options."}
+                )
+        elif slide_type in (
+            MeetingSlide.SlideType.ISSUE_CARD,
+            MeetingSlide.SlideType.POLITICAL_ISSUE_CARD,
+        ):
+            if not prompt and not title:
+                raise serializers.ValidationError(
+                    {"prompt": "Issue card slides need a prompt or title."}
+                )
+        return attrs
+
+
 class DashboardMeetingCreateSerializer(serializers.Serializer):
     title = serializers.CharField(max_length=200)
     description = serializers.CharField(required=False, allow_blank=True, default="")
     access_mode = serializers.ChoiceField(
         choices=Meeting.AccessMode.choices,
         default=Meeting.AccessMode.PUBLIC,
+    )
+    scheduled_start_at = serializers.DateTimeField(required=False, allow_null=True)
+    allow_start_early = serializers.BooleanField(default=False)
+    is_anonymous = serializers.BooleanField(default=False)
+    ai_mode = serializers.ChoiceField(
+        choices=Meeting.AIMode.choices,
+        default=Meeting.AIMode.NONE,
     )
     access_code = serializers.CharField(
         required=False, allow_blank=True, max_length=32
@@ -192,6 +341,75 @@ class DashboardMeetingCreateSerializer(serializers.Serializer):
     search_description = serializers.CharField(
         required=False, allow_blank=True, max_length=500
     )
+    slides = MeetingSlideCreateSerializer(many=True, min_length=1)
+
+
+class DashboardMeetingUpdateSerializer(serializers.Serializer):
+    title = serializers.CharField(max_length=200, required=False)
+    description = serializers.CharField(required=False, allow_blank=True)
+    scheduled_start_at = serializers.DateTimeField(required=False, allow_null=True)
+    allow_start_early = serializers.BooleanField(required=False)
+    is_anonymous = serializers.BooleanField(required=False)
+    ai_mode = serializers.ChoiceField(choices=Meeting.AIMode.choices, required=False)
+    slides = MeetingSlideCreateSerializer(many=True, required=False)
+
+
+class MeetingSessionPublicSerializer(serializers.ModelSerializer):
+    current_slide = MeetingSlideSerializer(read_only=True)
+    attendance_count = serializers.IntegerField(read_only=True)
+    current_slide_response_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = MeetingSession
+        fields = [
+            "id",
+            "session_number",
+            "status",
+            "current_slide",
+            "started_at",
+            "attendance_count",
+            "current_slide_response_count",
+        ]
+
+
+class MeetingJoinSerializer(serializers.Serializer):
+    private_code = serializers.CharField(required=False, allow_blank=True, max_length=64)
+    attendance_id = serializers.UUIDField(required=False)
+
+
+class MeetingProfileSubmitSerializer(serializers.Serializer):
+    attendance_id = serializers.UUIDField()
+    slide_id = serializers.IntegerField()
+    fields = serializers.DictField()
+
+
+class MeetingRespondSerializer(serializers.Serializer):
+    attendance_id = serializers.UUIDField()
+    slide_id = serializers.IntegerField()
+    response_text = serializers.CharField(required=False, allow_blank=True, default="")
+    selected_options = serializers.ListField(
+        child=serializers.CharField(), required=False, default=list
+    )
+
+
+class MeetingLeaveSerializer(serializers.Serializer):
+    attendance_id = serializers.UUIDField()
+
+
+class MeetingStartSerializer(serializers.Serializer):
+    slide_id = serializers.IntegerField(required=False)
+
+
+class MeetingGoToSlideSerializer(serializers.Serializer):
+    slide_id = serializers.IntegerField()
+
+
+class MeetingRestartSerializer(serializers.Serializer):
+    slide_id = serializers.IntegerField(required=False)
+
+
+class MeetingAddSlidesSerializer(serializers.Serializer):
+    slides = MeetingSlideCreateSerializer(many=True, min_length=1)
 
 
 class ContactSubmissionSerializer(serializers.Serializer):

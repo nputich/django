@@ -101,6 +101,10 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+_db_options = {}
+if os.getenv("DB_SSLMODE"):
+    _db_options["sslmode"] = os.getenv("DB_SSLMODE")
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql',
@@ -109,6 +113,7 @@ DATABASES = {
         'PASSWORD': os.getenv('DB_PWD'),
         'HOST': os.getenv('DB_HOST'),
         'PORT': os.getenv('DB_PORT'),
+        'OPTIONS': _db_options,
     }
 }
 

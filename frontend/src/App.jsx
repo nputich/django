@@ -13,6 +13,7 @@ import DashboardHome from "./pages/DashboardHome";
 import OrgDashboard from "./pages/OrgDashboard";
 import CreateSurvey from "./pages/CreateSurvey";
 import CreateMeeting from "./pages/CreateMeeting";
+import MeetingHostPage from "./pages/MeetingHostPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { clearAuth } from "./auth";
 import { UNDER_CONSTRUCTION_ROUTES } from "./constants/siteLinks";
@@ -68,6 +69,14 @@ function App() {
           element={
             <ProtectedRoute>
               <CreateMeeting />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/:slug/meetings/:id/host"
+          element={
+            <ProtectedRoute>
+              <MeetingHostPage />
             </ProtectedRoute>
           }
         />
