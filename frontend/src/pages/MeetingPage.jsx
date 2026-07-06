@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import api from "../api";
 import { ensureValidSession } from "../auth";
+import IssueCardForm from "../components/IssueCardForm";
 import {
   clearMeetingParticipant,
   getMeetingParticipant,
@@ -156,6 +157,7 @@ export default function MeetingPage() {
   const [profileValues, setProfileValues] = useState({});
   const [responseText, setResponseText] = useState("");
   const [selectedOptions, setSelectedOptions] = useState([]);
+  const [issueItems, setIssueItems] = useState([]);
   const [pageError, setPageError] = useState("");
   const [actionError, setActionError] = useState("");
   const [loading, setLoading] = useState(true);
@@ -234,6 +236,7 @@ export default function MeetingPage() {
   useEffect(() => {
     setResponseText("");
     setSelectedOptions([]);
+    setIssueItems([]);
     setActionError("");
   }, [session?.current_slide?.id]);
 
@@ -299,6 +302,29 @@ export default function MeetingPage() {
       setProfileValues({});
     } catch (err) {
       setActionError(err.response?.data?.detail || "Could not save profile.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleIssueSubmit = async (issues) => {
+    setActionError("");
+    setSubmitting(true);
+    try {
+      await api.post(`/api/meetings/${id}/respond/`, {
+        attendance_id: participant.attendance_id,
+        slide_id: currentSlide.id,
+        issues: issues.map((issue, index) => ({
+          text: issue.text,
+          importance_order: index + 1,
+        })),
+      });
+      setCompletedSlideIds((prev) =>
+        prev.includes(currentSlide.id) ? prev : [...prev, currentSlide.id]
+      );
+      setIssueItems([]);
+    } catch (err) {
+      setActionError(err.response?.data?.detail || "Could not submit issues.");
     } finally {
       setSubmitting(false);
     }
@@ -474,9 +500,7 @@ export default function MeetingPage() {
             )
           )}
 
-          {["standard", "issue_card", "political_issue_card"].includes(
-            currentSlide.slide_type
-          ) && (
+          {currentSlide.slide_type === "standard" && (
             <QuestionForm
               slide={currentSlide}
               responseText={responseText}
@@ -484,6 +508,17 @@ export default function MeetingPage() {
               onTextChange={setResponseText}
               onOptionsChange={setSelectedOptions}
               onSubmit={handleRespond}
+              submitting={submitting}
+              error={actionError}
+              alreadyAnswered={alreadyAnswered}
+            />
+          )}
+
+          {["issue_card", "political_issue_card"].includes(currentSlide.slide_type) && (
+            <IssueCardForm
+              issues={issueItems}
+              onChange={setIssueItems}
+              onSubmit={handleIssueSubmit}
               submitting={submitting}
               error={actionError}
               alreadyAnswered={alreadyAnswered}

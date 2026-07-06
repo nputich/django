@@ -47,6 +47,7 @@ from .meeting_service import (
     participant_completed_slide_ids,
     replace_meeting_slides,
     submit_participant_profile,
+    submit_issue_card_responses,
     submit_slide_response,
 )
 from .meeting_ai import process_meeting_ai, schedule_response_ai_processing
@@ -665,7 +666,32 @@ class MeetingRespondView(APIView):
             return Response({"detail": exc.messages[0]}, status=400)
 
         slide = get_object_or_404(MeetingSlide, pk=data["slide_id"], meeting=meeting)
+        issues = data.get("issues")
         try:
+            if issues and slide.slide_type in (
+                MeetingSlide.SlideType.ISSUE_CARD,
+                MeetingSlide.SlideType.POLITICAL_ISSUE_CARD,
+            ):
+                responses = submit_issue_card_responses(
+                    meeting,
+                    session,
+                    attendance,
+                    slide,
+                    issues,
+                )
+                for response in responses:
+                    schedule_response_ai_processing(response)
+                return Response(
+                    {
+                        "detail": "Issues saved.",
+                        "slide_id": slide.id,
+                        "response_ids": [r.id for r in responses],
+                        "issue_count": len(responses),
+                        "ai_processing": meeting.ai_mode != Meeting.AIMode.NONE,
+                    },
+                    status=status.HTTP_201_CREATED,
+                )
+
             response = submit_slide_response(
                 meeting,
                 session,

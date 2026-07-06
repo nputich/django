@@ -43,6 +43,7 @@ MEETING_DF_COLUMNS = [
     "unresolved_question",
     "timestamp",
     "confidence",
+    "importance_order",
 ]
 
 PROFILE_EXPORT_COLUMNS = [
@@ -132,6 +133,7 @@ def _base_row(meeting: Meeting, session: MeetingSession, response: MeetingRespon
         "response_text": response.response_text or response.raw_text,
         "selected_option": _selected_option(response),
         "provided_answer": (response.response_text or response.raw_text) if is_issue else "",
+        "importance_order": response.importance_order or "",
         "major_issue_bucket": "",
         "specific_issue_bucket": "",
         "concern_bucket": "",
@@ -178,7 +180,7 @@ def build_meeting_df(meeting: Meeting, session_id: str | None = None) -> list[di
             MeetingResponse.objects.filter(meeting=meeting, session=session)
             .select_related("slide", "attendance", "session")
             .prefetch_related("political_classifications", "ai")
-            .order_by("created_at", "id")
+            .order_by("slide_id", "importance_order", "created_at", "id")
         )
         for response in responses:
             rows.extend(_rows_for_response(meeting, session, response))

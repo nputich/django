@@ -390,6 +390,37 @@ class MeetingRespondSerializer(serializers.Serializer):
     selected_options = serializers.ListField(
         child=serializers.CharField(), required=False, default=list
     )
+    issues = serializers.ListField(
+        child=serializers.DictField(),
+        required=False,
+        allow_empty=False,
+    )
+
+    def validate_issues(self, value):
+        if not value:
+            return value
+        cleaned = []
+        for item in value:
+            text = str(item.get("text", "")).strip()
+            if not text:
+                continue
+            order = item.get("importance_order")
+            payload = {"text": text}
+            if order is not None:
+                try:
+                    payload["importance_order"] = int(order)
+                except (TypeError, ValueError) as exc:
+                    raise serializers.ValidationError(
+                        "importance_order must be a positive integer."
+                    ) from exc
+                if payload["importance_order"] < 1:
+                    raise serializers.ValidationError(
+                        "importance_order must be at least 1."
+                    )
+            cleaned.append(payload)
+        if not cleaned:
+            raise serializers.ValidationError("Each issue must include non-empty text.")
+        return cleaned
 
 
 class MeetingLeaveSerializer(serializers.Serializer):

@@ -1,0 +1,112 @@
+.issue-list {
+  list-style: none;
+  margin: 0 0 1rem;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.issue-list-empty {
+  margin: 0 0 1rem;
+  color: var(--cb-text-secondary, #6b7280);
+  font-size: 0.9rem;
+}
+
+.issue-list-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.65rem;
+  border: 1px solid var(--cb-border, #e5e7eb);
+  border-radius: 10px;
+  background: #fff;
+  transition: border-color 0.15s, opacity 0.15s;
+}
+
+.issue-list-item--dragging {
+  opacity: 0.45;
+}
+
+.issue-list-item--drag-over {
+  border-color: var(--cb-orange, #f5a623);
+  box-shadow: inset 0 0 0 1px var(--cb-orange, #f5a623);
+}
+
+.issue-list-item__drag {
+  border: none;
+  background: transparent;
+  color: var(--cb-text-muted, #9ca3af);
+  cursor: grab;
+  font-size: 0.8rem;
+  line-height: 1;
+  padding: 0.15rem;
+}
+
+.issue-list-item__drag:active {
+  cursor: grabbing;
+}
+
+.issue-list-item__position {
+  width: 2.5rem;
+  padding: 0.25rem;
+  border: 1px solid var(--cb-border, #e5e7eb);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  text-align: center;
+  flex-shrink: 0;
+  -moz-appearance: textfield;
+}
+
+.issue-list-item__position::-webkit-outer-spin-button,
+.issue-list-item__position::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.issue-list-item__position:focus {
+  outline: none;
+  border-color: var(--cb-orange, #f5a623);
+}
+
+.issue-list-item__text {
+  flex: 1;
+  font-size: 0.95rem;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.issue-list-item__remove {
+  border: none;
+  background: transparent;
+  color: var(--cb-text-muted, #9ca3af);
+  cursor: pointer;
+  font-size: 1.2rem;
+  line-height: 1;
+  padding: 0 0.25rem;
+}
+
+.issue-list-item__remove:hover {
+  color: #b91c1c;
+}
+
+.issue-list-hint {
+  margin: 0 0 0.75rem;
+  font-size: 0.85rem;
+  color: var(--cb-text-secondary, #6b7280);
+}
+
+.issue-list-input {
+  width: 100%;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--cb-border, #e5e7eb);
+  border-radius: 10px;
+  font-size: 1rem;
+  margin-bottom: 1rem;
+}
+
+.issue-list-input:focus {
+  outline: none;
+  border-color: var(--cb-orange, #f5a623);
+  box-shadow: 0 0 0 2px rgba(245, 166, 35, 0.2);
+}

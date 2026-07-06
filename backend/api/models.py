@@ -286,6 +286,11 @@ class MeetingResponse(models.Model):
     raw_text = models.TextField(blank=True)
     normalized_text = models.TextField(blank=True)
     normalization_status = models.CharField(max_length=20, default="pending")
+    importance_order = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Participant-ranked order on issue card slides (1 = highest importance).",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
 

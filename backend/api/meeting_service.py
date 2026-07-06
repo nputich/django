@@ -171,21 +171,94 @@ def submit_slide_response(
         if not text:
             raise ValidationError("A response is required.")
 
+    defaults = {
+        "meeting": meeting,
+        "attendance": attendance,
+        "user": attendance.user,
+        "response_text": text,
+        "selected_options": selected_options,
+        "raw_text": text,
+        "normalization_status": "pending",
+        "importance_order": 1
+        if slide.slide_type
+        in (
+            MeetingSlide.SlideType.ISSUE_CARD,
+            MeetingSlide.SlideType.POLITICAL_ISSUE_CARD,
+        )
+        else None,
+    }
+
     response, _ = MeetingResponse.objects.update_or_create(
         session=session,
         slide=slide,
         participant_id=attendance.participant_id,
-        defaults={
-            "meeting": meeting,
-            "attendance": attendance,
-            "user": attendance.user,
-            "response_text": text,
-            "selected_options": selected_options,
-            "raw_text": text,
-            "normalization_status": "pending",
-        },
+        defaults=defaults,
     )
     return response
+
+
+def submit_issue_card_responses(
+    meeting: Meeting,
+    session: MeetingSession,
+    attendance: MeetingAttendance,
+    slide: MeetingSlide,
+    issues: list[dict],
+) -> list[MeetingResponse]:
+    if slide.slide_type not in (
+        MeetingSlide.SlideType.ISSUE_CARD,
+        MeetingSlide.SlideType.POLITICAL_ISSUE_CARD,
+    ):
+        raise ValidationError("This endpoint is only for issue card slides.")
+
+    if session.current_slide_id != slide.id:
+        raise ValidationError("You can only respond to the organizer's current slide.")
+
+    if session.status != MeetingSession.Status.LIVE:
+        raise ValidationError("The meeting is paused. Wait for the organizer to resume.")
+
+    cleaned: list[dict] = []
+    for item in issues:
+        text = (item.get("text") or "").strip()
+        if not text:
+            continue
+        order = item.get("importance_order")
+        cleaned.append(
+            {
+                "text": text,
+                "importance_order": int(order) if order is not None else len(cleaned) + 1,
+            }
+        )
+
+    if not cleaned:
+        raise ValidationError("Add at least one issue before submitting.")
+
+    cleaned.sort(key=lambda row: row["importance_order"])
+    for index, item in enumerate(cleaned, start=1):
+        item["importance_order"] = index
+
+    MeetingResponse.objects.filter(
+        session=session,
+        slide=slide,
+        participant_id=attendance.participant_id,
+    ).delete()
+
+    responses: list[MeetingResponse] = []
+    for item in cleaned:
+        responses.append(
+            MeetingResponse.objects.create(
+                meeting=meeting,
+                session=session,
+                slide=slide,
+                attendance=attendance,
+                user=attendance.user,
+                participant_id=attendance.participant_id,
+                response_text=item["text"],
+                raw_text=item["text"],
+                importance_order=item["importance_order"],
+                normalization_status="pending",
+            )
+        )
+    return responses
 
 
 def get_session_stats(session: MeetingSession) -> dict:
