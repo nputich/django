@@ -7,10 +7,18 @@ import "../styles/CodeResults.css";
 function Login() {
   return (
     <MarketingLayout mainClassName="landing-main landing-main--home">
-      <section className="landing-hero">
+      <section className="landing-hero landing-hero--home">
         <SiteLogo />
       </section>
-      <CodeLookup />
+      <section className="landing-code-section" aria-labelledby="landing-code-heading">
+        <h1 id="landing-code-heading" className="landing-code-heading">
+          Enter your <span className="landing-code-heading-accent">community code</span>
+        </h1>
+        <p className="landing-code-lead">
+          Search by organization or meeting code to join a session.
+        </p>
+        <CodeLookup className="landing-code-lookup--home" />
+      </section>
     </MarketingLayout>
   );
 }

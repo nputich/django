@@ -1,6 +1,6 @@
 import SiteNavLinks from "./SiteNavLinks";
 import SiteFooter from "./SiteFooter";
-import Form from "./Form";
+import HeaderLoginAccordion from "./HeaderLoginAccordion";
 import { isAccessTokenValid } from "../auth";
 import "../styles/Landing.css";
 
@@ -22,7 +22,7 @@ export default function MarketingLayout({
         </div>
         {showLoginPanel && (
           <div className="landing-nav-login">
-            <Form route="/api/token/" method="login" header />
+            <HeaderLoginAccordion />
           </div>
         )}
       </header>
