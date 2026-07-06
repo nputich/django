@@ -331,6 +331,7 @@ def get_organizer_live_payload(meeting: Meeting, session: MeetingSession) -> dic
     from django.db.models import Count
 
     from api.meeting_ai import ai_mode_enabled
+    from api.meeting_analytics import get_demographic_fields
 
     stats = get_session_stats(session)
     slide_stats = (
@@ -363,6 +364,12 @@ def get_organizer_live_payload(meeting: Meeting, session: MeetingSession) -> dic
                 "response_count": counts_by_slide.get(slide.id, 0)
                 if slide.slide_type != MeetingSlide.SlideType.PARTICIPANT_INFO
                 else profile_counts.get(slide.id, 0),
+                "is_analyzable": slide.slide_type
+                in (
+                    MeetingSlide.SlideType.STANDARD,
+                    MeetingSlide.SlideType.ISSUE_CARD,
+                    MeetingSlide.SlideType.POLITICAL_ISSUE_CARD,
+                ),
             }
         )
 
@@ -398,6 +405,7 @@ def get_organizer_live_payload(meeting: Meeting, session: MeetingSession) -> dic
             "current_slide_response_count": stats["current_slide_response_count"],
         },
         "slides": slides_payload,
+        "demographic_fields": get_demographic_fields(meeting),
     }
 
 

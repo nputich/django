@@ -385,7 +385,18 @@
 
 .host-slide-count {
   font-size: 0.875rem;
-  font-weight: 600;
+  color: var(--cb-text-secondary);
   white-space: nowrap;
-  color: var(--cb-orange);
+}
+
+.host-slide-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.35rem;
+}
+
+.dashboard-btn--small {
+  padding: 0.25rem 0.55rem;
+  font-size: 0.8rem;
 }

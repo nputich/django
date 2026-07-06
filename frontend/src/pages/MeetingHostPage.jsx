@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import api from "../api";
 import AppHeader from "../components/AppHeader";
+import HostResultsPanel from "../components/HostResultsPanel";
 import "../styles/Dashboard.css";
 
 function emptyStandardSlide(order) {
@@ -31,6 +32,8 @@ export default function MeetingHostPage() {
   const [showAddSlide, setShowAddSlide] = useState(false);
   const [exportSessionId, setExportSessionId] = useState("all");
   const [exporting, setExporting] = useState(false);
+  const [showResults, setShowResults] = useState(false);
+  const [resultsSlideId, setResultsSlideId] = useState(null);
 
   const loadLive = useCallback(async () => {
     const res = await api.get(
@@ -197,6 +200,23 @@ export default function MeetingHostPage() {
   const isScheduled = sessionStatus === "scheduled";
   const isEnded = sessionStatus === "ended";
   const canControlSlides = isLive || isPaused;
+  const canViewResults = isLive || isPaused || isEnded;
+  const currentSlideId = live.session?.current_slide_id;
+  const analyzableSlides = (live.slides || []).filter(
+    (s) =>
+      s.is_analyzable ||
+      ["standard", "issue_card", "political_issue_card"].includes(s.slide_type)
+  );
+
+  const openResults = (slideId) => {
+    const target =
+      slideId ||
+      currentSlideId ||
+      analyzableSlides.find((s) => s.response_count > 0)?.id ||
+      analyzableSlides[0]?.id;
+    setResultsSlideId(target);
+    setShowResults(true);
+  };
 
   return (
     <div className="dashboard">
@@ -330,6 +350,34 @@ export default function MeetingHostPage() {
                   ))}
                 </select>
               </div>
+              {canViewResults && analyzableSlides.length > 0 && (
+                <div className="host-control-row" style={{ marginTop: "0.75rem" }}>
+                  <button
+                    type="button"
+                    className="dashboard-btn dashboard-btn--primary"
+                    onClick={() => openResults(currentSlideId)}
+                  >
+                    View live results
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {canViewResults && !canControlSlides && analyzableSlides.length > 0 && (
+            <div className="dashboard-card">
+              <h2>Live results</h2>
+              <p className="dashboard-meta">
+                Review responses from completed questions with optional demographic
+                splits from the participant info slide.
+              </p>
+              <button
+                type="button"
+                className="dashboard-btn dashboard-btn--primary"
+                onClick={() => openResults()}
+              >
+                View live results
+              </button>
             </div>
           )}
 
@@ -480,7 +528,18 @@ export default function MeetingHostPage() {
                   {slide.title && <span> — {slide.title}</span>}
                   {slide.prompt && <p>{slide.prompt}</p>}
                 </div>
-                <span className="host-slide-count">{slide.response_count} responses</span>
+                <div className="host-slide-actions">
+                  <span className="host-slide-count">{slide.response_count} responses</span>
+                  {canViewResults && slide.is_analyzable && slide.response_count > 0 && (
+                    <button
+                      type="button"
+                      className="dashboard-btn dashboard-btn--small"
+                      onClick={() => openResults(slide.id)}
+                    >
+                      Results
+                    </button>
+                  )}
+                </div>
               </li>
             ))}
           </ul>
@@ -588,6 +647,17 @@ export default function MeetingHostPage() {
           </div>
         )}
       </main>
+
+      {showResults && (
+        <HostResultsPanel
+          slug={slug}
+          meetingId={meetingId}
+          slides={live.slides}
+          demographicFields={live.demographic_fields}
+          defaultSlideId={resultsSlideId}
+          onClose={() => setShowResults(false)}
+        />
+      )}
     </div>
   );
 }

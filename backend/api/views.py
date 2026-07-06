@@ -51,6 +51,7 @@ from .meeting_service import (
     submit_slide_response,
 )
 from .survey_service import append_survey_questions
+from .meeting_analytics import get_slide_analytics, get_slide_analytics_compare
 from .meeting_ai import process_meeting_ai, schedule_response_ai_processing
 from .org_access import (
     get_admin_organization,
@@ -850,6 +851,72 @@ class OrganizationMeetingLiveView(APIView):
             return Response({"detail": "No session found."}, status=404)
         session = MeetingSession.objects.select_related("current_slide").get(pk=session.pk)
         return Response(get_organizer_live_payload(meeting, session))
+
+
+class OrganizationMeetingAnalyticsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, slug, pk):
+        meeting, err = _get_org_meeting_admin(request, slug, pk)
+        if err:
+            return err
+
+        slide_id = request.query_params.get("slide_id")
+        if not slide_id:
+            return Response({"detail": "slide_id is required."}, status=400)
+
+        session = get_latest_session(meeting)
+        if not session:
+            return Response({"detail": "No session found."}, status=404)
+
+        slide = get_object_or_404(MeetingSlide, pk=slide_id, meeting=meeting)
+        split_field = request.query_params.get("split_field") or None
+        split_value = request.query_params.get("split_value")
+        split_compare = request.query_params.get("split_compare", "").lower() in (
+            "1",
+            "true",
+            "yes",
+        )
+        include_individual = request.query_params.get(
+            "include_individual", ""
+        ).lower() in ("1", "true", "yes")
+        if include_individual and settings.APP_ENV != "local":
+            include_individual = False
+        limit = request.query_params.get("limit", "10")
+        try:
+            limit_n = max(1, min(25, int(limit)))
+        except ValueError:
+            limit_n = 10
+
+        use_compare = split_field and (
+            split_compare
+            or split_value is None
+            or str(split_value).strip() == ""
+        )
+        if use_compare:
+            payload = get_slide_analytics_compare(
+                meeting,
+                session,
+                slide,
+                split_field=split_field,
+                limit=limit_n,
+                include_individual=include_individual,
+            )
+        else:
+            if split_field and split_value is None:
+                split_value = ""
+            payload = get_slide_analytics(
+                meeting,
+                session,
+                slide,
+                split_field=split_field,
+                split_value=split_value,
+                limit=limit_n,
+                include_individual=include_individual,
+            )
+        if payload.get("error"):
+            return Response({"detail": payload["error"]}, status=400)
+        return Response(payload)
 
 
 class OrganizationMeetingPauseView(APIView):

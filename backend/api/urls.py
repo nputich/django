@@ -55,6 +55,11 @@ urlpatterns = [
         name="org-meeting-live",
     ),
     path(
+        "organizations/<slug:slug>/meetings/<int:pk>/analytics/",
+        views.OrganizationMeetingAnalyticsView.as_view(),
+        name="org-meeting-analytics",
+    ),
+    path(
         "organizations/<slug:slug>/meetings/<int:pk>/pause/",
         views.OrganizationMeetingPauseView.as_view(),
         name="org-meeting-pause",
