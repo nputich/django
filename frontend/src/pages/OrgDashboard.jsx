@@ -95,7 +95,10 @@ export default function OrgDashboard() {
                         <h3>{survey.title}</h3>
                         <p className="dashboard-meta">
                           {survey.is_active ? "Active" : "Inactive"} ·{" "}
-                          <Link to={`/s/${survey.id}`}>Open survey</Link>
+                          <Link to={`/s/${survey.id}`}>Open survey</Link> ·{" "}
+                          <Link to={`/dashboard/${slug}/surveys/${survey.id}/edit`}>
+                            Edit
+                          </Link>
                         </p>
                       </div>
                       <div>
@@ -123,7 +126,10 @@ export default function OrgDashboard() {
                         <h3>{meeting.title}</h3>
                         <p className="dashboard-meta">
                           {meeting.access_mode} · {meeting.status} ·{" "}
-                          <Link to={`/m/${meeting.id}`}>Open meeting</Link>
+                          <Link to={`/m/${meeting.id}`}>Open meeting</Link> ·{" "}
+                          <Link to={`/dashboard/${slug}/meetings/${meeting.id}/edit`}>
+                            Edit
+                          </Link>
                         </p>
                         {meeting.status === "scheduled" && (
                           <button

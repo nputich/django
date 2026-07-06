@@ -19,6 +19,16 @@ urlpatterns = [
         name="org-survey-create",
     ),
     path(
+        "organizations/<slug:slug>/surveys/<int:pk>/",
+        views.OrganizationSurveyDetailView.as_view(),
+        name="org-survey-detail",
+    ),
+    path(
+        "organizations/<slug:slug>/surveys/<int:pk>/questions/",
+        views.OrganizationSurveyAppendQuestionsView.as_view(),
+        name="org-survey-append-questions",
+    ),
+    path(
         "organizations/<slug:slug>/meetings/",
         views.OrganizationMeetingCreateView.as_view(),
         name="org-meeting-create",

@@ -13,6 +13,8 @@ import DashboardHome from "./pages/DashboardHome";
 import OrgDashboard from "./pages/OrgDashboard";
 import CreateSurvey from "./pages/CreateSurvey";
 import CreateMeeting from "./pages/CreateMeeting";
+import EditSurvey from "./pages/EditSurvey";
+import EditMeeting from "./pages/EditMeeting";
 import MeetingHostPage from "./pages/MeetingHostPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { clearAuth } from "./auth";
@@ -65,10 +67,26 @@ function App() {
           }
         />
         <Route
+          path="/dashboard/:slug/surveys/:id/edit"
+          element={
+            <ProtectedRoute>
+              <EditSurvey />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/dashboard/:slug/meetings/new"
           element={
             <ProtectedRoute>
               <CreateMeeting />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/:slug/meetings/:id/edit"
+          element={
+            <ProtectedRoute>
+              <EditMeeting />
             </ProtectedRoute>
           }
         />

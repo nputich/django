@@ -50,6 +50,7 @@ from .meeting_service import (
     submit_issue_card_responses,
     submit_slide_response,
 )
+from .survey_service import append_survey_questions
 from .meeting_ai import process_meeting_ai, schedule_response_ai_processing
 from .org_access import (
     get_admin_organization,
@@ -65,6 +66,9 @@ from .serializers import (
     DashboardMeetingCreateSerializer,
     DashboardMeetingUpdateSerializer,
     DashboardSurveyCreateSerializer,
+    DashboardSurveyDetailSerializer,
+    DashboardSurveyUpdateSerializer,
+    SurveyAppendQuestionsSerializer,
     MeetingDetailSerializer,
     MeetingJoinSerializer,
     MeetingLeaveSerializer,
@@ -361,6 +365,71 @@ class OrganizationSurveyCreateView(APIView):
                     "code": access_code.code,
                     "label": access_code.label,
                 },
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class OrganizationSurveyDetailView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, slug, pk):
+        try:
+            organization = get_admin_organization(request.user, slug)
+        except Organization.DoesNotExist:
+            return Response(
+                {"detail": "Organization not found or you are not an admin."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        survey = get_object_or_404(
+            Survey.objects.prefetch_related("questions", "access_codes"),
+            pk=pk,
+            organization=organization,
+        )
+        return Response(DashboardSurveyDetailSerializer(survey).data)
+
+    @transaction.atomic
+    def patch(self, request, slug, pk):
+        try:
+            organization = get_admin_organization(request.user, slug)
+        except Organization.DoesNotExist:
+            return Response(
+                {"detail": "Organization not found or you are not an admin."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        survey = get_object_or_404(Survey, pk=pk, organization=organization)
+        serializer = DashboardSurveyUpdateSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        for field in ("title", "description", "is_anonymous", "is_active"):
+            if field in data:
+                setattr(survey, field, data[field])
+        survey.save()
+        survey = Survey.objects.prefetch_related("questions", "access_codes").get(pk=survey.pk)
+        return Response(DashboardSurveyDetailSerializer(survey).data)
+
+
+class OrganizationSurveyAppendQuestionsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    @transaction.atomic
+    def post(self, request, slug, pk):
+        try:
+            organization = get_admin_organization(request.user, slug)
+        except Organization.DoesNotExist:
+            return Response(
+                {"detail": "Organization not found or you are not an admin."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        survey = get_object_or_404(Survey, pk=pk, organization=organization)
+        serializer = SurveyAppendQuestionsSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        append_survey_questions(survey, serializer.validated_data["questions"])
+        survey = Survey.objects.prefetch_related("questions", "access_codes").get(pk=survey.pk)
+        return Response(
+            {
+                "detail": "Questions added.",
+                "survey": DashboardSurveyDetailSerializer(survey).data,
             },
             status=status.HTTP_201_CREATED,
         )
@@ -939,19 +1008,33 @@ class OrganizationMeetingAddSlidesView(APIView):
         if err:
             return err
         session = get_latest_session(meeting)
-        if not session or session.status not in (
+        serializer = MeetingAddSlidesSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        slide_payloads = serializer.validated_data["slides"]
+        append_meeting_slides(meeting, slide_payloads)
+
+        if session and session.status in (
             MeetingSession.Status.LIVE,
             MeetingSession.Status.PAUSED,
         ):
-            return Response(
-                {"detail": "Slides can only be added during a live or paused meeting."},
-                status=400,
-            )
-        serializer = MeetingAddSlidesSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        append_meeting_slides(meeting, serializer.validated_data["slides"])
-        session = MeetingSession.objects.select_related("current_slide").get(pk=session.pk)
-        return _control_session_response(meeting, session, "Slides added.")
+            session = MeetingSession.objects.select_related("current_slide").get(pk=session.pk)
+            return _control_session_response(meeting, session, "Slides added.")
+
+        if session and session.status == MeetingSession.Status.SCHEDULED:
+            first_slide = meeting.slides.filter(is_active=True).order_by("order", "id").first()
+            if first_slide and not session.current_slide_id:
+                session.current_slide = first_slide
+                session.started_from_slide = first_slide
+                session.save(update_fields=["current_slide", "started_from_slide"])
+
+        meeting = Meeting.objects.prefetch_related("slides", "access_codes").get(pk=meeting.pk)
+        return Response(
+            {
+                "detail": "Slides added.",
+                "meeting": MeetingDetailSerializer(meeting).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class OrganizationMeetingExportView(APIView):

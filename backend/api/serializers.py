@@ -133,6 +133,24 @@ class DashboardSurveySerializer(serializers.ModelSerializer):
         ]
 
 
+class DashboardSurveyDetailSerializer(serializers.ModelSerializer):
+    questions = SurveyQuestionSerializer(many=True, read_only=True)
+    access_codes = DashboardAccessCodeSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Survey
+        fields = [
+            "id",
+            "title",
+            "description",
+            "is_active",
+            "is_anonymous",
+            "created_at",
+            "questions",
+            "access_codes",
+        ]
+
+
 class MeetingSlideSerializer(serializers.ModelSerializer):
     participant_fields = serializers.SerializerMethodField()
 
@@ -240,6 +258,17 @@ class DashboardSurveyCreateSerializer(serializers.Serializer):
     search_description = serializers.CharField(
         required=False, allow_blank=True, max_length=500
     )
+    questions = SurveyQuestionCreateSerializer(many=True, min_length=1)
+
+
+class DashboardSurveyUpdateSerializer(serializers.Serializer):
+    title = serializers.CharField(max_length=200, required=False)
+    description = serializers.CharField(required=False, allow_blank=True)
+    is_anonymous = serializers.BooleanField(required=False)
+    is_active = serializers.BooleanField(required=False)
+
+
+class SurveyAppendQuestionsSerializer(serializers.Serializer):
     questions = SurveyQuestionCreateSerializer(many=True, min_length=1)
 
 
