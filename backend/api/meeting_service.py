@@ -136,7 +136,7 @@ def submit_slide_response(
     session: MeetingSession,
     attendance: MeetingAttendance,
     slide: MeetingSlide,
-    response_text: str = "",
+    raw_response: str = "",
     selected_options: list | None = None,
 ) -> MeetingResponse:
     if slide.slide_type == MeetingSlide.SlideType.PARTICIPANT_INFO:
@@ -149,7 +149,7 @@ def submit_slide_response(
         raise ValidationError("The meeting is paused. Wait for the organizer to resume.")
 
     selected_options = selected_options or []
-    text = response_text.strip()
+    text = raw_response.strip()
 
     if slide.slide_type == MeetingSlide.SlideType.STANDARD:
         if slide.question_format == MeetingSlide.QuestionFormat.TEXT:
@@ -175,9 +175,8 @@ def submit_slide_response(
         "meeting": meeting,
         "attendance": attendance,
         "user": attendance.user,
-        "response_text": text,
+        "raw_response": text,
         "selected_options": selected_options,
-        "raw_text": text,
         "normalization_status": "pending",
         "importance_order": 1
         if slide.slide_type
@@ -187,6 +186,20 @@ def submit_slide_response(
         )
         else None,
     }
+    if slide.slide_type == MeetingSlide.SlideType.POLITICAL_ISSUE_CARD:
+        defaults.update(
+            {
+                "normalized_response": "",
+                "major_issue": "",
+                "specific_issue": "",
+                "issue_type": "",
+                "classification_confidence": None,
+                "classification_status": "pending",
+                "review_reason": "",
+                "classified_raw_snapshot": "",
+                "classification_processed_at": None,
+            }
+        )
 
     response, _ = MeetingResponse.objects.update_or_create(
         session=session,
@@ -252,8 +265,7 @@ def submit_issue_card_responses(
                 attendance=attendance,
                 user=attendance.user,
                 participant_id=attendance.participant_id,
-                response_text=item["text"],
-                raw_text=item["text"],
+                raw_response=item["text"],
                 importance_order=item["importance_order"],
                 normalization_status="pending",
             )
@@ -383,7 +395,7 @@ def get_organizer_live_payload(meeting: Meeting, session: MeetingSession) -> dic
             meeting=meeting,
             session=session,
             normalization_status="pending",
-        ).exclude(response_text="", raw_text="").count()
+        ).exclude(raw_response="").count()
         if ai_mode_enabled(meeting)
         else 0,
         "sessions": [

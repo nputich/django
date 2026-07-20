@@ -92,6 +92,37 @@
   font-size: 1.125rem;
 }
 
+.dashboard-collapsible-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+  margin: 0 0 1rem;
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: var(--cb-font);
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--cb-text);
+  text-align: left;
+  cursor: default;
+  pointer-events: none;
+}
+
+.dashboard-collapsible-chevron {
+  display: none;
+}
+
+.dashboard-collapsible-panel {
+  display: block;
+}
+
+.dashboard-collapsible-panel-inner > :first-child {
+  margin-top: 0;
+}
+
 .dashboard-card h3 {
   margin: 0 0 0.25rem;
   font-size: 1rem;
@@ -297,6 +328,11 @@
   margin: 2rem 0;
 }
 
+.dashboard-section-title {
+  margin: 1.5rem 0 0.75rem;
+  font-size: 1.125rem;
+}
+
 .dashboard-section-header {
   display: flex;
   flex-wrap: wrap;
@@ -399,4 +435,79 @@
 .dashboard-btn--small {
   padding: 0.25rem 0.55rem;
   font-size: 0.8rem;
+}
+
+.meeting-slide-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.meeting-slide-summary {
+  margin: 0.35rem 0 0;
+}
+
+.meeting-slide-editor-body {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--cb-border);
+}
+
+.meeting-participant-fields h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+@media (max-width: 767px) {
+  .dashboard-collapsible {
+    padding: 0;
+    overflow: hidden;
+  }
+
+  .dashboard-collapsible-trigger {
+    margin: 0;
+    padding: 1rem 1.25rem;
+    background: var(--cb-bg);
+    cursor: pointer;
+    pointer-events: auto;
+    transition: background-color 0.15s;
+  }
+
+  .dashboard-collapsible-trigger:hover {
+    background: var(--cb-bg-subtle);
+  }
+
+  .dashboard-collapsible-chevron {
+    display: block;
+    flex-shrink: 0;
+    color: var(--cb-text-secondary);
+    transition: transform 0.25s ease;
+  }
+
+  .dashboard-collapsible--open .dashboard-collapsible-chevron {
+    transform: rotate(180deg);
+  }
+
+  .dashboard-collapsible-panel {
+    display: grid;
+    grid-template-rows: 0fr;
+    transition: grid-template-rows 0.3s ease;
+  }
+
+  .dashboard-collapsible--open .dashboard-collapsible-panel {
+    grid-template-rows: 1fr;
+  }
+
+  .dashboard-collapsible-panel-inner {
+    overflow: hidden;
+    min-height: 0;
+    padding: 0 1.25rem;
+  }
+
+  .dashboard-collapsible--open .dashboard-collapsible-panel-inner {
+    overflow: visible;
+    padding: 1rem 1.25rem 1.25rem;
+    border-top: 1px solid var(--cb-border);
+  }
 }

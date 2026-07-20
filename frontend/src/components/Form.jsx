@@ -21,7 +21,7 @@ function Form({ route, method, compact = false, header = false, hideFooter = fal
             if (method === "login") {
                 localStorage.setItem(ACCESS_TOKEN, res.data.access);
                 localStorage.setItem(REFRESH_TOKEN, res.data.refresh);
-                window.location.href = "/";
+                window.location.href = "/dashboard";
             } else {
                 navigate("/");
             }

@@ -10,7 +10,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from .contact_email import send_contact_notification
-from .models import AccessCode, ContactSubmission, Meeting, MeetingAttendance, MeetingSession, MeetingSlide, Note, Organization, Survey, SurveyAnswer, SurveyQuestion
+from .models import AccessCode, ContactSubmission, Meeting, MeetingAttendance, MeetingSession, MeetingSlide, Organization, Survey, SurveyAnswer, SurveyQuestion
 from .meeting_access import (
     can_start_meeting,
     end_meeting_session,
@@ -53,6 +53,7 @@ from .meeting_service import (
 from .survey_service import append_survey_questions
 from .meeting_analytics import get_slide_analytics, get_slide_analytics_compare
 from .meeting_ai import process_meeting_ai, schedule_response_ai_processing
+from .political_issue_classifier import classify_political_slide_responses
 from .org_access import (
     get_admin_organization,
     get_resource_type,
@@ -81,30 +82,21 @@ from .serializers import (
     MeetingRestartSerializer,
     MeetingAddSlidesSerializer,
     MyOrganizationSerializer,
-    NoteSerializer,
     OrganizationDashboardSerializer,
     OrganizationHubSerializer,
     SurveyDetailSerializer,
     SurveySubmitSerializer,
     UserSerializer,
 )
-class NoteListCreate(generics.ListCreateAPIView):
-    serializer_class = NoteSerializer
-    permission_classes = [IsAuthenticated]
-    def get_queryset(self):
-        return Note.objects.filter(author=self.request.user)
-    def perform_create(self, serializer):
-        serializer.save(author=self.request.user)
-class NoteDelete(generics.DestroyAPIView):
-    serializer_class = NoteSerializer
-    permission_classes = [IsAuthenticated]
-    def get_queryset(self):
-        return Note.objects.filter(author=self.request.user)
+
+
 class CreateUserView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [AllowAny]
     authentication_classes = []
+
+
 def build_access_code_result(access_code):
     org = access_code.organization
     type_slug = access_code.resource_type.slug
@@ -265,6 +257,7 @@ class OrganizationDashboardView(APIView):
                     "access_codes"
                 ),
             ),
+            "board",
         ).get(pk=organization.pk)
         return Response(OrganizationDashboardSerializer(organization).data)
 
@@ -767,7 +760,7 @@ class MeetingRespondView(APIView):
                 session,
                 attendance,
                 slide,
-                response_text=data.get("response_text", ""),
+                raw_response=data.get("raw_response", data.get("response_text", "")),
                 selected_options=data.get("selected_options", []),
             )
         except DjangoValidationError as exc:
@@ -917,6 +910,38 @@ class OrganizationMeetingAnalyticsView(APIView):
         if payload.get("error"):
             return Response({"detail": payload["error"]}, status=400)
         return Response(payload)
+
+
+class OrganizationMeetingPoliticalClassifyView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, slug, pk):
+        meeting, err = _get_org_meeting_admin(request, slug, pk)
+        if err:
+            return err
+
+        slide_id = request.query_params.get("slide_id") or request.data.get("slide_id")
+        if not slide_id:
+            return Response({"detail": "slide_id is required."}, status=400)
+
+        session = get_latest_session(meeting)
+        if not session:
+            return Response({"detail": "No session found."}, status=404)
+
+        slide = get_object_or_404(MeetingSlide, pk=slide_id, meeting=meeting)
+        if slide.slide_type != MeetingSlide.SlideType.POLITICAL_ISSUE_CARD:
+            return Response(
+                {"detail": "Classification is only available for political issue cards."},
+                status=400,
+            )
+
+        force = request.query_params.get("force", "").lower() in ("1", "true", "yes")
+        if not force:
+            force = bool(request.data.get("force"))
+
+        outcome = classify_political_slide_responses(session, slide, force=force)
+        status_code = 200 if outcome.get("status") != "error" else 500
+        return Response(outcome, status=status_code)
 
 
 class OrganizationMeetingPauseView(APIView):

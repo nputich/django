@@ -72,10 +72,10 @@ export default function OrgHubPage() {
         )}
       </section>
 
-      {org.has_board && (
+      {org.has_board !== false && (
         <section className="hub-section">
-          <h2>Message board</h2>
-          <Link to={`/org/${org.slug}/board`}>Go to message board</Link>
+          <h2>Posting board</h2>
+          <Link to={`/org/${org.slug}/board`}>View posting board</Link>
         </section>
       )}
     </div>

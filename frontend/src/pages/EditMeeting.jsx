@@ -2,38 +2,14 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import api from "../api";
 import AppHeader from "../components/AppHeader";
+import MeetingSlideEditor, {
+  emptyIssueSlide,
+  emptyParticipantInfoSlide,
+  emptyStandardSlide,
+  slideFromApi,
+  slideToPayload,
+} from "../components/MeetingSlideEditor";
 import "../styles/Dashboard.css";
-
-function emptyStandardSlide() {
-  return {
-    slide_type: "standard",
-    title: "",
-    prompt: "",
-    question_format: "text",
-    choices: [],
-    fields: [],
-  };
-}
-
-function emptyIssueSlide(slideType) {
-  return {
-    slide_type: slideType,
-    title: "",
-    prompt:
-      slideType === "political_issue_card"
-        ? "Describe a policy issue that matters to you."
-        : "Share a concern or suggestion.",
-    question_format: "",
-    choices: [],
-    fields: [],
-  };
-}
-
-function slideLabel(slide) {
-  const type = slide.slide_type.replace(/_/g, " ");
-  const text = slide.prompt || slide.title || "";
-  return `#${slide.order} ${type}${text ? `: ${text.slice(0, 50)}` : ""}`;
-}
 
 function toDatetimeLocal(iso) {
   if (!iso) return "";
@@ -41,6 +17,52 @@ function toDatetimeLocal(iso) {
   if (Number.isNaN(d.getTime())) return "";
   const pad = (n) => String(n).padStart(2, "0");
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+function validateSlides(slides) {
+  for (let index = 0; index < slides.length; index += 1) {
+    const slide = slides[index];
+    const label = `Slide ${index + 1}`;
+
+    if (slide.slide_type === "standard") {
+      if (!slide.prompt.trim() && !slide.title.trim()) {
+        return `${label}: add a prompt or title.`;
+      }
+      if (
+        ["single_choice", "multi_choice"].includes(slide.question_format) &&
+        slide.choices.filter(Boolean).length < 2
+      ) {
+        return `${label}: choice questions need at least two options.`;
+      }
+    }
+
+    if (
+      slide.slide_type === "issue_card" ||
+      slide.slide_type === "political_issue_card"
+    ) {
+      if (!slide.prompt.trim() && !slide.title.trim()) {
+        return `${label}: add a prompt or title.`;
+      }
+    }
+
+    if (slide.slide_type === "participant_info") {
+      if (!slide.fields.length) {
+        return `${label}: add at least one participant question.`;
+      }
+      for (const field of slide.fields) {
+        if (!field.label.trim()) {
+          return `${label}: each participant question needs a label.`;
+        }
+        if (
+          ["single_select", "multi_select"].includes(field.field_type) &&
+          (field.options || []).filter(Boolean).length < 2
+        ) {
+          return `${label}: "${field.label}" needs at least two options.`;
+        }
+      }
+    }
+  }
+  return "";
 }
 
 export default function EditMeeting() {
@@ -53,7 +75,8 @@ export default function EditMeeting() {
   const [allowStartEarly, setAllowStartEarly] = useState(false);
   const [isAnonymous, setIsAnonymous] = useState(false);
   const [aiMode, setAiMode] = useState("none");
-  const [newSlides, setNewSlides] = useState([emptyStandardSlide()]);
+  const [slides, setSlides] = useState([]);
+  const [expandedIndex, setExpandedIndex] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -73,6 +96,11 @@ export default function EditMeeting() {
         setAllowStartEarly(!!m.allow_start_early);
         setIsAnonymous(!!m.is_anonymous);
         setAiMode(m.ai_mode || "none");
+        const loadedSlides = (m.slides || [])
+          .slice()
+          .sort((a, b) => a.order - b.order)
+          .map(slideFromApi);
+        setSlides(loadedSlides);
       } catch (err) {
         if (!cancelled) {
           setError(err.response?.data?.detail || "Could not load meeting.");
@@ -86,54 +114,56 @@ export default function EditMeeting() {
     };
   }, [slug, id]);
 
-  const updateNewSlide = (index, field, value) => {
-    setNewSlides((prev) =>
-      prev.map((slide, i) => (i === index ? { ...slide, [field]: value } : slide))
-    );
+  const updateSlide = (index, nextSlide) => {
+    setSlides((prev) => prev.map((slide, i) => (i === index ? nextSlide : slide)));
   };
 
-  const addNewSlide = (slideType) => {
-    if (slideType === "issue_card") {
-      setNewSlides((prev) => [...prev, emptyIssueSlide("issue_card")]);
+  const addSlide = (slideType) => {
+    let nextSlide = emptyStandardSlide();
+    if (slideType === "participant_info") {
+      nextSlide = emptyParticipantInfoSlide();
+    } else if (slideType === "issue_card") {
+      nextSlide = emptyIssueSlide("issue_card");
     } else if (slideType === "political_issue_card") {
-      setNewSlides((prev) => [...prev, emptyIssueSlide("political_issue_card")]);
-    } else {
-      setNewSlides((prev) => [...prev, emptyStandardSlide()]);
+      nextSlide = emptyIssueSlide("political_issue_card");
     }
+    setSlides((prev) => {
+      const next = [...prev, nextSlide];
+      setExpandedIndex(next.length - 1);
+      return next;
+    });
   };
 
-  const removeNewSlide = (index) => {
-    if (newSlides.length <= 1) return;
-    setNewSlides((prev) => prev.filter((_, i) => i !== index));
+  const removeSlide = (index) => {
+    if (!window.confirm("Delete this slide?")) return;
+    setSlides((prev) => prev.filter((_, i) => i !== index));
+    setExpandedIndex((current) => {
+      if (current === null) return null;
+      if (current === index) return null;
+      if (current > index) return current - 1;
+      return current;
+    });
   };
-
-  const buildNewSlidePayloads = () =>
-    newSlides.map((slide) => ({
-      slide_type: slide.slide_type,
-      title: slide.title.trim(),
-      prompt: slide.prompt.trim(),
-      question_format:
-        slide.slide_type === "standard" ? slide.question_format : "",
-      choices:
-        slide.slide_type === "standard" &&
-        ["single_choice", "multi_choice"].includes(slide.question_format)
-          ? slide.choices.filter(Boolean)
-          : [],
-      fields: slide.slide_type === "participant_info" ? slide.fields : [],
-    }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError("");
     setSuccess("");
+
+    if (!slides.length) {
+      setError("Add at least one slide.");
+      return;
+    }
+
+    const slideError = validateSlides(slides);
+    if (slideError) {
+      setError(slideError);
+      return;
+    }
+
     setSubmitting(true);
-
-    const hasNewContent = newSlides.some(
-      (s) => s.prompt.trim() || s.title.trim() || s.choices?.length
-    );
-
     try {
-      await api.patch(`/api/organizations/${slug}/meetings/${id}/`, {
+      const res = await api.patch(`/api/organizations/${slug}/meetings/${id}/`, {
         title: title.trim(),
         description: description.trim(),
         scheduled_start_at: scheduledStartAt
@@ -142,28 +172,18 @@ export default function EditMeeting() {
         allow_start_early: allowStartEarly,
         is_anonymous: isAnonymous,
         ai_mode: aiMode,
+        slides: slides.map((slide, index) => slideToPayload(slide, index + 1)),
       });
 
-      if (hasNewContent) {
-        const payloads = buildNewSlidePayloads().filter(
-          (s) =>
-            s.prompt ||
-            s.title ||
-            (s.slide_type === "standard" && s.question_format !== "text" && s.choices.length)
-        );
-        if (payloads.length) {
-          const res = await api.post(
-            `/api/organizations/${slug}/meetings/${id}/slides/add/`,
-            { slides: payloads }
-          );
-          setMeeting(res.data.meeting || meeting);
-        }
-      }
-
+      setMeeting(res.data);
+      setSlides(
+        (res.data.slides || [])
+          .slice()
+          .sort((a, b) => a.order - b.order)
+          .map(slideFromApi)
+      );
+      setExpandedIndex(null);
       setSuccess("Meeting updated.");
-      setNewSlides([emptyStandardSlide()]);
-      const refreshed = await api.get(`/api/organizations/${slug}/meetings/${id}/`);
-      setMeeting(refreshed.data);
       setTimeout(() => navigate(`/dashboard/${slug}`), 2000);
     } catch (err) {
       setError(
@@ -299,118 +319,93 @@ export default function EditMeeting() {
             </select>
           </div>
 
-          <div className="dashboard-card">
-            <h2>Current slides ({meeting.slides?.length || 0})</h2>
-            {meeting.slides?.length ? (
-              <ul className="dashboard-list">
-                {meeting.slides.map((slide) => (
-                  <li key={slide.id} className="dashboard-list-item">
-                    <span>{slideLabel(slide)}</span>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="dashboard-empty">No slides yet.</p>
-            )}
-          </div>
-
           {!isLive && (
             <div className="dashboard-section">
               <div className="dashboard-section-header">
-                <h2>Add slides</h2>
+                <h2>Slides ({slides.length})</h2>
                 <div className="dashboard-section-actions">
                   <button
                     type="button"
                     className="dashboard-btn"
-                    onClick={() => addNewSlide("standard")}
+                    onClick={() => addSlide("standard")}
                   >
                     + Standard
                   </button>
                   <button
                     type="button"
                     className="dashboard-btn"
-                    onClick={() => addNewSlide("issue_card")}
+                    onClick={() => addSlide("participant_info")}
+                  >
+                    + Participant info
+                  </button>
+                  <button
+                    type="button"
+                    className="dashboard-btn"
+                    onClick={() => addSlide("issue_card")}
                   >
                     + Issue card
                   </button>
                   <button
                     type="button"
                     className="dashboard-btn"
-                    onClick={() => addNewSlide("political_issue_card")}
+                    onClick={() => addSlide("political_issue_card")}
                   >
                     + Political issue
                   </button>
                 </div>
               </div>
 
-              {newSlides.map((slide, index) => (
-                <div key={index} className="dashboard-card">
-                  <div className="dashboard-card-header">
-                    <strong>New slide {index + 1}</strong>
-                    {newSlides.length > 1 && (
-                      <button type="button" onClick={() => removeNewSlide(index)}>
-                        Remove
-                      </button>
-                    )}
-                  </div>
+              {slides.length === 0 ? (
+                <p className="dashboard-empty">No slides yet. Add one above.</p>
+              ) : (
+                slides.map((slide, index) => (
+                  <MeetingSlideEditor
+                    key={slide.id || `new-${index}`}
+                    slide={slide}
+                    order={index + 1}
+                    expanded={expandedIndex === index}
+                    onToggleExpand={() =>
+                      setExpandedIndex((current) => (current === index ? null : index))
+                    }
+                    onChange={(nextSlide) => updateSlide(index, nextSlide)}
+                    onDelete={() => removeSlide(index)}
+                    canDelete={slides.length > 1}
+                  />
+                ))
+              )}
+            </div>
+          )}
 
-                  <div className="dashboard-field">
-                    <label>Type</label>
-                    <select
-                      value={slide.slide_type}
-                      onChange={(e) => updateNewSlide(index, "slide_type", e.target.value)}
-                    >
-                      <option value="standard">Standard question</option>
-                      <option value="issue_card">Issue card</option>
-                      <option value="political_issue_card">Political issue card</option>
-                    </select>
-                  </div>
-
-                  <div className="dashboard-field">
-                    <label>Prompt</label>
-                    <textarea
-                      value={slide.prompt}
-                      onChange={(e) => updateNewSlide(index, "prompt", e.target.value)}
-                    />
-                  </div>
-
-                  {slide.slide_type === "standard" && (
-                    <>
-                      <div className="dashboard-field">
-                        <label>Format</label>
-                        <select
-                          value={slide.question_format}
-                          onChange={(e) =>
-                            updateNewSlide(index, "question_format", e.target.value)
-                          }
-                        >
-                          <option value="text">Free text</option>
-                          <option value="single_choice">Single choice</option>
-                          <option value="multi_choice">Multiple choice</option>
-                        </select>
-                      </div>
-                      {["single_choice", "multi_choice"].includes(slide.question_format) && (
-                        <div className="dashboard-field">
-                          <label>Choices (comma-separated)</label>
-                          <input
-                            value={slide.choices.join(", ")}
-                            onChange={(e) =>
-                              updateNewSlide(
-                                index,
-                                "choices",
-                                e.target.value
-                                  .split(",")
-                                  .map((s) => s.trim())
-                                  .filter(Boolean)
-                              )
-                            }
-                          />
-                        </div>
+          {isLive && slides.length > 0 && (
+            <div className="dashboard-card">
+              <h2>Current slides ({slides.length})</h2>
+              <p className="dashboard-meta">
+                Slide edits are locked while the meeting is live. End the meeting to edit
+                slides here, or add slides from host controls during the session.
+              </p>
+              <ul className="dashboard-list">
+                {slides.map((slide, index) => (
+                  <li key={slide.id || index} className="dashboard-list-item">
+                    <div>
+                      <strong>Slide {index + 1}</strong>
+                      <p className="dashboard-meta">{slide.prompt || slide.title}</p>
+                      {slide.slide_type === "standard" &&
+                        ["single_choice", "multi_choice"].includes(slide.question_format) && (
+                          <p className="dashboard-meta">
+                            Options: {(slide.choices || []).join(", ") || "None"}
+                          </p>
+                        )}
+                      {slide.slide_type === "participant_info" && (
+                        <p className="dashboard-meta">
+                          {(slide.fields || [])
+                            .map((field) => field.label)
+                            .join(", ") || "No participant questions"}
+                        </p>
                       )}
-                    </>
-                  )}
-                </div>
-              ))}
+                    </div>
+                  </li>
+                ))}
+              </ul>
             </div>
           )}
 

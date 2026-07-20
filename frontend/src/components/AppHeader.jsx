@@ -11,6 +11,9 @@ function AppHeader() {
         <Link className="landing-nav-pill" to="/dashboard">
           Dashboard
         </Link>
+        <Link className="landing-nav-pill" to="/account">
+          Account
+        </Link>
         <Link className="landing-nav-pill landing-nav-pill--logout" to="/logout">
           Log out
         </Link>

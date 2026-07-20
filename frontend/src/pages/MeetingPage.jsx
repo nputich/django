@@ -338,7 +338,7 @@ export default function MeetingPage() {
       await api.post(`/api/meetings/${id}/respond/`, {
         attendance_id: participant.attendance_id,
         slide_id: currentSlide.id,
-        response_text: responseText,
+        raw_response: responseText,
         selected_options: selectedOptions,
       });
       setCompletedSlideIds((prev) =>

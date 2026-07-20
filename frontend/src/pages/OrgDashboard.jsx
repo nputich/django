@@ -1,22 +1,47 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import api from "../api";
 import AppHeader from "../components/AppHeader";
+import DashboardCollapsibleSection from "../components/DashboardCollapsibleSection";
+import PostingBoard from "../components/PostingBoard";
 import "../styles/Dashboard.css";
+import "../styles/Board.css";
+
+function readOnlyMessage(postingMode, isAdmin) {
+  if (postingMode === "restricted" && !isAdmin) {
+    return "This board is restricted. Only organization admins can create posts; logged-in users can reply.";
+  }
+  if (postingMode === "members_only") {
+    return "Only organization members can post and reply on this board.";
+  }
+  return "Sign in to post or reply on this board.";
+}
 
 export default function OrgDashboard() {
   const { slug } = useParams();
   const [org, setOrg] = useState(null);
+  const [boardData, setBoardData] = useState(null);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  const [boardLoading, setBoardLoading] = useState(true);
   const [startingId, setStartingId] = useState(null);
+  const [boardTitle, setBoardTitle] = useState("");
+  const [boardMode, setBoardMode] = useState("public");
+  const [boardSaving, setBoardSaving] = useState(false);
+  const [boardMessage, setBoardMessage] = useState("");
 
-  const loadDashboard = () => {
+  const loadDashboard = useCallback(() => {
     setLoading(true);
     setError("");
     return api
       .get(`/api/organizations/${slug}/dashboard/`)
-      .then((res) => setOrg(res.data))
+      .then((res) => {
+        setOrg(res.data);
+        if (res.data.board) {
+          setBoardTitle(res.data.board.title || "");
+          setBoardMode(res.data.board.posting_mode || "public");
+        }
+      })
       .catch((err) => {
         setError(
           err.response?.data?.detail ||
@@ -24,11 +49,24 @@ export default function OrgDashboard() {
         );
       })
       .finally(() => setLoading(false));
-  };
+  }, [slug]);
+
+  const loadBoard = useCallback(() => {
+    setBoardLoading(true);
+    return api
+      .get(`/api/organizations/${slug}/board/`)
+      .then((res) => setBoardData(res.data))
+      .catch((err) => {
+        setBoardData(null);
+        setError(err.response?.data?.detail || "Could not load this posting board.");
+      })
+      .finally(() => setBoardLoading(false));
+  }, [slug]);
 
   useEffect(() => {
     loadDashboard();
-  }, [slug]);
+    loadBoard();
+  }, [loadDashboard, loadBoard]);
 
   const handleStartMeeting = async (meetingId) => {
     setStartingId(meetingId);
@@ -40,6 +78,49 @@ export default function OrgDashboard() {
     } finally {
       setStartingId(null);
     }
+  };
+
+  const handleSaveBoardSettings = async (e) => {
+    e.preventDefault();
+    setBoardSaving(true);
+    setBoardMessage("");
+    try {
+      await api.patch(`/api/organizations/${slug}/board/settings/`, {
+        title: boardTitle,
+        posting_mode: boardMode,
+      });
+      setBoardMessage("Board settings saved.");
+      await loadDashboard();
+      await loadBoard();
+    } catch (err) {
+      setError(err.response?.data?.detail || "Could not save board settings.");
+    } finally {
+      setBoardSaving(false);
+    }
+  };
+
+  const handleCreatePost = async (payload) => {
+    await api.post(`/api/organizations/${slug}/board/`, payload);
+    await loadBoard();
+  };
+
+  const handleDeletePost = async (postId) => {
+    if (!window.confirm("Delete this post?")) return;
+    await api.delete(`/api/organizations/${slug}/board/posts/${postId}/`);
+    await loadBoard();
+  };
+
+  const handleCreateReply = async (postId, payload) => {
+    await api.post(`/api/organizations/${slug}/board/posts/${postId}/replies/`, payload);
+    await loadBoard();
+  };
+
+  const handleDeleteReply = async (postId, replyId) => {
+    if (!window.confirm("Delete this reply?")) return;
+    await api.delete(
+      `/api/organizations/${slug}/board/posts/${postId}/replies/${replyId}/`
+    );
+    await loadBoard();
   };
 
   return (
@@ -83,8 +164,67 @@ export default function OrgDashboard() {
               </Link>
             </div>
 
-            <div className="dashboard-card">
-              <h2>Surveys</h2>
+            <DashboardCollapsibleSection id="org-board" title="Posting board" defaultOpen>
+              <p className="dashboard-meta">
+                Control who can post on your organization&apos;s public board.
+              </p>
+              <form className="dashboard-form" onSubmit={handleSaveBoardSettings}>
+                <div className="dashboard-field">
+                  <label htmlFor="board-title">Board title</label>
+                  <input
+                    id="board-title"
+                    value={boardTitle}
+                    onChange={(e) => setBoardTitle(e.target.value)}
+                  />
+                </div>
+                <div className="dashboard-field">
+                  <label htmlFor="board-mode">Who can post</label>
+                  <select
+                    id="board-mode"
+                    value={boardMode}
+                    onChange={(e) => setBoardMode(e.target.value)}
+                  >
+                    <option value="public">Everyone (logged in)</option>
+                    <option value="members_only">Members only</option>
+                    <option value="restricted">Restricted (admins only)</option>
+                  </select>
+                </div>
+                {boardMessage && (
+                  <p className="dashboard-success" style={{ margin: 0 }}>
+                    {boardMessage}
+                  </p>
+                )}
+                <button
+                  type="submit"
+                  className="dashboard-btn dashboard-btn--primary"
+                  disabled={boardSaving}
+                >
+                  {boardSaving ? "Saving..." : "Save board settings"}
+                </button>
+              </form>
+              {boardLoading && <p className="dashboard-empty">Loading board...</p>}
+              {boardData && (
+                <PostingBoard
+                  title={boardData.board?.title || `${boardData.organization_name} board`}
+                  postingMode={boardData.board?.posting_mode}
+                  postingModeLabel={boardData.board?.posting_mode_label}
+                  posts={boardData.posts}
+                  canPost={boardData.can_post}
+                  canReply={boardData.can_reply}
+                  readOnlyMessage={
+                    boardData.can_post
+                      ? ""
+                      : readOnlyMessage(boardData.board?.posting_mode, boardData.is_admin)
+                  }
+                  onCreatePost={boardData.can_post ? handleCreatePost : undefined}
+                  onCreateReply={boardData.can_reply ? handleCreateReply : undefined}
+                  onDeletePost={handleDeletePost}
+                  onDeleteReply={handleDeleteReply}
+                />
+              )}
+            </DashboardCollapsibleSection>
+
+            <DashboardCollapsibleSection id="org-surveys" title="Surveys">
               {org.surveys.length === 0 ? (
                 <p className="dashboard-empty">No surveys yet.</p>
               ) : (
@@ -112,10 +252,9 @@ export default function OrgDashboard() {
                   ))}
                 </ul>
               )}
-            </div>
+            </DashboardCollapsibleSection>
 
-            <div className="dashboard-card">
-              <h2>Meetings</h2>
+            <DashboardCollapsibleSection id="org-meetings" title="Meetings">
               {org.meetings.length === 0 ? (
                 <p className="dashboard-empty">No meetings yet.</p>
               ) : (
@@ -161,7 +300,7 @@ export default function OrgDashboard() {
                   ))}
                 </ul>
               )}
-            </div>
+            </DashboardCollapsibleSection>
           </>
         )}
       </main>

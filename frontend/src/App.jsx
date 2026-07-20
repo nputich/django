@@ -5,17 +5,21 @@ import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
 import EnterCode from "./pages/EnterCode";
 import ContactPage from "./pages/ContactPage";
+import AboutPage from "./pages/AboutPage";
 import UnderConstruction from "./pages/UnderConstruction";
 import SurveyPage from "./pages/SurveyPage";
 import OrgHubPage from "./pages/OrgHubPage";
 import MeetingPage from "./pages/MeetingPage";
+import MeetingHostPage from "./pages/MeetingHostPage";
 import DashboardHome from "./pages/DashboardHome";
 import OrgDashboard from "./pages/OrgDashboard";
 import CreateSurvey from "./pages/CreateSurvey";
 import CreateMeeting from "./pages/CreateMeeting";
 import EditSurvey from "./pages/EditSurvey";
 import EditMeeting from "./pages/EditMeeting";
-import MeetingHostPage from "./pages/MeetingHostPage";
+import CompleteProfile from "./pages/CompleteProfile";
+import AccountSettings from "./pages/AccountSettings";
+import OrgBoardPage from "./pages/OrgBoardPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { clearAuth } from "./auth";
 import { UNDER_CONSTRUCTION_ROUTES } from "./constants/siteLinks";
@@ -35,13 +39,32 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/logout" element={<Logout />} />
         <Route path="/enter-code" element={<EnterCode />} />
+        <Route path="/explore-communities" element={<Navigate to="/enter-code" replace />} />
         <Route path="/contact" element={<ContactPage />} />
+        <Route path="/about" element={<AboutPage />} />
         {UNDER_CONSTRUCTION_ROUTES.map((path) => (
           <Route key={path} path={path} element={<UnderConstruction />} />
         ))}
         <Route path="/s/:id" element={<SurveyPage />} />
         <Route path="/m/:id" element={<MeetingPage />} />
         <Route path="/org/:slug/hub" element={<OrgHubPage />} />
+        <Route path="/org/:slug/board" element={<OrgBoardPage />} />
+        <Route
+          path="/complete-profile"
+          element={
+            <ProtectedRoute skipProfileCheck>
+              <CompleteProfile />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/account"
+          element={
+            <ProtectedRoute>
+              <AccountSettings />
+            </ProtectedRoute>
+          }
+        />
         <Route
           path="/dashboard"
           element={

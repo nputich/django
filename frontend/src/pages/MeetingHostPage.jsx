@@ -600,8 +600,9 @@ export default function MeetingHostPage() {
             </button>
           </div>
           <p className="dashboard-meta">
-            Issue and political issue cards include <code>provided_answer</code>; political
-            buckets appear in export after AI runs.
+            Exports include <code>raw_response</code>, <code>normalized_response</code>,{" "}
+            <code>major_issue</code>, and <code>specific_issue</code> for political issue
+            cards after AI runs.
           </p>
         </div>
 

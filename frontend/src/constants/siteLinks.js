@@ -9,7 +9,7 @@ export const NAV_LINKS = [
     children: [
       { to: "/demo", label: "Demo" },
       { to: "/org", label: "Organization Accounts" },
-      { to: "/explore-communities", label: "Explore Communities" },
+      { to: "/enter-code", label: "Explore Communities" },
     ],
   },
   { to: "/pricing", label: "Pricing" },
@@ -26,13 +26,11 @@ export const FOOTER_LINKS = [
 ];
 
 export const UNDER_CONSTRUCTION_ROUTES = [
-  "/about",
   "/pricing",
   "/product",
   "/demo",
   "/blog",
   "/knowledge-center",
-  "/explore-communities",
   "/org",
   "/privacy",
   "/terms",

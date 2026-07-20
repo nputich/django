@@ -13,6 +13,7 @@ from api.models import (
     MeetingSlide,
     ParticipantProfileValue,
 )
+from api.political_issue_classifier import classification_summary
 
 
 def _normalize_profile_value(value: Any) -> str:
@@ -143,7 +144,22 @@ def _bars_from_counter(
     return bars
 
 
+def _issue_response_display_text(slide: MeetingSlide, response: MeetingResponse) -> str:
+    """For political issue cards, prefer classified normalized text over raw participant text."""
+    if slide.slide_type == MeetingSlide.SlideType.POLITICAL_ISSUE_CARD:
+        status = (response.classification_status or "pending").strip()
+        normalized = (response.normalized_response or "").strip()
+        if normalized and status in ("classified", "needs_review"):
+            return normalized
+    return (response.raw_response or "").strip()
+
+
 def _response_answer_text(slide: MeetingSlide, response: MeetingResponse) -> str:
+    if slide.slide_type in (
+        MeetingSlide.SlideType.ISSUE_CARD,
+        MeetingSlide.SlideType.POLITICAL_ISSUE_CARD,
+    ):
+        return _issue_response_display_text(slide, response)
     if slide.question_format in (
         MeetingSlide.QuestionFormat.SINGLE_CHOICE,
         MeetingSlide.QuestionFormat.MULTI_CHOICE,
@@ -152,13 +168,13 @@ def _response_answer_text(slide: MeetingSlide, response: MeetingResponse) -> str
             options = response.selected_options or []
             if options:
                 return ", ".join(options)
-        text = (response.response_text or response.raw_text or "").strip()
+        text = (response.raw_response or "").strip()
         if text:
             return text
         if response.selected_options:
             return response.selected_options[0]
         return ""
-    return (response.response_text or response.raw_text or "").strip()
+    return (response.raw_response or "").strip()
 
 
 def _counts_for_responses(
@@ -268,6 +284,14 @@ def _individual_responses(
                 "participant_label": label,
                 "answer": answer,
                 "demographics": profiles.get(attendance_id, {}),
+                "raw_response": response.raw_response or "",
+                "normalized_response": response.normalized_response or "",
+                "major_issue": response.major_issue or "",
+                "specific_issue": response.specific_issue or "",
+                "issue_type": response.issue_type or "",
+                "classification_status": response.classification_status or "pending",
+                "confidence": response.classification_confidence,
+                "review_reason": response.review_reason or "",
             }
         )
     return rows
@@ -294,6 +318,7 @@ def _analytics_standard(
 
 
 def _analytics_issues(
+    slide: MeetingSlide,
     responses: list[MeetingResponse],
     limit: int,
     *,
@@ -302,7 +327,7 @@ def _analytics_issues(
 ) -> list[dict]:
     counts = Counter()
     for response in responses:
-        text = (response.response_text or response.raw_text or "").strip()
+        text = _issue_response_display_text(slide, response)
         if text:
             counts[text] += 1
     return _bars_from_counter(
@@ -360,7 +385,7 @@ def get_slide_analytics(
     if slide.slide_type == MeetingSlide.SlideType.STANDARD:
         bars = _analytics_standard(slide, filtered_responses, limit)
     else:
-        bars = _analytics_issues(filtered_responses, limit)
+        bars = _analytics_issues(slide, filtered_responses, limit)
 
     individual_responses = []
     if include_individual:
@@ -368,7 +393,7 @@ def get_slide_analytics(
             meeting, session, slide, all_responses
         )
 
-    return {
+    payload = {
         "meeting_id": meeting.id,
         "session_id": session.id,
         "slide_id": slide.id,
@@ -385,6 +410,9 @@ def get_slide_analytics(
         "split_values": get_demographic_values(session, split_field) if split_field else [],
         "individual_responses": individual_responses,
     }
+    if slide.slide_type == MeetingSlide.SlideType.POLITICAL_ISSUE_CARD:
+        payload["classification"] = classification_summary(all_responses)
+    return payload
 
 
 def get_slide_analytics_compare(
@@ -463,7 +491,7 @@ def get_slide_analytics_compare(
             meeting, session, slide, all_responses
         )
 
-    return {
+    payload = {
         "meeting_id": meeting.id,
         "session_id": session.id,
         "slide_id": slide.id,
@@ -489,3 +517,6 @@ def get_slide_analytics_compare(
         "split_values": split_values,
         "individual_responses": individual_responses,
     }
+    if slide.slide_type == MeetingSlide.SlideType.POLITICAL_ISSUE_CARD:
+        payload["classification"] = classification_summary(all_responses)
+    return payload

@@ -11,11 +11,6 @@ const DEFAULT = {
 };
 
 const MESSAGES = {
-  "/about": {
-    title: "About Us",
-    body: "Learn more about communiB and our mission. This page is coming soon.",
-    back: { to: "/", label: "← Back to home" },
-  },
   "/pricing": {
     title: "Pricing",
     body: "Plans and pricing for organizations are not available yet. Please check back later.",
@@ -44,11 +39,6 @@ const MESSAGES = {
   "/knowledge-center": {
     title: "Knowledge Center",
     body: "Guides, updates, and resources from communiB. Coming soon.",
-    back: { to: "/", label: "← Back to home" },
-  },
-  "/explore-communities": {
-    title: "Explore Communities",
-    body: "Browse and discover communities on communiB. Coming soon.",
     back: { to: "/", label: "← Back to home" },
   },
   "/org": {

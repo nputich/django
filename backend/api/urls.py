@@ -1,8 +1,16 @@
 from django.urls import path
 from . import views
+from . import profile_board_views
+
 urlpatterns = [
-    path("notes/", views.NoteListCreate.as_view(), name="note-list"),
-    path("notes/delete/<int:pk>/", views.NoteDelete.as_view(), name="delete-note"),
+    path("me/", profile_board_views.MeView.as_view(), name="me"),
+    path("me/profile/", profile_board_views.MeProfileView.as_view(), name="me-profile"),
+    path("me/board/", profile_board_views.PersonalBoardView.as_view(), name="me-board"),
+    path(
+        "me/board/posts/<int:pk>/",
+        profile_board_views.PersonalBoardPostDeleteView.as_view(),
+        name="me-board-post-delete",
+    ),
     path("codes/<str:query>/resolve/", views.ResolveCodeView.as_view(), name="resolve-code"),
     path("surveys/<int:pk>/", views.SurveyDetailView.as_view(), name="survey-detail"),
     path("surveys/<int:pk>/submit/", views.SurveySubmitView.as_view(), name="survey-submit"),
@@ -60,6 +68,11 @@ urlpatterns = [
         name="org-meeting-analytics",
     ),
     path(
+        "organizations/<slug:slug>/meetings/<int:pk>/analytics/classify/",
+        views.OrganizationMeetingPoliticalClassifyView.as_view(),
+        name="org-meeting-analytics-classify",
+    ),
+    path(
         "organizations/<slug:slug>/meetings/<int:pk>/pause/",
         views.OrganizationMeetingPauseView.as_view(),
         name="org-meeting-pause",
@@ -113,6 +126,31 @@ urlpatterns = [
         "access-codes/check/",
         views.AccessCodeCheckView.as_view(),
         name="access-code-check",
+    ),
+    path(
+        "organizations/<slug:slug>/board/",
+        profile_board_views.OrganizationBoardView.as_view(),
+        name="org-board",
+    ),
+    path(
+        "organizations/<slug:slug>/board/settings/",
+        profile_board_views.OrganizationBoardSettingsView.as_view(),
+        name="org-board-settings",
+    ),
+    path(
+        "organizations/<slug:slug>/board/posts/<int:pk>/",
+        profile_board_views.OrganizationBoardPostDeleteView.as_view(),
+        name="org-board-post-delete",
+    ),
+    path(
+        "organizations/<slug:slug>/board/posts/<int:pk>/replies/",
+        profile_board_views.OrganizationBoardReplyView.as_view(),
+        name="org-board-reply-create",
+    ),
+    path(
+        "organizations/<slug:slug>/board/posts/<int:pk>/replies/<int:reply_pk>/",
+        profile_board_views.OrganizationBoardReplyDeleteView.as_view(),
+        name="org-board-reply-delete",
     ),
     path("contact/", views.ContactSubmitView.as_view(), name="contact-submit"),
 ]

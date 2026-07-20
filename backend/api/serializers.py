@@ -1,7 +1,10 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
+from .board_service import can_delete_org_post, can_delete_org_reply
 from .models import (
     AccessCode,
+    BoardPost,
+    BoardPostReply,
     Meeting,
     MeetingSession,
     MeetingSlide,
@@ -9,10 +12,11 @@ from .models import (
     Organization,
     OrganizationBoard,
     OrganizationMembership,
-    BoardPost,
+    PersonalBoardPost,
     Survey,
-    SurveyQuestion,
     SurveyAnswer,
+    SurveyQuestion,
+    UserProfile,
 )
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -229,10 +233,153 @@ class DashboardMeetingSerializer(serializers.ModelSerializer):
 class OrganizationDashboardSerializer(serializers.ModelSerializer):
     surveys = DashboardSurveySerializer(many=True, read_only=True)
     meetings = DashboardMeetingSerializer(many=True, read_only=True)
+    board = serializers.SerializerMethodField()
 
     class Meta:
         model = Organization
-        fields = ["id", "name", "slug", "description", "is_verified", "surveys", "meetings"]
+        fields = [
+            "id",
+            "name",
+            "slug",
+            "description",
+            "is_verified",
+            "surveys",
+            "meetings",
+            "board",
+        ]
+
+    def get_board(self, obj):
+        if not hasattr(obj, "board"):
+            return None
+        return OrganizationBoardPublicSerializer(obj.board).data
+
+
+def _profile_picture_url(profile, request):
+    if not profile or not profile.profile_picture:
+        return None
+    if request:
+        return request.build_absolute_uri(profile.profile_picture.url)
+    return profile.profile_picture.url
+
+
+def serialize_post_author(user, request):
+    profile = getattr(user, "profile", None)
+    if profile is None:
+        try:
+            profile = user.profile
+        except UserProfile.DoesNotExist:
+            profile = None
+    return {
+        "id": user.id,
+        "username": user.username,
+        "display_name": profile.display_name if profile else "",
+        "profile_picture_url": _profile_picture_url(profile, request),
+    }
+
+
+def build_me_payload(user, request):
+    profile, _ = UserProfile.objects.get_or_create(user=user)
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "display_name": profile.display_name,
+        "city": profile.city,
+        "state": profile.state,
+        "phone": profile.phone,
+        "contact_email": profile.contact_email,
+        "profile_picture_url": _profile_picture_url(profile, request),
+        "extra_data": profile.extra_data,
+        "profile_complete": profile.is_complete,
+        "required_fields": ["display_name", "username"],
+    }
+
+
+class UserProfileUpdateSerializer(serializers.Serializer):
+    username = serializers.CharField(max_length=150, required=False)
+    display_name = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    city = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    state = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    phone = serializers.CharField(max_length=30, required=False, allow_blank=True)
+    contact_email = serializers.EmailField(required=False, allow_blank=True)
+    profile_picture = serializers.ImageField(required=False)
+    clear_profile_picture = serializers.BooleanField(required=False, default=False)
+
+
+class BoardPostCreateSerializer(serializers.Serializer):
+    title = serializers.CharField(max_length=200)
+    body = serializers.CharField()
+
+
+class BoardPostReplyCreateSerializer(serializers.Serializer):
+    body = serializers.CharField()
+
+
+class BoardPostReplySerializer(serializers.ModelSerializer):
+    author = serializers.SerializerMethodField()
+    can_delete = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BoardPostReply
+        fields = ["id", "body", "author", "can_delete", "created_at", "updated_at"]
+
+    def get_author(self, obj):
+        return serialize_post_author(obj.author, self.context.get("request"))
+
+    def get_can_delete(self, obj):
+        request = self.context.get("request")
+        user = request.user if request else None
+        return can_delete_org_reply(obj, user)
+
+
+class BoardPostSerializer(serializers.ModelSerializer):
+    author = serializers.SerializerMethodField()
+    replies = BoardPostReplySerializer(many=True, read_only=True)
+    can_delete = serializers.SerializerMethodField()
+
+    class Meta:
+        model = BoardPost
+        fields = [
+            "id",
+            "title",
+            "body",
+            "author",
+            "can_delete",
+            "created_at",
+            "updated_at",
+            "replies",
+        ]
+
+    def get_author(self, obj):
+        return serialize_post_author(obj.author, self.context.get("request"))
+
+    def get_can_delete(self, obj):
+        request = self.context.get("request")
+        user = request.user if request else None
+        return can_delete_org_post(obj, user)
+
+
+class PersonalBoardPostSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = PersonalBoardPost
+        fields = ["id", "title", "body", "created_at", "updated_at"]
+
+
+class OrganizationBoardPublicSerializer(serializers.ModelSerializer):
+    posting_mode_label = serializers.CharField(
+        source="get_posting_mode_display", read_only=True
+    )
+
+    class Meta:
+        model = OrganizationBoard
+        fields = ["id", "title", "posting_mode", "posting_mode_label"]
+
+
+class OrganizationBoardSettingsSerializer(serializers.Serializer):
+    title = serializers.CharField(max_length=200, required=False)
+    posting_mode = serializers.ChoiceField(
+        choices=OrganizationBoard.PostingMode.choices, required=False
+    )
 
 
 class SurveyQuestionCreateSerializer(serializers.Serializer):
@@ -415,7 +562,7 @@ class MeetingProfileSubmitSerializer(serializers.Serializer):
 class MeetingRespondSerializer(serializers.Serializer):
     attendance_id = serializers.UUIDField()
     slide_id = serializers.IntegerField()
-    response_text = serializers.CharField(required=False, allow_blank=True, default="")
+    raw_response = serializers.CharField(required=False, allow_blank=True, default="")
     selected_options = serializers.ListField(
         child=serializers.CharField(), required=False, default=list
     )

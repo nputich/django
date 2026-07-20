@@ -2,6 +2,7 @@ from django.contrib import admin
 from .models import (
     AccessCode,
     BoardPost,
+    ContactSubmission,
     Meeting,
     MeetingAttendance,
     MeetingQuestion,
@@ -14,12 +15,14 @@ from .models import (
     OrganizationBoard,
     OrganizationMembership,
     ParticipantProfileValue,
+    PersonalBoard,
+    PersonalBoardPost,
     PoliticalClassification,
     ResourceType,
     Survey,
     SurveyAnswer,
     SurveyQuestion,
-    ContactSubmission,
+    UserProfile,
 )
 
 
@@ -115,7 +118,14 @@ class MeetingQuestionAdmin(admin.ModelAdmin):
 
 @admin.register(MeetingResponse)
 class MeetingResponseAdmin(admin.ModelAdmin):
-    list_display = ("meeting", "slide", "participant_id", "normalization_status", "created_at")
+    list_display = (
+        "meeting",
+        "slide",
+        "participant_id",
+        "normalization_status",
+        "classification_status",
+        "created_at",
+    )
 
 
 @admin.register(MeetingResponseAI)
@@ -127,16 +137,31 @@ class MeetingResponseAIAdmin(admin.ModelAdmin):
 class PoliticalClassificationAdmin(admin.ModelAdmin):
     list_display = (
         "response",
-        "major_issue_bucket",
-        "specific_issue_bucket",
-        "concern_bucket",
+        "major_issue",
+        "specific_issue",
         "source",
     )
 
 
 @admin.register(OrganizationBoard)
 class OrganizationBoardAdmin(admin.ModelAdmin):
-    list_display = ("organization", "title")
+    list_display = ("organization", "title", "posting_mode")
+
+
+@admin.register(UserProfile)
+class UserProfileAdmin(admin.ModelAdmin):
+    list_display = ("user", "display_name", "city", "state", "updated_at")
+    search_fields = ("user__username", "display_name")
+
+
+@admin.register(PersonalBoard)
+class PersonalBoardAdmin(admin.ModelAdmin):
+    list_display = ("user", "title", "created_at")
+
+
+@admin.register(PersonalBoardPost)
+class PersonalBoardPostAdmin(admin.ModelAdmin):
+    list_display = ("board", "title", "created_at")
 
 
 @admin.register(BoardPost)

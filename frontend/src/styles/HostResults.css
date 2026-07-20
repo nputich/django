@@ -248,3 +248,30 @@
 .host-results-individual-empty {
   margin: 0;
 }
+
+.host-results-classify {
+  margin: 0 0 0.75rem;
+  padding: 0.55rem 0.75rem;
+  border-radius: var(--cb-radius, 8px);
+  font-size: 0.9rem;
+}
+
+.host-results-classify--loading {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.host-results-classify--success {
+  background: #ecfdf5;
+  color: #047857;
+}
+
+.host-results-classify--error {
+  background: #fef2f2;
+  color: #b91c1c;
+}
+
+.host-results-classification-flag {
+  color: var(--cb-text-secondary, #6b7280);
+  font-size: 0.85rem;
+}

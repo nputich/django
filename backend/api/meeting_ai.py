@@ -34,17 +34,21 @@ from api.models import (
 
 logger = logging.getLogger(__name__)
 
-# Keyword hints for rule-based political classification (expandable; AI may add more later).
-POLITICAL_HINTS: list[tuple[str, str, str, tuple[str, ...]]] = [
-    ("Transportation", "Roads", "Potholes and road repair", ("pothole", "road", "highway", "bridge", "traffic")),
-    ("Transportation", "Public Transit", "Bus and rail service", ("bus", "transit", "train", "metro")),
-    ("Public Safety", "Police", "Police response and safety", ("police", "crime", "safety", "violence")),
-    ("Housing", "Affordable Housing", "Rent and housing costs", ("rent", "housing", "affordable", "evict")),
-    ("Education", "School Funding", "Schools and overcrowding", ("school", "education", "teacher", "classroom")),
-    ("Healthcare", "Mental Health Services", "Mental health access", ("mental health", "hospital", "clinic")),
-    ("Taxes and Budget", "Property Taxes", "Tax increases", ("tax", "property tax", "budget")),
-    ("Environment", "Water and Sewer", "Water infrastructure", ("water", "sewer", "flood")),
-    ("Local Government", "Government Transparency", "Corruption and transparency", ("corrupt", "transparent", "accountability")),
+# Keyword hints for rule-based political classification (major, specific, keywords).
+POLITICAL_HINTS: list[tuple[str, str, tuple[str, ...]]] = [
+    ("Transportation", "Roads", ("pothole", "road", "highway", "bridge", "traffic")),
+    ("Transportation", "Public Transit", ("bus", "transit", "train", "metro")),
+    ("Public Safety", "Police", ("police", "crime", "safety", "violence")),
+    ("Housing", "Affordable Housing", ("rent", "housing", "affordable", "evict")),
+    ("Education", "School Funding", ("school", "education", "teacher", "classroom")),
+    ("Healthcare", "Mental Health Services", ("mental health", "hospital", "clinic")),
+    ("Taxes and Budget", "Property Taxes", ("tax", "property tax", "budget")),
+    ("Environment", "Water and Sewer", ("water", "sewer", "flood")),
+    (
+        "Local Government",
+        "Government Transparency",
+        ("corrupt", "transparent", "accountability"),
+    ),
 ]
 
 SENTIMENT_POSITIVE = ("support", "agree", "good", "great", "yes", "improve", "thank")
@@ -53,15 +57,14 @@ SENTIMENT_NEGATIVE = ("oppose", "against", "bad", "worst", "no", "hate", "angry"
 
 @dataclass
 class PoliticalPath:
-    major_issue_bucket: str
-    specific_issue_bucket: str
-    concern_bucket: str
+    major_issue: str
+    specific_issue: str
     confidence: float = 0.5
 
 
 @dataclass
 class AnalysisResult:
-    ai_summary: str = ""
+    normalized_response: str = ""
     ai_tags: list[str] = field(default_factory=list)
     sentiment: str = ""
     support_level: str = ""
@@ -78,8 +81,8 @@ def ai_mode_enabled(meeting: Meeting) -> bool:
     return meeting.ai_mode != Meeting.AIMode.NONE
 
 
-def _response_text(response: MeetingResponse) -> str:
-    return (response.response_text or response.raw_text or "").strip()
+def _raw_response(response: MeetingResponse) -> str:
+    return (response.raw_response or "").strip()
 
 
 def _rule_sentiment(text: str) -> str:
@@ -96,26 +99,33 @@ def _rule_sentiment(text: str) -> str:
 def _rule_political_paths(text: str) -> list[PoliticalPath]:
     lower = text.lower()
     paths: list[PoliticalPath] = []
-    for major, specific, concern, keywords in POLITICAL_HINTS:
+    for major, specific, keywords in POLITICAL_HINTS:
         if any(kw in lower for kw in keywords):
             paths.append(
                 PoliticalPath(
-                    major_issue_bucket=major,
-                    specific_issue_bucket=specific,
-                    concern_bucket=concern,
+                    major_issue=major,
+                    specific_issue=specific,
                     confidence=0.55,
                 )
             )
-    if not paths and len(text) > 10:
+    if not paths and text.strip():
         paths.append(
             PoliticalPath(
-                major_issue_bucket="Community Services",
-                specific_issue_bucket="General Feedback",
-                concern_bucket=text[:200],
+                major_issue="Other",
+                specific_issue="Other",
                 confidence=0.35,
             )
         )
     return paths[:3]
+
+
+def _rule_normalized_response(text: str, slide_type: str, paths: list[PoliticalPath]) -> str:
+    if slide_type == MeetingSlide.SlideType.POLITICAL_ISSUE_CARD and paths:
+        primary = paths[0]
+        if primary.major_issue == "Other":
+            return text[:280] + ("…" if len(text) > 280 else "")
+        return f"{primary.major_issue} — {primary.specific_issue}"
+    return text[:280] + ("…" if len(text) > 280 else "")
 
 
 def _rule_analyze(text: str, slide_type: str) -> AnalysisResult:
@@ -125,8 +135,12 @@ def _rule_analyze(text: str, slide_type: str) -> AnalysisResult:
         if word not in tags:
             tags.append(word)
 
-    result = AnalysisResult(
-        ai_summary=text[:280] + ("…" if len(text) > 280 else ""),
+    paths: list[PoliticalPath] = []
+    if slide_type == MeetingSlide.SlideType.POLITICAL_ISSUE_CARD:
+        paths = _rule_political_paths(text)
+
+    return AnalysisResult(
+        normalized_response=_rule_normalized_response(text, slide_type, paths),
         ai_tags=tags[:6],
         sentiment=sentiment,
         support_level="moderate" if sentiment == "positive" else "low",
@@ -134,13 +148,9 @@ def _rule_analyze(text: str, slide_type: str) -> AnalysisResult:
         action_item="Review participant feedback" if len(text) > 20 else "",
         unresolved_question=text if "?" in text else "",
         confidence=0.45,
+        political_paths=paths,
         provider="rule_based",
     )
-    if slide_type == MeetingSlide.SlideType.POLITICAL_ISSUE_CARD:
-        result.political_paths = _rule_political_paths(text)
-    elif slide_type == MeetingSlide.SlideType.ISSUE_CARD:
-        result.political_paths = []
-    return result
 
 
 def _http_post_json(url: str, payload: dict, headers: dict | None = None, timeout: int = 60) -> dict:
@@ -161,10 +171,13 @@ Slide type: {slide_type}
 Response: {text}
 
 Return a single JSON object with keys:
-ai_summary (string), ai_tags (array of strings), sentiment (positive|negative|neutral),
+normalized_response (string, concise summary for display — not verbatim raw text),
+ai_tags (array of strings), sentiment (positive|negative|neutral),
 support_level (string), opposition_level (string), action_item (string),
 unresolved_question (string), confidence (0-1 number),
-political_paths (array of objects with major_issue_bucket, specific_issue_bucket, concern_bucket, confidence).
+political_paths (array of objects with major_issue, specific_issue, confidence).
+For political issue slides use major_issue and specific_issue taxonomy labels;
+use "Other" for both when no clear category fits.
 Use empty political_paths for non-political slides. No markdown."""
 
 
@@ -176,19 +189,45 @@ def _parse_llm_json(content: str) -> dict:
     return json.loads(content)
 
 
+def _parse_political_path(entry: dict) -> PoliticalPath | None:
+    major = (
+        entry.get("major_issue")
+        or entry.get("major_issue_bucket")
+        or ""
+    ).strip()
+    specific = (
+        entry.get("specific_issue")
+        or entry.get("specific_issue_bucket")
+        or ""
+    ).strip()
+    if not major and not specific:
+        return None
+    if not major:
+        major = "Other"
+    if not specific:
+        specific = "Other"
+    return PoliticalPath(
+        major_issue=major,
+        specific_issue=specific,
+        confidence=float(entry.get("confidence", 0.7)),
+    )
+
+
 def _llm_result_to_analysis(data: dict, provider: str) -> AnalysisResult:
-    paths = [
-        PoliticalPath(
-            major_issue_bucket=p.get("major_issue_bucket", ""),
-            specific_issue_bucket=p.get("specific_issue_bucket", ""),
-            concern_bucket=p.get("concern_bucket", ""),
-            confidence=float(p.get("confidence", 0.7)),
-        )
-        for p in data.get("political_paths", [])
-        if p.get("major_issue_bucket") or p.get("concern_bucket")
-    ]
+    paths = []
+    for entry in data.get("political_paths", []):
+        path = _parse_political_path(entry)
+        if path:
+            paths.append(path)
+
+    normalized = (
+        data.get("normalized_response")
+        or data.get("ai_summary")
+        or ""
+    ).strip()
+
     return AnalysisResult(
-        ai_summary=data.get("ai_summary", ""),
+        normalized_response=normalized,
         ai_tags=data.get("ai_tags", []) or [],
         sentiment=data.get("sentiment", ""),
         support_level=data.get("support_level", ""),
@@ -224,7 +263,18 @@ def _analyze_openai(text: str, slide_type: str, meeting: Meeting) -> AnalysisRes
             headers={"Authorization": f"Bearer {api_key}"},
         )
         content = data["choices"][0]["message"]["content"]
-        return _llm_result_to_analysis(_parse_llm_json(content), "openai")
+        result = _llm_result_to_analysis(_parse_llm_json(content), "openai")
+        if not result.normalized_response:
+            result.normalized_response = text[:280] + ("…" if len(text) > 280 else "")
+        if (
+            slide_type == MeetingSlide.SlideType.POLITICAL_ISSUE_CARD
+            and not result.political_paths
+            and text.strip()
+        ):
+            result.political_paths = [
+                PoliticalPath(major_issue="Other", specific_issue="Other", confidence=0.35)
+            ]
+        return result
     except (urllib.error.URLError, KeyError, json.JSONDecodeError, ValueError) as exc:
         logger.warning("OpenAI analysis failed: %s", exc)
         return None
@@ -248,7 +298,10 @@ def _analyze_ollama(text: str, slide_type: str, meeting: Meeting) -> AnalysisRes
             },
         )
         content = data["message"]["content"]
-        return _llm_result_to_analysis(_parse_llm_json(content), "ollama")
+        result = _llm_result_to_analysis(_parse_llm_json(content), "ollama")
+        if not result.normalized_response:
+            result.normalized_response = text[:280] + ("…" if len(text) > 280 else "")
+        return result
     except (urllib.error.URLError, KeyError, json.JSONDecodeError, ValueError) as exc:
         logger.warning("Ollama analysis failed: %s", exc)
         return None
@@ -268,24 +321,28 @@ def analyze_response(meeting: Meeting, text: str, slide_type: str) -> AnalysisRe
 
     if result is None:
         result = _rule_analyze(text, slide_type)
+    elif not result.normalized_response:
+        result.normalized_response = text[:280] + ("…" if len(text) > 280 else "")
     return result
 
 
 def _should_analyze_slide(slide: MeetingSlide | None) -> bool:
     if not slide:
         return False
+    if slide.slide_type == MeetingSlide.SlideType.POLITICAL_ISSUE_CARD:
+        return False
     return slide.slide_type in (
         MeetingSlide.SlideType.ISSUE_CARD,
-        MeetingSlide.SlideType.POLITICAL_ISSUE_CARD,
         MeetingSlide.SlideType.STANDARD,
     )
 
 
 def apply_analysis(response: MeetingResponse, analysis: AnalysisResult) -> MeetingResponseAI:
+    normalized = analysis.normalized_response or _raw_response(response)
     ai, _ = MeetingResponseAI.objects.update_or_create(
         response=response,
         defaults={
-            "ai_summary": analysis.ai_summary,
+            "ai_summary": normalized,
             "ai_tags": analysis.ai_tags,
             "sentiment": analysis.sentiment,
             "support_level": analysis.support_level,
@@ -299,20 +356,11 @@ def apply_analysis(response: MeetingResponse, analysis: AnalysisResult) -> Meeti
     )
 
     if response.slide and response.slide.slide_type == MeetingSlide.SlideType.POLITICAL_ISSUE_CARD:
-        response.political_classifications.all().delete()
-        for path in analysis.political_paths:
-            PoliticalClassification.objects.create(
-                response=response,
-                major_issue_bucket=path.major_issue_bucket,
-                specific_issue_bucket=path.specific_issue_bucket,
-                concern_bucket=path.concern_bucket,
-                source=PoliticalClassification.Source.AI,
-                confidence=path.confidence,
-            )
+        return ai
 
     response.normalization_status = "complete"
-    response.normalized_text = analysis.ai_summary or response.response_text
-    response.save(update_fields=["normalization_status", "normalized_text"])
+    response.normalized_response = normalized
+    response.save(update_fields=["normalization_status", "normalized_response"])
     return ai
 
 
@@ -325,7 +373,7 @@ def process_meeting_response(response: MeetingResponse) -> dict[str, Any]:
     if not _should_analyze_slide(slide):
         return {"processed": False, "reason": "slide_type_skipped"}
 
-    text = _response_text(response)
+    text = _raw_response(response)
     if not text:
         return {"processed": False, "reason": "empty_response"}
 
@@ -370,8 +418,20 @@ def process_session_ai(session: MeetingSession) -> dict[str, Any]:
     return {"processed": processed, "skipped": skipped, "results": results}
 
 
+def process_slide_responses_ai(
+    session: MeetingSession, slide: MeetingSlide
+) -> dict[str, Any]:
+    """Deprecated: political slides use batch classification via political_issue_classifier."""
+    from api.political_issue_classifier import classify_political_slide_responses
+
+    if slide.slide_type != MeetingSlide.SlideType.POLITICAL_ISSUE_CARD:
+        return {"processed": 0, "skipped": 0, "reason": "slide_type_skipped"}
+    return classify_political_slide_responses(session, slide)
+
+
 def process_meeting_ai(meeting: Meeting, session_id: str | None = None) -> dict[str, Any]:
     from api.meeting_export import get_sessions_for_export
+    from api.political_issue_classifier import classify_political_slide_responses
 
     if not ai_mode_enabled(meeting):
         return {"processed": 0, "skipped": 0, "reason": "ai_disabled"}
@@ -380,10 +440,37 @@ def process_meeting_ai(meeting: Meeting, session_id: str | None = None) -> dict[
     total_skipped = 0
     session_results = []
     for session in get_sessions_for_export(meeting, session_id or "all"):
-        outcome = process_session_ai(session)
-        total_processed += outcome.get("processed", 0)
-        total_skipped += outcome.get("skipped", 0)
-        session_results.append({"session_id": session.id, **outcome})
+        session_processed = 0
+        session_skipped = 0
+
+        political_slides = MeetingSlide.objects.filter(
+            meeting=meeting,
+            slide_type=MeetingSlide.SlideType.POLITICAL_ISSUE_CARD,
+        )
+        for slide in political_slides:
+            outcome = classify_political_slide_responses(session, slide)
+            session_processed += outcome.get("processed", 0)
+            session_skipped += outcome.get("skipped", 0)
+
+        qs = MeetingResponse.objects.filter(session=session).select_related("slide", "meeting")
+        for response in qs:
+            if response.slide and response.slide.slide_type == MeetingSlide.SlideType.POLITICAL_ISSUE_CARD:
+                continue
+            outcome = process_meeting_response(response)
+            if outcome.get("processed"):
+                session_processed += 1
+            else:
+                session_skipped += 1
+
+        total_processed += session_processed
+        total_skipped += session_skipped
+        session_results.append(
+            {
+                "session_id": session.id,
+                "processed": session_processed,
+                "skipped": session_skipped,
+            }
+        )
     return {
         "processed": total_processed,
         "skipped": total_skipped,
@@ -396,5 +483,10 @@ def schedule_response_ai_processing(response: MeetingResponse) -> None:
     from django.db import transaction
 
     if not ai_mode_enabled(response.meeting):
+        return
+    if (
+        response.slide
+        and response.slide.slide_type == MeetingSlide.SlideType.POLITICAL_ISSUE_CARD
+    ):
         return
     transaction.on_commit(lambda: process_meeting_response_by_id(response.id))

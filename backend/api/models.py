@@ -281,11 +281,22 @@ class MeetingResponse(models.Model):
         User, null=True, blank=True, on_delete=models.SET_NULL
     )
     participant_id = models.UUIDField(null=True, blank=True, db_index=True)
-    response_text = models.TextField(blank=True)
+    raw_response = models.TextField(blank=True)
     selected_options = models.JSONField(default=list, blank=True)
-    raw_text = models.TextField(blank=True)
-    normalized_text = models.TextField(blank=True)
+    normalized_response = models.TextField(blank=True)
     normalization_status = models.CharField(max_length=20, default="pending")
+    major_issue = models.CharField(max_length=200, blank=True)
+    specific_issue = models.CharField(max_length=200, blank=True)
+    issue_type = models.CharField(max_length=200, blank=True)
+    classification_confidence = models.FloatField(null=True, blank=True)
+    classification_status = models.CharField(max_length=20, default="pending")
+    review_reason = models.TextField(blank=True)
+    classified_raw_snapshot = models.TextField(
+        blank=True,
+        help_text="Raw response text at the last political classification run.",
+    )
+    classification_reprocess = models.BooleanField(default=False)
+    classification_processed_at = models.DateTimeField(null=True, blank=True)
     importance_order = models.PositiveIntegerField(
         null=True,
         blank=True,
@@ -322,21 +333,87 @@ class PoliticalClassification(models.Model):
     response = models.ForeignKey(
         MeetingResponse, on_delete=models.CASCADE, related_name="political_classifications"
     )
-    major_issue_bucket = models.CharField(max_length=200, blank=True)
-    specific_issue_bucket = models.CharField(max_length=200, blank=True)
-    concern_bucket = models.CharField(max_length=500, blank=True)
+    major_issue = models.CharField(max_length=200, blank=True)
+    specific_issue = models.CharField(max_length=200, blank=True)
     source = models.CharField(
         max_length=20, choices=Source.choices, default=Source.AI
     )
     confidence = models.FloatField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class UserProfile(models.Model):
+    """Extensible account profile; required fields gate dashboard access."""
+
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name="profile"
+    )
+    display_name = models.CharField(max_length=200, blank=True)
+    city = models.CharField(max_length=100, blank=True)
+    state = models.CharField(max_length=100, blank=True)
+    phone = models.CharField(max_length=30, blank=True)
+    contact_email = models.EmailField(blank=True)
+    profile_picture = models.ImageField(
+        upload_to="profiles/", blank=True, null=True
+    )
+    extra_data = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.display_name or self.user.username
+
+    @property
+    def is_complete(self) -> bool:
+        return bool(self.display_name.strip() and self.user.username.strip())
+
+
+class PersonalBoard(models.Model):
+    """Private posting board for a single user (restricted — owner only)."""
+
+    user = models.OneToOneField(
+        User, on_delete=models.CASCADE, related_name="personal_board"
+    )
+    title = models.CharField(max_length=200, default="My board")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"{self.user.username}'s board"
+
+
+class PersonalBoardPost(models.Model):
+    board = models.ForeignKey(
+        PersonalBoard, on_delete=models.CASCADE, related_name="posts"
+    )
+    title = models.CharField(max_length=200)
+    body = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+
 class OrganizationBoard(models.Model):
+    class PostingMode(models.TextChoices):
+        PUBLIC = "public", "Public"
+        MEMBERS_ONLY = "members_only", "Members only"
+        RESTRICTED = "restricted", "Restricted (admin posts only)"
+
     organization = models.OneToOneField(
         Organization, on_delete=models.CASCADE, related_name="board"
     )
     title = models.CharField(max_length=200, default="Message board")
+    posting_mode = models.CharField(
+        max_length=20,
+        choices=PostingMode.choices,
+        default=PostingMode.PUBLIC,
+    )
+
     def __str__(self):
         return f"{self.organization.name} board"
+
+
 class BoardPost(models.Model):
     board = models.ForeignKey(
         OrganizationBoard, on_delete=models.CASCADE, related_name="posts"
@@ -345,6 +422,21 @@ class BoardPost(models.Model):
     title = models.CharField(max_length=200)
     body = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+
+
+class BoardPostReply(models.Model):
+    post = models.ForeignKey(BoardPost, on_delete=models.CASCADE, related_name="replies")
+    author = models.ForeignKey(User, on_delete=models.CASCADE)
+    body = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["created_at"]
 class AccessCode(models.Model):
     code = models.CharField(max_length=32, db_index=True)
     organization = models.ForeignKey(

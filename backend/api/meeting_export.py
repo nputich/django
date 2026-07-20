@@ -27,13 +27,14 @@ MEETING_DF_COLUMNS = [
     "question_type",
     "anonymous_participant_id",
     "attendance_id",
-    "response_text",
+    "raw_response",
+    "normalized_response",
+    "major_issue",
+    "specific_issue",
+    "issue_type",
+    "classification_status",
+    "review_reason",
     "selected_option",
-    "provided_answer",
-    "major_issue_bucket",
-    "specific_issue_bucket",
-    "concern_bucket",
-    "ai_summary",
     "ai_tags",
     "sentiment",
     "support_level",
@@ -90,7 +91,6 @@ def _ai_fields(response: MeetingResponse) -> dict[str, Any]:
         ai = None
     if not ai:
         return {
-            "ai_summary": "",
             "ai_tags": "",
             "sentiment": "",
             "support_level": "",
@@ -101,7 +101,6 @@ def _ai_fields(response: MeetingResponse) -> dict[str, Any]:
             "confidence": "",
         }
     return {
-        "ai_summary": ai.ai_summary,
         "ai_tags": json.dumps(ai.ai_tags) if ai.ai_tags else "",
         "sentiment": ai.sentiment,
         "support_level": ai.support_level,
@@ -114,10 +113,6 @@ def _ai_fields(response: MeetingResponse) -> dict[str, Any]:
 
 
 def _base_row(meeting: Meeting, session: MeetingSession, response: MeetingResponse, slide: MeetingSlide) -> dict:
-    is_issue = slide.slide_type in (
-        MeetingSlide.SlideType.ISSUE_CARD,
-        MeetingSlide.SlideType.POLITICAL_ISSUE_CARD,
-    )
     row = {
         "meeting_id": meeting.id,
         "community_code": _community_code(meeting),
@@ -130,13 +125,15 @@ def _base_row(meeting: Meeting, session: MeetingSession, response: MeetingRespon
         "question_type": _question_type(slide),
         "anonymous_participant_id": str(response.participant_id) if response.participant_id else "",
         "attendance_id": str(response.attendance.attendance_id) if response.attendance_id else "",
-        "response_text": response.response_text or response.raw_text,
+        "raw_response": response.raw_response or "",
+        "normalized_response": response.normalized_response or "",
+        "major_issue": response.major_issue or "",
+        "specific_issue": response.specific_issue or "",
+        "issue_type": response.issue_type or "",
+        "classification_status": response.classification_status or "",
+        "review_reason": response.review_reason or "",
         "selected_option": _selected_option(response),
-        "provided_answer": (response.response_text or response.raw_text) if is_issue else "",
         "importance_order": response.importance_order or "",
-        "major_issue_bucket": "",
-        "specific_issue_bucket": "",
-        "concern_bucket": "",
         "timestamp": response.created_at.isoformat() if response.created_at else "",
     }
     row.update(_ai_fields(response))
@@ -148,20 +145,11 @@ def _rows_for_response(meeting: Meeting, session: MeetingSession, response: Meet
     if not slide:
         return []
 
-    classifications = list(response.political_classifications.all())
-    if slide.slide_type == MeetingSlide.SlideType.POLITICAL_ISSUE_CARD and classifications:
-        rows = []
-        for path in classifications:
-            row = _base_row(meeting, session, response, slide)
-            row["major_issue_bucket"] = path.major_issue_bucket
-            row["specific_issue_bucket"] = path.specific_issue_bucket
-            row["concern_bucket"] = path.concern_bucket
-            if path.confidence is not None:
-                row["confidence"] = path.confidence
-            rows.append(row)
-        return rows
-
-    return [_base_row(meeting, session, response, slide)]
+    row = _base_row(meeting, session, response, slide)
+    if slide.slide_type == MeetingSlide.SlideType.POLITICAL_ISSUE_CARD:
+        if response.classification_confidence is not None:
+            row["confidence"] = response.classification_confidence
+    return [row]
 
 
 def get_sessions_for_export(meeting: Meeting, session_id: str | None) -> list[MeetingSession]:

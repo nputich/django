@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import api from "../api";
 import "../styles/HostResults.css";
 
@@ -9,6 +9,10 @@ function isAnalyzableSlide(slide) {
     slide?.is_analyzable ||
     ["standard", "issue_card", "political_issue_card"].includes(slide?.slide_type)
   );
+}
+
+function isPoliticalSlide(slide) {
+  return slide?.slide_type === "political_issue_card";
 }
 
 function BarChart({ bars, compact = false }) {
@@ -72,6 +76,12 @@ function IndividualResponses({ responses, splitField, splitFieldLabel }) {
             </span>
           )}
           <span className="host-results-individual-answer"> — {row.answer}</span>
+          {row.classification_status && row.classification_status !== "classified" && (
+            <span className="host-results-classification-flag">
+              {" "}
+              · {row.classification_status.replace("_", " ")}
+            </span>
+          )}
         </li>
       ))}
     </ul>
@@ -99,6 +109,12 @@ export default function HostResultsPanel({
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [classifyState, setClassifyState] = useState("idle");
+  const [classifyMessage, setClassifyMessage] = useState("");
+  const classifyInFlightRef = useRef(false);
+  const pendingClassifyTimerRef = useRef(null);
+
+  const selectedSlide = analyzableSlides.find((slide) => slide.id === slideId);
 
   const loadAnalytics = useCallback(async () => {
     if (!slideId) return;
@@ -124,10 +140,75 @@ export default function HostResultsPanel({
     }
   }, [slug, meetingId, slideId, splitField, showIndividuals]);
 
+  const runClassification = useCallback(async () => {
+    if (!slideId || !isPoliticalSlide(selectedSlide)) return;
+    if (classifyInFlightRef.current) return;
+
+    classifyInFlightRef.current = true;
+    setClassifyState("loading");
+    setClassifyMessage("Analyzing responses…");
+
+    try {
+      const res = await api.post(
+        `/api/organizations/${slug}/meetings/${meetingId}/analytics/classify/`,
+        {},
+        { params: { slide_id: slideId } }
+      );
+      const outcome = res.data || {};
+      if (outcome.status === "skipped" && outcome.reason === "ai_disabled") {
+        setClassifyState("error");
+        setClassifyMessage("AI mode is disabled for this meeting.");
+      } else if (outcome.status === "error") {
+        setClassifyState("error");
+        setClassifyMessage(
+          outcome.detail || "Classification failed. Showing available results."
+        );
+      } else if (outcome.status === "partial") {
+        setClassifyState("error");
+        setClassifyMessage(
+          `Classified ${outcome.processed} response${outcome.processed === 1 ? "" : "s"}, but ${outcome.failed} could not be saved.`
+        );
+      } else if (outcome.processed > 0) {
+        setClassifyState("success");
+        setClassifyMessage(
+          `Classified ${outcome.processed} response${outcome.processed === 1 ? "" : "s"}.`
+        );
+      } else {
+        setClassifyState("success");
+        setClassifyMessage(outcome.message || "Responses are up to date.");
+      }
+      await loadAnalytics();
+    } catch (err) {
+      setClassifyState("error");
+      setClassifyMessage(
+        err.response?.data?.detail ||
+          "Could not classify responses. Showing available results."
+      );
+    } finally {
+      classifyInFlightRef.current = false;
+    }
+  }, [slug, meetingId, slideId, selectedSlide, loadAnalytics]);
+
   useEffect(() => {
     setLoading(true);
     loadAnalytics();
   }, [loadAnalytics]);
+
+  useEffect(() => {
+    if (!slideId || !isPoliticalSlide(selectedSlide)) {
+      setClassifyState("idle");
+      setClassifyMessage("");
+      return undefined;
+    }
+
+    runClassification();
+
+    return () => {
+      if (pendingClassifyTimerRef.current) {
+        clearTimeout(pendingClassifyTimerRef.current);
+      }
+    };
+  }, [slideId, selectedSlide?.slide_type, runClassification]);
 
   useEffect(() => {
     if (!slideId) return undefined;
@@ -137,6 +218,26 @@ export default function HostResultsPanel({
     return () => clearInterval(interval);
   }, [slideId, loadAnalytics]);
 
+  useEffect(() => {
+    if (!isPoliticalSlide(selectedSlide)) return undefined;
+    const pending = analytics?.classification?.pending || 0;
+    if (pending <= 0 || classifyInFlightRef.current) return undefined;
+
+    pendingClassifyTimerRef.current = setTimeout(() => {
+      runClassification();
+    }, 2000);
+
+    return () => {
+      if (pendingClassifyTimerRef.current) {
+        clearTimeout(pendingClassifyTimerRef.current);
+      }
+    };
+  }, [
+    analytics?.classification?.pending,
+    selectedSlide,
+    runClassification,
+  ]);
+
   const fields = analytics?.demographic_fields?.length
     ? analytics.demographic_fields
     : demographicFields || [];
@@ -145,6 +246,8 @@ export default function HostResultsPanel({
   const isCompare = Boolean(splitField && analytics?.comparisons);
   const splitFieldLabel =
     analytics?.split?.field_label || selectedField?.label || splitField;
+
+  const classification = analytics?.classification;
 
   return (
     <div
@@ -213,8 +316,35 @@ export default function HostResultsPanel({
           )}
         </div>
 
+        {isPoliticalSlide(selectedSlide) && classifyState !== "idle" && (
+          <p
+            className={`host-results-classify host-results-classify--${classifyState}`}
+            role="status"
+          >
+            {classifyMessage}
+          </p>
+        )}
+
         {analytics && (
           <p className="host-results-meta">
+            {analytics.slide_type === "political_issue_card" && (
+              <>
+                Showing normalized responses
+                {classification && (
+                  <>
+                    {" "}
+                    · {classification.classified || 0} classified
+                    {(classification.needs_review || 0) > 0 && (
+                      <> · {classification.needs_review} need review</>
+                    )}
+                    {(classification.pending || 0) > 0 && (
+                      <> · {classification.pending} pending</>
+                    )}
+                  </>
+                )}
+                .{" "}
+              </>
+            )}
             {isCompare ? (
               <>
                 Comparing <strong>{analytics.total_respondents}</strong> participant
@@ -298,6 +428,8 @@ export default function HostResultsPanel({
 
         <p className="dashboard-meta host-results-footnote">
           Results refresh every few seconds while this panel is open.
+          {analytics?.slide_type === "political_issue_card" &&
+            " Political issue charts list normalized responses, not raw participant text. Classification runs when you open live results, not on every refresh."}
           {isCompare && " Scroll sideways to compare groups; scroll down if needed."}
         </p>
       </div>
