@@ -188,7 +188,7 @@ class DirectoryOrganizationsView(APIView):
         if "state" in steps and state_slug and not state:
             return Response({"detail": "State not found."}, status=404)
         if "county" in steps and county_slug and not county:
-            return Response({"detail": "County / region not found."}, status=404)
+            return Response({"detail": "County not found."}, status=404)
 
         required_ok = True
         if "country" in steps and not country:

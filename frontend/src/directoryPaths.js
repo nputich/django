@@ -22,8 +22,7 @@ export const SCOPES = new Set([
 export const BROWSE_LEVELS = [
   { value: "national", label: "National" },
   { value: "state", label: "State" },
-  { value: "county", label: "County / Region" },
-  { value: "city", label: "City / Local" },
+  { value: "county", label: "Local" },
 ];
 
 export const GLOBAL_COUNTRY = {
@@ -38,15 +37,13 @@ export function scopeForBrowseLevel(browseLevel) {
   if (browseLevel === "national") return "national";
   if (browseLevel === "state") return "state_province";
   if (browseLevel === "county") return "local";
-  if (browseLevel === "city") return "city";
   return "national";
 }
 
 export function browseLevelFromScope(scope) {
   if (scope === "national") return "national";
   if (scope === "state_province") return "state";
-  if (scope === "local") return "county";
-  if (scope === "city") return "city";
+  if (scope === "local" || scope === "city") return "county";
   return "national";
 }
 

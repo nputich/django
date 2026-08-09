@@ -65,14 +65,17 @@ if (-not $ServiceAccount) {
 Write-Host "Backend service account: $ServiceAccount" -ForegroundColor Yellow
 
 Write-Host "Ensuring Secret Manager access for OPENAI_API_KEY..." -ForegroundColor Cyan
-# gcloud writes success notices to stderr; with $ErrorActionPreference=Stop that
-# becomes a terminating NativeCommandError. Capture instead of letting it abort.
+# gcloud writes success notices to stderr; PowerShell Stop mode treats that as fatal.
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
 $iamOut = & gcloud secrets add-iam-policy-binding OPENAI_API_KEY `
     --project $Project `
     --member="serviceAccount:$ServiceAccount" `
     --role="roles/secretmanager.secretAccessor" `
     --quiet 2>&1
-if ($LASTEXITCODE -ne 0) {
+$iamCode = $LASTEXITCODE
+$ErrorActionPreference = $prevEap
+if ($iamCode -ne 0) {
     Write-Host "Could not bind OPENAI_API_KEY (secret may not exist yet)." -ForegroundColor Yellow
     Write-Host ($iamOut | Out-String)
 } else {
@@ -80,6 +83,8 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "Deploying backend..." -ForegroundColor Cyan
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
 $backendOut = & gcloud run deploy $BackendService `
     --image $BackendImage `
     --region $Region `
@@ -87,21 +92,27 @@ $backendOut = & gcloud run deploy $BackendService `
     --update-secrets="OPENAI_API_KEY=OPENAI_API_KEY:latest" `
     --update-env-vars="OPENAI_MODEL=gpt-4o-mini,PAID_AI_MODEL=gpt-4o" `
     --quiet 2>&1
-if ($LASTEXITCODE -ne 0) {
+$backendCode = $LASTEXITCODE
+$ErrorActionPreference = $prevEap
+if ($backendCode -ne 0) {
     Write-Host ($backendOut | Out-String) -ForegroundColor Red
-    exit $LASTEXITCODE
+    exit $backendCode
 }
 Write-Host ($backendOut | Out-String)
 
 Write-Host "Deploying frontend..." -ForegroundColor Cyan
+$prevEap = $ErrorActionPreference
+$ErrorActionPreference = "Continue"
 $frontendOut = & gcloud run deploy communib `
     --image $FrontendImage `
     --region $Region `
     --project $Project `
     --quiet 2>&1
-if ($LASTEXITCODE -ne 0) {
+$frontendCode = $LASTEXITCODE
+$ErrorActionPreference = $prevEap
+if ($frontendCode -ne 0) {
     Write-Host ($frontendOut | Out-String) -ForegroundColor Red
-    exit $LASTEXITCODE
+    exit $frontendCode
 }
 Write-Host ($frontendOut | Out-String)
 

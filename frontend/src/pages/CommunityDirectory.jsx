@@ -39,22 +39,17 @@ export default function CommunityDirectory() {
   const [countries, setCountries] = useState([]);
   const [stateOptions, setStateOptions] = useState([]);
   const [countyOptions, setCountyOptions] = useState([]);
-  const [localityOptions, setLocalityOptions] = useState([]);
   const [loadingState, setLoadingState] = useState(false);
   const [loadingCounty, setLoadingCounty] = useState(false);
-  const [loadingLocality, setLoadingLocality] = useState(false);
 
   const [countryObj, setCountryObj] = useState(null);
   const [stateObj, setStateObj] = useState(null);
   const [countyObj, setCountyObj] = useState(null);
-  const [localityObj, setLocalityObj] = useState(null);
 
   const [stateQuery, setStateQuery] = useState("");
   const [countyQuery, setCountyQuery] = useState("");
-  const [localityQuery, setLocalityQuery] = useState("");
   const debouncedStateQuery = useDebouncedValue(stateQuery, DEBOUNCE_MS);
   const debouncedCountyQuery = useDebouncedValue(countyQuery, DEBOUNCE_MS);
-  const debouncedLocalityQuery = useDebouncedValue(localityQuery, DEBOUNCE_MS);
 
   const [categories, setCategories] = useState([]);
   const [subcategories, setSubcategories] = useState([]);
@@ -81,20 +76,18 @@ export default function CommunityDirectory() {
   }, [pathState.scope, navigate]);
 
   const isGlobal = pathState.scope === "international";
-  const isUnitedStates = pathState.country === US_SLUG;
   const browseLevel = isGlobal
     ? null
     : browseLevelFromScope(pathState.scope || "national");
   const browseLevelObj =
     BROWSE_LEVELS.find((level) => level.value === browseLevel) || null;
 
-  const showBrowseLevel = Boolean(countryObj && !isGlobal && isUnitedStates);
+  // Browse Level for any real country (Global has no deeper geo).
+  const showBrowseLevel = Boolean(countryObj && !isGlobal);
   const showState =
     showBrowseLevel &&
-    (browseLevel === "state" || browseLevel === "county" || browseLevel === "city");
-  const showCounty =
-    showBrowseLevel && (browseLevel === "county" || browseLevel === "city");
-  const showCity = showBrowseLevel && browseLevel === "city";
+    (browseLevel === "state" || browseLevel === "county");
+  const showCounty = showBrowseLevel && browseLevel === "county";
 
   // Load countries once.
   useEffect(() => {
@@ -121,7 +114,6 @@ export default function CommunityDirectory() {
       setCountryObj(GLOBAL_COUNTRY);
       setStateObj(null);
       setCountyObj(null);
-      setLocalityObj(null);
       return;
     }
     if (!countries.length) return;
@@ -212,55 +204,28 @@ export default function CommunityDirectory() {
     pathState.county,
   ]);
 
-  // Load / search cities.
+  // City browse level is not offered; map legacy /city/ URLs to local (county).
   useEffect(() => {
-    if (!showCity || !countyObj?.id) {
-      setLocalityOptions([]);
-      if (!pathState.locality) setLocalityObj(null);
-      return;
-    }
-    let cancelled = false;
-    setLoadingLocality(true);
-    api
-      .get("/api/directory/geo/", {
-        params: {
-          area_type: "locality",
-          parent_id: countyObj.id,
-          q: debouncedLocalityQuery,
-          limit: 200,
-        },
-      })
-      .then((res) => {
-        if (cancelled) return;
-        const list = res.data.results || [];
-        setLocalityOptions(list);
-        const match = list.find((a) => a.slug === pathState.locality);
-        if (match) setLocalityObj(match);
-        else if (pathState.locality) {
-          setLocalityObj({
-            id: `city:${pathState.locality}`,
-            slug: pathState.locality,
-            name: pathState.locality.replace(/-/g, " "),
-            area_type: "locality",
-          });
-        } else {
-          setLocalityObj(null);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setError("Could not load cities.");
-      })
-      .finally(() => {
-        if (!cancelled) setLoadingLocality(false);
-      });
-    return () => {
-      cancelled = true;
-    };
+    if (pathState.scope !== "city") return;
+    navigate(
+      buildDirectoryPath({
+        scope: "local",
+        country: pathState.country,
+        state: pathState.state,
+        county: pathState.county,
+        category: pathState.category,
+        subcategory: pathState.subcategory,
+      }),
+      { replace: true }
+    );
   }, [
-    showCity,
-    countyObj?.id,
-    debouncedLocalityQuery,
-    pathState.locality,
+    pathState.scope,
+    pathState.country,
+    pathState.state,
+    pathState.county,
+    pathState.category,
+    pathState.subcategory,
+    navigate,
   ]);
 
   const isGeoReady = geoComplete(pathState);
@@ -303,11 +268,10 @@ export default function CommunityDirectory() {
     api
       .get("/api/directory/organizations/", {
         params: {
-          scope: pathState.scope,
+          scope: pathState.scope === "city" ? "local" : pathState.scope,
           country: pathState.country || undefined,
           state: pathState.state || undefined,
           county: pathState.county || undefined,
-          locality: pathState.locality || undefined,
           category: pathState.category || undefined,
           subcategory: pathState.subcategory || undefined,
           q: debouncedOrgQuery || undefined,
@@ -331,7 +295,6 @@ export default function CommunityDirectory() {
     pathState.country,
     pathState.state,
     pathState.county,
-    pathState.locality,
     pathState.category,
     pathState.subcategory,
     debouncedOrgQuery,
@@ -381,17 +344,6 @@ export default function CommunityDirectory() {
     });
   };
 
-  const onSelectLocality = (area) => {
-    setOrgQuery("");
-    go({
-      scope: "city",
-      country: pathState.country,
-      state: pathState.state,
-      county: pathState.county,
-      locality: area?.slug || "",
-    });
-  };
-
   const crumbClick = (index) => {
     const crumb = breadcrumb[index];
     if (!crumb) return;
@@ -428,23 +380,12 @@ export default function CommunityDirectory() {
       });
       return;
     }
-    if (crumb.type === "locality") {
-      go({
-        scope: pathState.scope,
-        country: pathState.country,
-        state: pathState.state,
-        county: pathState.county,
-        locality: pathState.locality,
-      });
-      return;
-    }
     if (crumb.type === "category") {
       go({
         scope: pathState.scope,
         country: pathState.country,
         state: pathState.state,
         county: pathState.county,
-        locality: pathState.locality,
         category: pathState.category,
       });
     }
@@ -455,7 +396,6 @@ export default function CommunityDirectory() {
     country: pathState.country,
     state: pathState.state,
     county: pathState.county,
-    locality: pathState.locality,
   };
 
   const showDirectoryHome = isGeoReady && !pathState.category;
@@ -469,7 +409,6 @@ export default function CommunityDirectory() {
   const countryOptions = countries;
   const onSearchState = useCallback((q) => setStateQuery(q), []);
   const onSearchCounty = useCallback((q) => setCountyQuery(q), []);
-  const onSearchLocality = useCallback((q) => setLocalityQuery(q), []);
 
   return (
     <MarketingLayout mainClassName="landing-main">
@@ -510,11 +449,12 @@ export default function CommunityDirectory() {
               <div className="directory-stack">
                 <SearchableSelect
                   label="Country"
-                  placeholder="Search countries…"
+                  placeholder="Select a country…"
                   options={countryOptions}
                   pinnedOptions={[GLOBAL_COUNTRY]}
                   value={countryObj || GLOBAL_COUNTRY}
                   onChange={onSelectCountry}
+                  clearable={false}
                 />
 
                 {showBrowseLevel && (
@@ -526,6 +466,7 @@ export default function CommunityDirectory() {
                     onChange={onSelectBrowseLevel}
                     getOptionLabel={(o) => o?.label ?? ""}
                     getOptionKey={(o) => o?.value ?? ""}
+                    clearable={false}
                   />
                 )}
 
@@ -544,7 +485,7 @@ export default function CommunityDirectory() {
 
                 {showCounty && stateObj && (
                   <SearchableSelect
-                    label="County / Region"
+                    label="County"
                     placeholder="Search counties…"
                     options={countyOptions}
                     value={countyObj}
@@ -552,19 +493,6 @@ export default function CommunityDirectory() {
                     onSearch={onSearchCounty}
                     loading={loadingCounty}
                     emptyMessage="No matching counties"
-                  />
-                )}
-
-                {showCity && countyObj && (
-                  <SearchableSelect
-                    label="City / Locality"
-                    placeholder="Search cities…"
-                    options={localityOptions}
-                    value={localityObj}
-                    onChange={onSelectLocality}
-                    onSearch={onSearchLocality}
-                    loading={loadingLocality}
-                    emptyMessage="No matching cities yet"
                   />
                 )}
               </div>
@@ -652,13 +580,11 @@ export default function CommunityDirectory() {
                     "Select a state to see organizations."}
                   {browseLevel === "county" &&
                     !stateObj &&
-                    "Select a state, then a county / region."}
+                    "Select a state, then a county."}
                   {browseLevel === "county" &&
                     stateObj &&
                     !countyObj &&
-                    "Select a county / region to see organizations."}
-                  {browseLevel === "city" &&
-                    "Select state, county / region, then a city / locality."}
+                    "Select a county to see organizations."}
                   {browseLevel === "national" &&
                     "Loading national organizations…"}
                 </p>

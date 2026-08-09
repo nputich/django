@@ -32,11 +32,11 @@ SCOPE_META = {
         "geo_steps": ["country", "state"],
     },
     Organization.GeographicScope.LOCAL: {
-        "label": "County / Region",
+        "label": "Local",
         "geo_steps": ["country", "state", "county"],
     },
     DIRECTORY_SCOPE_CITY: {
-        "label": "City / Local",
+        "label": "City",
         "geo_steps": ["country", "state", "county", "locality"],
     },
     # Hidden until regional areas are populated:

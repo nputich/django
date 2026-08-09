@@ -12,6 +12,7 @@ export default function SearchableSelect({
   onChange,
   disabled = false,
   loading = false,
+  clearable = true,
   emptyMessage = "No matches",
   getOptionLabel = (o) => o?.name ?? "",
   getOptionKey = (o) => o?.id ?? o?.slug ?? getOptionLabel(o),
@@ -85,21 +86,25 @@ export default function SearchableSelect({
       <div className="searchable-select-control">
         <button
           type="button"
-          className="searchable-select-trigger"
+          className={`searchable-select-trigger${
+            clearable && value ? " has-clear" : ""
+          }`}
           disabled={disabled}
           aria-haspopup="listbox"
           aria-expanded={open}
           aria-labelledby={label ? `${listId}-label` : undefined}
           onClick={() => !disabled && setOpen((v) => !v)}
         >
-          <span className={displayLabel ? "" : "searchable-select-placeholder"}>
+          <span
+            className={`searchable-select-value${
+              displayLabel ? "" : " searchable-select-placeholder"
+            }`}
+          >
             {displayLabel || placeholder}
           </span>
-          <span className="searchable-select-chevron" aria-hidden="true">
-            ▾
-          </span>
+          <span className="searchable-select-chevron" aria-hidden="true" />
         </button>
-        {value && !disabled && (
+        {clearable && value && !disabled && (
           <button
             type="button"
             className="searchable-select-clear"
