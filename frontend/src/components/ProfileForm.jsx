@@ -72,12 +72,25 @@ export default function ProfileForm({
         formData.append("clear_profile_picture", "true");
       }
 
-      const res = await api.patch("/api/me/profile/", formData);
+      const res = await api.patch("/api/me/profile/", formData, {
+        headers: { "Content-Type": undefined },
+      });
       if (onSaved) {
         await onSaved(res.data);
       }
     } catch (err) {
-      setError(err.response?.data?.detail || "Could not save profile.");
+      const data = err.response?.data;
+      if (typeof data === "object" && data !== null) {
+        const firstKey = Object.keys(data)[0];
+        const val = data[firstKey];
+        setError(
+          Array.isArray(val)
+            ? `${firstKey}: ${val[0]}`
+            : data.detail || "Could not save profile."
+        );
+      } else {
+        setError("Could not save profile.");
+      }
     } finally {
       setSaving(false);
     }

@@ -278,7 +278,24 @@ def serialize_post_author(user, request):
 
 
 def build_me_payload(user, request):
-    profile, _ = UserProfile.objects.get_or_create(user=user)
+    try:
+        profile, _ = UserProfile.objects.get_or_create(user=user)
+    except Exception:
+        # Fail soft if profile tables are mid-migration or unavailable.
+        return {
+            "id": user.id,
+            "username": user.username,
+            "email": user.email,
+            "display_name": "",
+            "city": "",
+            "state": "",
+            "phone": "",
+            "contact_email": "",
+            "profile_picture_url": None,
+            "extra_data": {},
+            "profile_complete": bool(user.username),
+            "required_fields": ["display_name", "username"],
+        }
     return {
         "id": user.id,
         "username": user.username,
@@ -296,14 +313,26 @@ def build_me_payload(user, request):
 
 
 class UserProfileUpdateSerializer(serializers.Serializer):
-    username = serializers.CharField(max_length=150, required=False)
+    username = serializers.CharField(max_length=150, required=False, allow_blank=True)
     display_name = serializers.CharField(max_length=200, required=False, allow_blank=True)
     city = serializers.CharField(max_length=100, required=False, allow_blank=True)
     state = serializers.CharField(max_length=100, required=False, allow_blank=True)
     phone = serializers.CharField(max_length=30, required=False, allow_blank=True)
-    contact_email = serializers.EmailField(required=False, allow_blank=True)
+    contact_email = serializers.CharField(max_length=254, required=False, allow_blank=True)
     profile_picture = serializers.ImageField(required=False)
     clear_profile_picture = serializers.BooleanField(required=False, default=False)
+
+    def validate_contact_email(self, value):
+        value = (value or "").strip()
+        if not value:
+            return ""
+        return serializers.EmailField().run_validation(value)
+
+    def validate_username(self, value):
+        value = (value or "").strip()
+        if not value:
+            raise serializers.ValidationError("Username is required.")
+        return value
 
 
 class BoardPostCreateSerializer(serializers.Serializer):

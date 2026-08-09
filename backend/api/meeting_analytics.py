@@ -145,12 +145,22 @@ def _bars_from_counter(
 
 
 def _issue_response_display_text(slide: MeetingSlide, response: MeetingResponse) -> str:
-    """For political issue cards, prefer classified normalized text over raw participant text."""
+    """For political issue cards, chart by issue_type when classification is available."""
     if slide.slide_type == MeetingSlide.SlideType.POLITICAL_ISSUE_CARD:
         status = (response.classification_status or "pending").strip()
-        normalized = (response.normalized_response or "").strip()
-        if normalized and status in ("classified", "needs_review"):
-            return normalized
+        if status in ("classified", "needs_review"):
+            issue_type = (response.issue_type or "").strip()
+            if issue_type:
+                return issue_type
+            specific = (response.specific_issue or "").strip()
+            if specific:
+                return specific
+            major = (response.major_issue or "").strip()
+            if major:
+                return major
+            normalized = (response.normalized_response or "").strip()
+            if normalized:
+                return normalized
     return (response.raw_response or "").strip()
 
 

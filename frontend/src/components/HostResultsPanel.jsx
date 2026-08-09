@@ -329,7 +329,7 @@ export default function HostResultsPanel({
           <p className="host-results-meta">
             {analytics.slide_type === "political_issue_card" && (
               <>
-                Showing normalized responses
+                Showing issue types
                 {classification && (
                   <>
                     {" "}
