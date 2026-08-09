@@ -127,7 +127,7 @@ export default function CodeLookup({ className = "" }) {
         </button>
       </form>
       <p className="landing-code-help">
-        <Link to="/search-another-way">Search another way</Link>
+        <Link to="/communities">Search another way</Link>
       </p>
       {error && <p className="landing-code-error">{error}</p>}
       {showNoResults && <p className="landing-code-error">No results.</p>}

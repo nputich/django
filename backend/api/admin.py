@@ -3,6 +3,7 @@ from .models import (
     AccessCode,
     BoardPost,
     ContactSubmission,
+    GeographicArea,
     Meeting,
     MeetingAttendance,
     MeetingQuestion,
@@ -14,6 +15,7 @@ from .models import (
     Organization,
     OrganizationBoard,
     OrganizationMembership,
+    OrgCategory,
     ParticipantProfileValue,
     PersonalBoard,
     PersonalBoardPost,
@@ -31,10 +33,42 @@ class NoteAdmin(admin.ModelAdmin):
     list_display = ("title", "author", "created_at")
 
 
+@admin.register(GeographicArea)
+class GeographicAreaAdmin(admin.ModelAdmin):
+    list_display = ("name", "area_type", "country_code", "external_code", "parent", "is_active")
+    list_filter = ("area_type", "country_code", "is_active")
+    search_fields = ("name", "slug", "external_code")
+    raw_id_fields = ("parent",)
+
+
+@admin.register(OrgCategory)
+class OrgCategoryAdmin(admin.ModelAdmin):
+    list_display = ("name", "slug", "parent", "sort_order", "is_active")
+    list_filter = ("is_active",)
+    search_fields = ("name", "slug")
+    raw_id_fields = ("parent",)
+
+
 @admin.register(Organization)
 class OrganizationAdmin(admin.ModelAdmin):
-    list_display = ("name", "slug", "is_active", "is_verified")
+    list_display = (
+        "name",
+        "slug",
+        "geographic_scope",
+        "service_area",
+        "primary_subcategory",
+        "is_active",
+        "is_verified",
+    )
+    list_filter = ("geographic_scope", "is_active", "is_verified")
+    search_fields = ("name", "slug")
     prepopulated_fields = {"slug": ("name",)}
+    raw_id_fields = (
+        "service_area",
+        "headquarters_area",
+        "primary_subcategory",
+        "parent_organization",
+    )
 
 
 @admin.register(ResourceType)

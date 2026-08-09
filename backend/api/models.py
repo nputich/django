@@ -8,15 +8,172 @@ class Note(models.Model):
     author = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notes")
     def __str__(self):
         return self.title
+class GeographicArea(models.Model):
+    """Reusable geographic reference node (country → admin1 → admin2 / region)."""
+
+    class AreaType(models.TextChoices):
+        COUNTRY = "country", "Country"
+        ADMIN1 = "admin1", "State / Province / Territory"
+        ADMIN2 = "admin2", "County / County-equivalent"
+        # Regional multi-area nodes (Piedmont Triad, etc.) — seed later; hide in UI for now.
+        REGION = "region", "Regional area"
+
+    name = models.CharField(max_length=200)
+    slug = models.SlugField(max_length=220)
+    area_type = models.CharField(max_length=20, choices=AreaType.choices)
+    parent = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="children",
+    )
+    country_code = models.CharField(max_length=2, blank=True, db_index=True)
+    external_code = models.CharField(max_length=32, blank=True, db_index=True)
+    name_search = models.CharField(max_length=220, blank=True, db_index=True)
+    is_active = models.BooleanField(default=True)
+    sort_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["area_type", "parent", "name_search"]),
+            models.Index(fields=["country_code", "area_type"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["parent", "slug"],
+                condition=models.Q(parent__isnull=False),
+                name="uniq_geo_parent_slug",
+            ),
+            models.UniqueConstraint(
+                fields=["slug"],
+                condition=models.Q(parent__isnull=True),
+                name="uniq_geo_root_slug",
+            ),
+        ]
+        ordering = ["sort_order", "name"]
+
+    def __str__(self):
+        return self.name
+
+    def save(self, *args, **kwargs):
+        self.name_search = (self.name or "").casefold()
+        super().save(*args, **kwargs)
+
+
+class OrgCategory(models.Model):
+    """Directory taxonomy: top-level categories and subcategories (parent set)."""
+
+    name = models.CharField(max_length=200)
+    slug = models.SlugField(max_length=220)
+    parent = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="subcategories",
+    )
+    sort_order = models.PositiveIntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name_plural = "org categories"
+        ordering = ["sort_order", "name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["parent", "slug"],
+                condition=models.Q(parent__isnull=False),
+                name="uniq_orgcategory_parent_slug",
+            ),
+            models.UniqueConstraint(
+                fields=["slug"],
+                condition=models.Q(parent__isnull=True),
+                name="uniq_orgcategory_root_slug",
+            ),
+        ]
+
+    def __str__(self):
+        if self.parent_id:
+            return f"{self.parent.name} / {self.name}"
+        return self.name
+
+    @property
+    def is_subcategory(self) -> bool:
+        return self.parent_id is not None
+
+
 class Organization(models.Model):
+    class GeographicScope(models.TextChoices):
+        INTERNATIONAL = "international", "International"
+        NATIONAL = "national", "National"
+        STATE_PROVINCE = "state_province", "State / Province"
+        # Regional scope supported in data model; UI hides it until regions are seeded.
+        REGIONAL = "regional", "Regional"
+        LOCAL = "local", "Local"
+
     name = models.CharField(max_length=200)
     slug = models.SlugField(unique=True)
     description = models.TextField(blank=True)
     is_active = models.BooleanField(default=True)
     is_verified = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    # Directory dimensions (kept separate from HQ / affiliation).
+    geographic_scope = models.CharField(
+        max_length=20,
+        choices=GeographicScope.choices,
+        blank=True,
+        default="",
+    )
+    # Where the org appears in the geography-first directory (service area).
+    service_area = models.ForeignKey(
+        GeographicArea,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="organizations_serving",
+    )
+    # Optional physical / headquarters place (not used to infer scope).
+    headquarters_area = models.ForeignKey(
+        GeographicArea,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="organizations_headquartered",
+    )
+    headquarters_city = models.CharField(max_length=120, blank=True)
+    headquarters_address = models.CharField(max_length=255, blank=True)
+
+    # Primary classification: store subcategory; category is subcategory.parent.
+    primary_subcategory = models.ForeignKey(
+        OrgCategory,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="organizations",
+    )
+
+    # Optional affiliation hierarchy — does NOT grant admin permissions.
+    parent_organization = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="child_organizations",
+    )
+
+    search_aliases = models.JSONField(default=list, blank=True)
+
     def __str__(self):
         return self.name
+
+    @property
+    def primary_category(self):
+        if self.primary_subcategory_id and self.primary_subcategory.parent_id:
+            return self.primary_subcategory.parent
+        return None
+
+
 class ResourceType(models.Model):
     slug = models.SlugField(unique=True)
     name = models.CharField(max_length=100)

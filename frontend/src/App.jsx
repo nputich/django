@@ -4,6 +4,7 @@ import Root from "./components/Root";
 import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
 import EnterCode from "./pages/EnterCode";
+import CommunityDirectory from "./pages/CommunityDirectory";
 import ContactPage from "./pages/ContactPage";
 import AboutPage from "./pages/AboutPage";
 import UnderConstruction from "./pages/UnderConstruction";
@@ -39,7 +40,9 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/logout" element={<Logout />} />
         <Route path="/enter-code" element={<EnterCode />} />
-        <Route path="/explore-communities" element={<Navigate to="/enter-code" replace />} />
+        <Route path="/communities/*" element={<CommunityDirectory />} />
+        <Route path="/explore-communities" element={<Navigate to="/communities" replace />} />
+        <Route path="/search-another-way" element={<Navigate to="/communities" replace />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/about" element={<AboutPage />} />
         {UNDER_CONSTRUCTION_ROUTES.map((path) => (

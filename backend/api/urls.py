@@ -1,6 +1,7 @@
 from django.urls import path
 from . import views
 from . import profile_board_views
+from . import directory_views
 
 urlpatterns = [
     path("me/", profile_board_views.MeView.as_view(), name="me"),
@@ -10,6 +11,18 @@ urlpatterns = [
         "me/board/posts/<int:pk>/",
         profile_board_views.PersonalBoardPostDeleteView.as_view(),
         name="me-board-post-delete",
+    ),
+    path("directory/scopes/", directory_views.DirectoryScopesView.as_view(), name="directory-scopes"),
+    path("directory/geo/", directory_views.DirectoryGeoSearchView.as_view(), name="directory-geo"),
+    path(
+        "directory/categories/",
+        directory_views.DirectoryCategoriesView.as_view(),
+        name="directory-categories",
+    ),
+    path(
+        "directory/organizations/",
+        directory_views.DirectoryOrganizationsView.as_view(),
+        name="directory-organizations",
     ),
     path("codes/<str:query>/resolve/", views.ResolveCodeView.as_view(), name="resolve-code"),
     path("surveys/<int:pk>/", views.SurveyDetailView.as_view(), name="survey-detail"),
