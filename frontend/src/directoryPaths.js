@@ -3,23 +3,61 @@
  *
  * Grammar:
  *   /communities
- *   /communities/:scope
- *   /communities/:scope/:country
- *   /communities/:scope/:country/:admin1
- *   /communities/:scope/:country/:admin1/:admin2
+ *   /communities/international
+ *   /communities/national/:country
+ *   /communities/state_province/:country/:state
+ *   /communities/local/:country/:state/:county
+ *   /communities/city/:country/:state/:county/:locality
  *   … optional /cat/:category[/:subcategory]
  */
 
-const SCOPES = new Set(["international", "national", "state_province", "local"]);
+export const SCOPES = new Set([
+  "international",
+  "national",
+  "state_province",
+  "local",
+  "city",
+]);
+
+export const BROWSE_LEVELS = [
+  { value: "national", label: "National" },
+  { value: "state", label: "State" },
+  { value: "county", label: "County / Region" },
+  { value: "city", label: "City / Local" },
+];
+
+export const GLOBAL_COUNTRY = {
+  id: "global",
+  slug: "global",
+  name: "Global",
+  area_type: "global",
+};
+
+/** Map UI browse level → directory scope used in URLs / API. */
+export function scopeForBrowseLevel(browseLevel) {
+  if (browseLevel === "national") return "national";
+  if (browseLevel === "state") return "state_province";
+  if (browseLevel === "county") return "local";
+  if (browseLevel === "city") return "city";
+  return "national";
+}
+
+export function browseLevelFromScope(scope) {
+  if (scope === "national") return "national";
+  if (scope === "state_province") return "state";
+  if (scope === "local") return "county";
+  if (scope === "city") return "city";
+  return "national";
+}
 
 export function parseDirectoryPath(pathname) {
   const parts = pathname.replace(/^\/+|\/+$/g, "").split("/").filter(Boolean);
-  // parts[0] === "communities"
   const result = {
     scope: "",
     country: "",
-    admin1: "",
-    admin2: "",
+    state: "",
+    county: "",
+    locality: "",
     category: "",
     subcategory: "",
   };
@@ -40,11 +78,16 @@ export function parseDirectoryPath(pathname) {
     result.country = geoParts[0] || "";
   } else if (scope === "state_province") {
     result.country = geoParts[0] || "";
-    result.admin1 = geoParts[1] || "";
+    result.state = geoParts[1] || "";
   } else if (scope === "local") {
     result.country = geoParts[0] || "";
-    result.admin1 = geoParts[1] || "";
-    result.admin2 = geoParts[2] || "";
+    result.state = geoParts[1] || "";
+    result.county = geoParts[2] || "";
+  } else if (scope === "city") {
+    result.country = geoParts[0] || "";
+    result.state = geoParts[1] || "";
+    result.county = geoParts[2] || "";
+    result.locality = geoParts[3] || "";
   }
 
   result.category = catParts[0] || "";
@@ -55,8 +98,9 @@ export function parseDirectoryPath(pathname) {
 export function buildDirectoryPath({
   scope = "",
   country = "",
-  admin1 = "",
-  admin2 = "",
+  state = "",
+  county = "",
+  locality = "",
   category = "",
   subcategory = "",
 } = {}) {
@@ -67,11 +111,16 @@ export function buildDirectoryPath({
     parts.push(country);
   } else if (scope === "state_province") {
     if (country) parts.push(country);
-    if (country && admin1) parts.push(admin1);
+    if (country && state) parts.push(state);
   } else if (scope === "local") {
     if (country) parts.push(country);
-    if (country && admin1) parts.push(admin1);
-    if (country && admin1 && admin2) parts.push(admin2);
+    if (country && state) parts.push(state);
+    if (country && state && county) parts.push(county);
+  } else if (scope === "city") {
+    if (country) parts.push(country);
+    if (country && state) parts.push(state);
+    if (country && state && county) parts.push(county);
+    if (country && state && county && locality) parts.push(locality);
   }
 
   if (category) {
@@ -81,13 +130,20 @@ export function buildDirectoryPath({
   return parts.join("/");
 }
 
-export function geoComplete(state, scopesMeta) {
+export function geoComplete(state) {
   if (!state.scope) return false;
-  const meta = scopesMeta.find((s) => s.value === state.scope);
-  if (!meta) return false;
-  const steps = meta.geo_steps || [];
-  if (steps.includes("country") && !state.country) return false;
-  if (steps.includes("admin1") && !state.admin1) return false;
-  if (steps.includes("admin2") && !state.admin2) return false;
-  return true;
+  if (state.scope === "international") return true;
+  if (state.scope === "national") return Boolean(state.country);
+  if (state.scope === "state_province") {
+    return Boolean(state.country && state.state);
+  }
+  if (state.scope === "local") {
+    return Boolean(state.country && state.state && state.county);
+  }
+  if (state.scope === "city") {
+    return Boolean(
+      state.country && state.state && state.county && state.locality
+    );
+  }
+  return false;
 }

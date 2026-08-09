@@ -3,17 +3,19 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from api.directory_service import (
+    AREA_TYPE_PUBLIC_TO_DB,
     DIRECTORY_SCOPES,
     SCOPE_META,
     organizations_for_directory,
     resolve_area_path,
     search_areas,
+    search_localities,
     serialize_area,
     serialize_category,
     serialize_organization,
     service_area_for_scope,
 )
-from api.models import GeographicArea, Organization, OrgCategory
+from api.models import GeographicArea, OrgCategory
 
 
 class DirectoryScopesView(APIView):
@@ -39,15 +41,13 @@ class DirectoryGeoSearchView(APIView):
     authentication_classes = []
 
     def get(self, request):
-        area_type = (request.query_params.get("area_type") or "").strip()
-        if area_type not in {
-            GeographicArea.AreaType.COUNTRY,
-            GeographicArea.AreaType.ADMIN1,
-            GeographicArea.AreaType.ADMIN2,
-            # GeographicArea.AreaType.REGION,  # hidden until regional data exists
-        }:
+        area_type_raw = (request.query_params.get("area_type") or "").strip()
+        area_type = AREA_TYPE_PUBLIC_TO_DB.get(area_type_raw)
+        if not area_type:
             return Response(
-                {"detail": "area_type must be country, admin1, or admin2."},
+                {
+                    "detail": "area_type must be country, state, county, or locality."
+                },
                 status=400,
             )
 
@@ -61,29 +61,45 @@ class DirectoryGeoSearchView(APIView):
 
         if area_type != GeographicArea.AreaType.COUNTRY and parent_id is None:
             return Response(
-                {"detail": "parent_id is required for admin1 and admin2."},
+                {
+                    "detail": "parent_id is required for state, county, and locality."
+                },
                 status=400,
             )
 
         query = request.query_params.get("q", "")
         country_code = request.query_params.get("country_code", "")
         try:
-            limit = min(int(request.query_params.get("limit", 40)), 100)
+            limit = min(int(request.query_params.get("limit", 80)), 500)
         except (TypeError, ValueError):
-            limit = 40
+            limit = 80
 
-        areas = search_areas(
-            area_type=area_type,
-            parent_id=parent_id,
-            query=query,
-            country_code=country_code,
-            limit=limit,
-        )
+        if area_type == GeographicArea.AreaType.LOCALITY:
+            results = search_localities(
+                parent_id=parent_id,
+                query=query,
+                limit=limit,
+            )
+        else:
+            areas = search_areas(
+                area_type=area_type,
+                parent_id=parent_id,
+                query=query,
+                country_code=country_code,
+                limit=limit,
+            )
+            results = [serialize_area(area) for area in areas]
+
         return Response(
             {
-                "area_type": area_type,
+                "area_type": area_type_raw
+                if area_type_raw in {"country", "state", "county", "locality"}
+                else {
+                    GeographicArea.AreaType.ADMIN1: "state",
+                    GeographicArea.AreaType.ADMIN2: "county",
+                }.get(area_type, area_type_raw),
                 "query": query,
-                "results": [serialize_area(area) for area in areas],
+                "results": results,
             }
         )
 
@@ -130,55 +146,87 @@ class DirectoryOrganizationsView(APIView):
         if scope not in DIRECTORY_SCOPES:
             return Response(
                 {
-                    "detail": "scope must be international, national, state_province, or local."
+                    "detail": (
+                        "scope must be international, national, "
+                        "state_province, local, or city."
+                    )
                 },
                 status=400,
             )
 
         country_slug = (request.query_params.get("country") or "").strip()
-        admin1_slug = (request.query_params.get("admin1") or "").strip()
-        admin2_slug = (request.query_params.get("admin2") or "").strip()
+        # Prefer state/county; accept legacy admin1/admin2 query names.
+        state_slug = (
+            request.query_params.get("state")
+            or request.query_params.get("admin1")
+            or ""
+        ).strip()
+        county_slug = (
+            request.query_params.get("county")
+            or request.query_params.get("admin2")
+            or ""
+        ).strip()
+        locality_slug = (request.query_params.get("locality") or "").strip()
         category_slug = (request.query_params.get("category") or "").strip()
         subcategory_slug = (request.query_params.get("subcategory") or "").strip()
         query = request.query_params.get("q", "")
 
         path = resolve_area_path(
             country_slug=country_slug,
-            admin1_slug=admin1_slug,
-            admin2_slug=admin2_slug,
+            state_slug=state_slug,
+            county_slug=county_slug,
+            locality_slug=locality_slug,
         )
         country = path["country"]
-        admin1 = path["admin1"]
-        admin2 = path["admin2"]
+        state = path["state"]
+        county = path["county"]
+        locality = path["locality"]
 
         steps = SCOPE_META[scope]["geo_steps"]
         if "country" in steps and country_slug and not country:
             return Response({"detail": "Country not found."}, status=404)
-        if "admin1" in steps and admin1_slug and not admin1:
-            return Response({"detail": "State / province not found."}, status=404)
-        if "admin2" in steps and admin2_slug and not admin2:
-            return Response({"detail": "Local area not found."}, status=404)
+        if "state" in steps and state_slug and not state:
+            return Response({"detail": "State not found."}, status=404)
+        if "county" in steps and county_slug and not county:
+            return Response({"detail": "County / region not found."}, status=404)
 
         required_ok = True
         if "country" in steps and not country:
             required_ok = False
-        if "admin1" in steps and not admin1:
+        if "state" in steps and not state:
             required_ok = False
-        if "admin2" in steps and not admin2:
+        if "county" in steps and not county:
+            required_ok = False
+        if "locality" in steps and not locality_slug:
             required_ok = False
 
-        breadcrumb = [{"type": "scope", "value": scope, "label": SCOPE_META[scope]["label"]}]
+        breadcrumb = [
+            {"type": "scope", "value": scope, "label": SCOPE_META[scope]["label"]}
+        ]
         if country:
             breadcrumb.append(
                 {"type": "country", "value": country.slug, "label": country.name}
             )
-        if admin1:
+        if state:
             breadcrumb.append(
-                {"type": "admin1", "value": admin1.slug, "label": admin1.name}
+                {"type": "state", "value": state.slug, "label": state.name}
             )
-        if admin2:
+        if county:
             breadcrumb.append(
-                {"type": "admin2", "value": admin2.slug, "label": admin2.name}
+                {"type": "county", "value": county.slug, "label": county.name}
+            )
+        if locality_slug:
+            locality_label = (
+                locality.name
+                if locality
+                else locality_slug.replace("-", " ").title()
+            )
+            breadcrumb.append(
+                {
+                    "type": "locality",
+                    "value": locality_slug,
+                    "label": locality_label,
+                }
             )
 
         category = None
@@ -223,15 +271,21 @@ class DirectoryOrganizationsView(APIView):
             organizations_for_directory(
                 scope=scope,
                 country=country,
-                admin1=admin1,
-                admin2=admin2,
+                state=state,
+                county=county,
+                locality=locality,
+                locality_slug=locality_slug,
                 category_slug=category_slug,
                 subcategory_slug=subcategory_slug,
                 query=query,
             )[:100]
         )
         area = service_area_for_scope(
-            scope, country=country, admin1=admin1, admin2=admin2
+            scope,
+            country=country,
+            state=state,
+            county=county,
+            locality=locality,
         )
 
         empty_message = None

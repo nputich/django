@@ -34,3 +34,8 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Host "Running seed_resource_types..." -ForegroundColor Cyan
 & (Join-Path $Root "venv\Scripts\python.exe") manage.py seed_resource_types @args
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+Write-Host "Running seed_directory_data (geo + categories)..." -ForegroundColor Cyan
+& (Join-Path $Root "venv\Scripts\python.exe") manage.py seed_directory_data @args
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

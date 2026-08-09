@@ -15,6 +15,7 @@ class GeographicArea(models.Model):
         COUNTRY = "country", "Country"
         ADMIN1 = "admin1", "State / Province / Territory"
         ADMIN2 = "admin2", "County / County-equivalent"
+        LOCALITY = "locality", "City / Locality"
         # Regional multi-area nodes (Piedmont Triad, etc.) — seed later; hide in UI for now.
         REGION = "region", "Regional area"
 

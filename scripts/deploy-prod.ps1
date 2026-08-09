@@ -65,30 +65,45 @@ if (-not $ServiceAccount) {
 Write-Host "Backend service account: $ServiceAccount" -ForegroundColor Yellow
 
 Write-Host "Ensuring Secret Manager access for OPENAI_API_KEY..." -ForegroundColor Cyan
-gcloud secrets add-iam-policy-binding OPENAI_API_KEY `
+# gcloud writes success notices to stderr; with $ErrorActionPreference=Stop that
+# becomes a terminating NativeCommandError. Capture instead of letting it abort.
+$iamOut = & gcloud secrets add-iam-policy-binding OPENAI_API_KEY `
     --project $Project `
     --member="serviceAccount:$ServiceAccount" `
     --role="roles/secretmanager.secretAccessor" `
-    --quiet 2>$null
+    --quiet 2>&1
 if ($LASTEXITCODE -ne 0) {
     Write-Host "Could not bind OPENAI_API_KEY (secret may not exist yet)." -ForegroundColor Yellow
+    Write-Host ($iamOut | Out-String)
+} else {
+    Write-Host "OPENAI_API_KEY accessor binding OK." -ForegroundColor Green
 }
 
-gcloud run deploy $BackendService `
+Write-Host "Deploying backend..." -ForegroundColor Cyan
+$backendOut = & gcloud run deploy $BackendService `
     --image $BackendImage `
     --region $Region `
     --project $Project `
     --update-secrets="OPENAI_API_KEY=OPENAI_API_KEY:latest" `
     --update-env-vars="OPENAI_MODEL=gpt-4o-mini,PAID_AI_MODEL=gpt-4o" `
-    --quiet
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    --quiet 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Host ($backendOut | Out-String) -ForegroundColor Red
+    exit $LASTEXITCODE
+}
+Write-Host ($backendOut | Out-String)
 
-gcloud run deploy communib `
+Write-Host "Deploying frontend..." -ForegroundColor Cyan
+$frontendOut = & gcloud run deploy communib `
     --image $FrontendImage `
     --region $Region `
     --project $Project `
-    --quiet
-if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    --quiet 2>&1
+if ($LASTEXITCODE -ne 0) {
+    Write-Host ($frontendOut | Out-String) -ForegroundColor Red
+    exit $LASTEXITCODE
+}
+Write-Host ($frontendOut | Out-String)
 
 Write-Host "`nDone. Test:" -ForegroundColor Green
 Write-Host "  https://communib.com"
