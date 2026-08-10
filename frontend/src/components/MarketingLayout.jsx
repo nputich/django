@@ -3,6 +3,7 @@ import SiteFooter from "./SiteFooter";
 import HeaderLoginAccordion from "./HeaderLoginAccordion";
 import HeaderAccountLinks from "./HeaderAccountLinks";
 import { isAccessTokenValid } from "../auth";
+import { isDevEnvironment } from "../envFlags";
 import "../styles/Landing.css";
 
 export default function MarketingLayout({
@@ -14,18 +15,25 @@ export default function MarketingLayout({
   const loggedIn = isAccessTokenValid();
   const showLoginPanel = showLogin && !loggedIn;
   const showAccountPanel = loggedIn;
+  const isDev = isDevEnvironment();
 
   return (
-    <div className="landing">
+    <div className={isDev ? "landing landing--dev" : "landing"}>
       <header
         className={[
           "landing-nav",
+          isDev ? "landing-nav--dev" : "",
           showLoginPanel ? "landing-nav--with-login" : "",
           showAccountPanel ? "landing-nav--with-account" : "",
         ]
           .filter(Boolean)
           .join(" ")}
       >
+        {isDev && (
+          <div className="landing-dev-banner" role="status">
+            Development environment — not production
+          </div>
+        )}
         <div className="landing-nav-inner">
           <SiteNavLinks />
         </div>

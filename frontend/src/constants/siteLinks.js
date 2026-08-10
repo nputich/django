@@ -21,6 +21,7 @@ export const NAV_LINKS = [
 
 export const FOOTER_LINKS = [
   { to: "/about", label: "About Us" },
+  { to: "/contact", label: "Contact Us" },
   { to: "/careers", label: "Careers" },
   { to: "/privacy", label: "Privacy Policy" },
   { to: "/terms", label: "Terms of Service" },

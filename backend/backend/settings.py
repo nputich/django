@@ -175,13 +175,27 @@ CSRF_TRUSTED_ORIGINS = [
 
 CONTACT_INBOX_EMAIL = os.getenv("CONTACT_INBOX_EMAIL", "contactcommunib@gmail.com")
 
+
+def _env_or_file(name: str, default: str = "") -> str:
+    """Read env var, or contents of {NAME}_FILE (Docker/Secret Manager mount)."""
+    value = os.getenv(name)
+    if value:
+        return value.strip()
+    file_path = os.getenv(f"{name}_FILE")
+    if file_path and os.path.isfile(file_path):
+        with open(file_path, encoding="utf-8") as fh:
+            return fh.read().strip()
+    return default
+
+
 if os.getenv("EMAIL_HOST_USER"):
     EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
     EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
     EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
     EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() in ("1", "true", "yes")
     EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
-    EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+    # Prefer EMAIL_HOST_PASSWORD; GMAIL_KEY is the Secret Manager name used in prod.
+    EMAIL_HOST_PASSWORD = _env_or_file("EMAIL_HOST_PASSWORD") or _env_or_file("GMAIL_KEY")
     DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
 else:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"

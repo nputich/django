@@ -1,3 +1,5 @@
+import logging
+
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
@@ -11,6 +13,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from .contact_email import send_contact_notification
 from .models import AccessCode, ContactSubmission, Meeting, MeetingAttendance, MeetingSession, MeetingSlide, Organization, Survey, SurveyAnswer, SurveyQuestion
+
+logger = logging.getLogger(__name__)
 from .meeting_access import (
     can_start_meeting,
     end_meeting_session,
@@ -1222,13 +1226,16 @@ class ContactSubmitView(APIView):
                 message=message,
             )
         except Exception:
-            if settings.DEBUG:
-                pass
-            else:
-                return Response(
-                    {"detail": "Your message was saved but email could not be sent. Please try again later."},
-                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
-                )
+            logger.exception("Contact form email send failed")
+            return Response(
+                {
+                    "detail": (
+                        "Your message was saved but email could not be sent. "
+                        "Please try again later."
+                    )
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
         return Response(
             {"detail": "Thank you — your message has been sent."},
             status=status.HTTP_201_CREATED,

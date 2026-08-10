@@ -20,6 +20,53 @@
   overflow: visible;
 }
 
+/* Local / development chrome — hard to confuse with production */
+.landing-nav--dev {
+  background: #6b7280;
+  border-bottom-color: #4b5563;
+  padding-top: 0;
+}
+
+.landing-dev-banner {
+  width: 100%;
+  margin: 0 0 0.85rem;
+  padding: 0.4rem 1rem;
+  text-align: center;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: #f9fafb;
+  background: #4b5563;
+}
+
+.landing-nav--dev .landing-nav-pill {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.28);
+  color: #f9fafb;
+}
+
+.landing-nav--dev .landing-nav-pill:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.45);
+  color: #fff;
+}
+
+.landing-nav--dev .landing-nav-pill--primary {
+  background: var(--cb-orange);
+  border-color: var(--cb-orange);
+  color: #fff;
+}
+
+.landing-nav--dev .landing-nav-register a {
+  color: #f3f4f6;
+}
+
+.landing-nav--dev .form-header-login-title,
+.landing-nav--dev .landing-nav-account {
+  color: #f9fafb;
+}
+
 .landing-nav-inner {
   display: flex;
   align-items: center;
