@@ -1,0 +1,245 @@
+@import "./theme.css";
+
+.kc-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 1rem 1.25rem 2.5rem;
+}
+
+.kc-hero {
+  text-align: center;
+  margin-bottom: 1.75rem;
+}
+
+.kc-hero--article {
+  margin-bottom: 1.5rem;
+}
+
+.kc-title {
+  margin: 0 0 0.75rem;
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--cb-text);
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+}
+
+.kc-lead {
+  margin: 0;
+  color: var(--cb-text-secondary);
+  line-height: 1.6;
+  font-size: 1rem;
+}
+
+.kc-filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  padding: 0.75rem 1rem;
+  background: var(--cb-orange-light);
+  border: 1px solid var(--cb-border);
+  border-radius: var(--cb-radius);
+}
+
+.kc-filter-label {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--cb-text);
+}
+
+.kc-filter-clear {
+  border: none;
+  background: transparent;
+  color: var(--cb-orange);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.15rem 0;
+}
+
+.kc-filter-clear:hover {
+  text-decoration: underline;
+}
+
+.kc-empty {
+  margin: 0;
+  color: var(--cb-text-secondary);
+  text-align: center;
+}
+
+.kc-article-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.kc-article-card {
+  border: 1px solid var(--cb-border);
+  border-radius: var(--cb-radius-lg);
+  background: var(--cb-bg);
+  padding: 1.15rem 1.25rem 1rem;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.kc-article-card:hover {
+  border-color: var(--cb-orange);
+  box-shadow: var(--cb-shadow-sm);
+}
+
+.kc-article-card-main {
+  display: block;
+  text-decoration: none;
+  color: inherit;
+}
+
+.kc-article-card-title {
+  margin: 0 0 0.65rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--cb-text);
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+}
+
+.kc-article-card-main:hover .kc-article-card-title {
+  color: var(--cb-orange-hover);
+}
+
+.kc-article-card-blurb {
+  margin: 0 0 0.85rem;
+  color: var(--cb-text-secondary);
+  line-height: 1.65;
+  font-size: 0.975rem;
+}
+
+.kc-article-card-read {
+  display: inline-block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--cb-orange);
+}
+
+.kc-article-card-main:hover .kc-article-card-read {
+  text-decoration: underline;
+}
+
+.kc-hashtags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.9rem;
+  padding-top: 0.85rem;
+  border-top: 1px solid var(--cb-border);
+}
+
+.kc-hashtags--article {
+  justify-content: center;
+  margin-top: 1rem;
+  padding-top: 0;
+  border-top: none;
+}
+
+.kc-hashtag {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--cb-border);
+  border-radius: 999px;
+  background: var(--cb-bg-subtle);
+  color: var(--cb-text);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0.28rem 0.7rem;
+  cursor: pointer;
+  text-decoration: none;
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s;
+}
+
+.kc-hashtag:hover,
+.kc-hashtag--active {
+  border-color: var(--cb-orange);
+  background: var(--cb-orange-light);
+  color: var(--cb-text);
+}
+
+.kc-article-body {
+  text-align: left;
+  color: var(--cb-text-secondary);
+  line-height: 1.7;
+  font-size: 0.975rem;
+}
+
+.kc-article-body h1 {
+  margin: 0 0 1.25rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--cb-text);
+  letter-spacing: -0.01em;
+  line-height: 1.3;
+}
+
+.kc-article-body h2 {
+  margin: 2rem 0 0.85rem;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--cb-text);
+  letter-spacing: -0.01em;
+  line-height: 1.35;
+}
+
+.kc-article-body p {
+  margin: 0 0 1rem;
+}
+
+.kc-article-body p:last-child,
+.kc-article-body ul:last-child,
+.kc-article-body ol:last-child {
+  margin-bottom: 0;
+}
+
+.kc-article-body ul,
+.kc-article-body ol {
+  margin: 0 0 1rem;
+  padding-left: 1.25rem;
+}
+
+.kc-article-body li {
+  margin-bottom: 0.35rem;
+}
+
+.kc-article-body strong {
+  color: var(--cb-text);
+  font-weight: 700;
+}
+
+.kc-back {
+  margin-top: 2rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--cb-border);
+  font-size: 0.875rem;
+}
+
+.kc-back a {
+  color: var(--cb-orange);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.kc-back a:hover {
+  text-decoration: underline;
+}
+
+@media (max-width: 560px) {
+  .kc-title {
+    font-size: 1.65rem;
+  }
+
+  .kc-article-card-title {
+    font-size: 1.1rem;
+  }
+}

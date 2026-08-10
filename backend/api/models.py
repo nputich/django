@@ -174,6 +174,12 @@ class Organization(models.Model):
             return self.primary_subcategory.parent
         return None
 
+    def get_current_service_level(self) -> str:
+        """Authoritative effective service level (FREE when no active paid entitlement)."""
+        from .billing_service import get_current_service_level
+
+        return get_current_service_level(self)
+
 
 class ResourceType(models.Model):
     slug = models.SlugField(unique=True)
@@ -196,6 +202,95 @@ class OrganizationMembership(models.Model):
         unique_together = ("organization", "user")
     def __str__(self):
         return f"{self.user.username} @ {self.organization.name}"
+
+
+class OrganizationService(models.Model):
+    """
+    Billing entitlement for an organization.
+
+    Organizations without an ACTIVE paid entitlement resolve to FREE.
+    Do not require a row for the free tier.
+    """
+
+    class ServiceLevel(models.TextChoices):
+        FREE = "FREE", "Organization (Free)"
+        BASIC = "BASIC", "Basic"
+        COMMUNITY = "COMMUNITY", "Community"
+        COMMUNITY_PLUS = "COMMUNITY_PLUS", "Community Plus"
+        ENTERPRISE = "ENTERPRISE", "Enterprise"
+
+    class BillingSource(models.TextChoices):
+        FREE = "FREE", "Free"
+        PAYPAL = "PAYPAL", "PayPal"
+        ACCESS_CODE = "ACCESS_CODE", "Access code"
+        ADMIN_GRANT = "ADMIN_GRANT", "Administrative grant"
+        ENTERPRISE_CONTRACT = "ENTERPRISE_CONTRACT", "Enterprise contract"
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "Pending"
+        ACTIVE = "ACTIVE", "Active"
+        PAYMENT_FAILED = "PAYMENT_FAILED", "Payment failed"
+        SUSPENDED = "SUSPENDED", "Suspended"
+        CANCELLED = "CANCELLED", "Cancelled"
+        EXPIRED = "EXPIRED", "Expired"
+
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="services",
+    )
+    requested_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="requested_organization_services",
+        help_text="User who started this checkout or entitlement request.",
+    )
+    service_level = models.CharField(max_length=32, choices=ServiceLevel.choices)
+    billing_source = models.CharField(
+        max_length=32,
+        choices=BillingSource.choices,
+        default=BillingSource.FREE,
+    )
+    status = models.CharField(
+        max_length=32,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
+    )
+    paypal_plan_id = models.CharField(max_length=64, blank=True, default="")
+    paypal_subscription_id = models.CharField(
+        max_length=64,
+        blank=True,
+        default="",
+        db_index=True,
+    )
+    billing_reference = models.CharField(
+        max_length=64,
+        unique=True,
+        help_text="Opaque CommuniB billing reference (e.g. COMMUNIB-SUB-000184-00001).",
+    )
+    started_at = models.DateTimeField(null=True, blank=True)
+    current_period_end = models.DateTimeField(null=True, blank=True)
+    cancelled_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at"]
+        indexes = [
+            models.Index(fields=["organization", "status"]),
+            models.Index(fields=["organization", "service_level", "status"]),
+        ]
+
+    def __str__(self):
+        return (
+            f"{self.organization.slug} {self.service_level} "
+            f"{self.status} ({self.billing_reference})"
+        )
+
+
 class Survey(models.Model):
     organization = models.ForeignKey(
         Organization, on_delete=models.CASCADE, related_name="surveys"

@@ -25,13 +25,20 @@ services:
       DB_PWD: postgres_user_password
       DB_HOST: host.docker.internal
       DB_PORT: 5432
+      FRONTEND_BASE_URL: http://localhost:10001
+      PAYPAL_MODE: disabled
+      PAYPAL_SUBSCRIPTIONS_ENABLED: "false"
     ports:
       - "8001:8080"
     secrets:
       - postgres_user_password
  
   communib-frontend: # Name of the frontend service
-    build: frontend
+    build:
+      context: frontend
+      args:
+        # Browser calls the host-mapped backend (not Cloud Run) for local QA.
+        VITE_API_URL: http://localhost:8001
     ports: 
       - "10001:80"
   

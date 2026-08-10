@@ -7,6 +7,8 @@ import EnterCode from "./pages/EnterCode";
 import CommunityDirectory from "./pages/CommunityDirectory";
 import ContactPage from "./pages/ContactPage";
 import AboutPage from "./pages/AboutPage";
+import KnowledgeCenter from "./pages/KnowledgeCenter";
+import KnowledgeCenterArticle from "./pages/KnowledgeCenterArticle";
 import UnderConstruction from "./pages/UnderConstruction";
 import SurveyPage from "./pages/SurveyPage";
 import OrgHubPage from "./pages/OrgHubPage";
@@ -14,6 +16,8 @@ import MeetingPage from "./pages/MeetingPage";
 import MeetingHostPage from "./pages/MeetingHostPage";
 import DashboardHome from "./pages/DashboardHome";
 import OrgDashboard from "./pages/OrgDashboard";
+import OrgBilling from "./pages/OrgBilling";
+import BillingEntry from "./pages/BillingEntry";
 import CreateSurvey from "./pages/CreateSurvey";
 import CreateMeeting from "./pages/CreateMeeting";
 import EditSurvey from "./pages/EditSurvey";
@@ -45,6 +49,11 @@ function App() {
         <Route path="/search-another-way" element={<Navigate to="/communities" replace />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/about" element={<AboutPage />} />
+        <Route path="/knowledge-center" element={<KnowledgeCenter />} />
+        <Route
+          path="/knowledge-center/:urlSlug"
+          element={<KnowledgeCenterArticle />}
+        />
         {UNDER_CONSTRUCTION_ROUTES.map((path) => (
           <Route key={path} path={path} element={<UnderConstruction />} />
         ))}
@@ -77,10 +86,26 @@ function App() {
           }
         />
         <Route
+          path="/dashboard/billing"
+          element={
+            <ProtectedRoute>
+              <BillingEntry />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/dashboard/:slug"
           element={
             <ProtectedRoute>
               <OrgDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/:slug/billing"
+          element={
+            <ProtectedRoute>
+              <OrgBilling />
             </ProtectedRoute>
           }
         />

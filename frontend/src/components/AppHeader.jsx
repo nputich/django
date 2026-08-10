@@ -1,23 +1,19 @@
-import { Link } from "react-router-dom";
+import SiteNavLinks from "./SiteNavLinks";
+import HeaderAccountLinks from "./HeaderAccountLinks";
 import "../styles/Landing.css";
 
+/**
+ * App chrome for signed-in pages: full marketing nav + account actions.
+ */
 function AppHeader() {
   return (
-    <header className="landing-nav landing-nav--end app-header">
-      <nav className="landing-nav-links" aria-label="Account">
-        <Link className="landing-nav-pill" to="/">
-          Home
-        </Link>
-        <Link className="landing-nav-pill" to="/dashboard">
-          Dashboard
-        </Link>
-        <Link className="landing-nav-pill" to="/account">
-          Account
-        </Link>
-        <Link className="landing-nav-pill landing-nav-pill--logout" to="/logout">
-          Log out
-        </Link>
-      </nav>
+    <header className="landing-nav landing-nav--with-account app-header">
+      <div className="landing-nav-inner">
+        <SiteNavLinks />
+      </div>
+      <div className="landing-nav-login landing-nav-login--account">
+        <HeaderAccountLinks />
+      </div>
     </header>
   );
 }

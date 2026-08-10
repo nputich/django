@@ -36,11 +36,6 @@ const MESSAGES = {
     body: "News and updates from communiB will appear here soon.",
     back: { to: "/", label: "← Back to home" },
   },
-  "/knowledge-center": {
-    title: "Knowledge Center",
-    body: "Guides, updates, and resources from communiB. Coming soon.",
-    back: { to: "/", label: "← Back to home" },
-  },
   "/org": {
     title: "Organization Accounts",
     body: "Organization sign-up and management are not available yet. Please check back later.",

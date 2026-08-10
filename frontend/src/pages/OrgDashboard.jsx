@@ -155,6 +155,12 @@ export default function OrgDashboard() {
                 Create meeting
               </Link>
               <Link
+                to={`/dashboard/${slug}/billing`}
+                className="dashboard-btn"
+              >
+                Billing &amp; Service
+              </Link>
+              <Link
                 to={`/org/${slug}/hub`}
                 className="dashboard-btn"
                 target="_blank"

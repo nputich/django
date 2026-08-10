@@ -15,6 +15,7 @@ from .models import (
     Organization,
     OrganizationBoard,
     OrganizationMembership,
+    OrganizationService,
     OrgCategory,
     ParticipantProfileValue,
     PersonalBoard,
@@ -79,6 +80,30 @@ class ResourceTypeAdmin(admin.ModelAdmin):
 @admin.register(OrganizationMembership)
 class OrganizationMembershipAdmin(admin.ModelAdmin):
     list_display = ("organization", "user", "role")
+
+
+@admin.register(OrganizationService)
+class OrganizationServiceAdmin(admin.ModelAdmin):
+    list_display = (
+        "billing_reference",
+        "organization",
+        "service_level",
+        "status",
+        "billing_source",
+        "paypal_subscription_id",
+        "started_at",
+        "created_at",
+    )
+    list_filter = ("service_level", "status", "billing_source")
+    search_fields = (
+        "billing_reference",
+        "paypal_subscription_id",
+        "paypal_plan_id",
+        "organization__name",
+        "organization__slug",
+    )
+    readonly_fields = ("created_at", "updated_at")
+    raw_id_fields = ("organization", "requested_by")
 
 
 class SurveyQuestionInline(admin.TabularInline):

@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 from . import profile_board_views
 from . import directory_views
+from . import billing_views
 
 urlpatterns = [
     path("me/", profile_board_views.MeView.as_view(), name="me"),
@@ -33,6 +34,26 @@ urlpatterns = [
         "organizations/<slug:slug>/dashboard/",
         views.OrganizationDashboardView.as_view(),
         name="org-dashboard",
+    ),
+    path(
+        "organizations/<slug:slug>/billing/",
+        billing_views.OrganizationBillingView.as_view(),
+        name="org-billing",
+    ),
+    path(
+        "organizations/<slug:slug>/billing/checkout-preview/",
+        billing_views.OrganizationBillingCheckoutPreviewView.as_view(),
+        name="org-billing-checkout-preview",
+    ),
+    path(
+        "organizations/<slug:slug>/billing/checkout/",
+        billing_views.OrganizationBillingCheckoutStartView.as_view(),
+        name="org-billing-checkout-start",
+    ),
+    path(
+        "organizations/<slug:slug>/billing/paypal/confirm/",
+        billing_views.OrganizationBillingPayPalConfirmView.as_view(),
+        name="org-billing-paypal-confirm",
     ),
     path(
         "organizations/<slug:slug>/surveys/",

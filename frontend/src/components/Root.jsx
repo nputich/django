@@ -1,11 +1,7 @@
-import { Navigate } from "react-router-dom";
-import { ensureValidSession } from "../auth";
 import Login from "../pages/Login";
 
+/** Public home (`/`) — same marketing landing for guests and signed-in users. */
 function Root() {
-  if (ensureValidSession()) {
-    return <Navigate to="/dashboard" replace />;
-  }
   return <Login />;
 }
 

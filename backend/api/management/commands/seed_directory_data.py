@@ -10,7 +10,7 @@ from django.db import transaction
 from django.utils.text import slugify
 
 from api.directory_taxonomy import DIRECTORY_TAXONOMY
-from api.models import GeographicArea, OrgCategory
+from api.models import GeographicArea, Organization, OrgCategory
 
 DATA_DIR = Path(__file__).resolve().parents[2] / "data"
 FIPS_CSV = DATA_DIR / "us_county_fips.csv"
@@ -302,6 +302,11 @@ class Command(BaseCommand):
             action="store_true",
             help="Skip US state/county FIPS import (still seeds countries + non-US admin1).",
         )
+        parser.add_argument(
+            "--with-samples",
+            action="store_true",
+            help="Also seed sample Democratic Party hierarchy (national/state/local).",
+        )
 
     @transaction.atomic
     def handle(self, *args, **options):
@@ -309,6 +314,8 @@ class Command(BaseCommand):
             self._seed_categories()
         if not options["skip_geo"]:
             self._seed_geo(skip_us_fips=options["skip_us_fips"])
+        if options["with_samples"]:
+            self._seed_samples()
         self.stdout.write(self.style.SUCCESS("Directory reference data seeded."))
 
     def _seed_categories(self):
@@ -365,6 +372,70 @@ class Command(BaseCommand):
             f"{GeographicArea.objects.filter(area_type='admin1').count()} admin1, "
             f"{GeographicArea.objects.filter(area_type='admin2').count()} admin2"
         )
+
+    def _seed_samples(self):
+        us = GeographicArea.objects.filter(
+            slug="us", area_type=GeographicArea.AreaType.COUNTRY
+        ).first()
+        nc = GeographicArea.objects.filter(
+            slug="north-carolina", area_type=GeographicArea.AreaType.ADMIN1
+        ).first()
+        forsyth = GeographicArea.objects.filter(
+            parent=nc, slug="forsyth-county"
+        ).first() if nc else None
+        parties = OrgCategory.objects.filter(
+            slug="parties", parent__slug="political"
+        ).first()
+        if not all([us, nc, forsyth, parties]):
+            self.stdout.write(
+                self.style.WARNING("Sample orgs skipped — geo/taxonomy incomplete.")
+            )
+            return
+
+        dnc, _ = Organization.objects.update_or_create(
+            slug="democratic-national-committee",
+            defaults={
+                "name": "Democratic National Committee",
+                "description": "National Democratic Party organization",
+                "geographic_scope": Organization.GeographicScope.NATIONAL,
+                "service_area": us,
+                "primary_subcategory": parties,
+                "is_active": True,
+                "is_verified": True,
+                "search_aliases": ["DNC", "Democrats"],
+            },
+        )
+        ncdp, _ = Organization.objects.update_or_create(
+            slug="north-carolina-democratic-party",
+            defaults={
+                "name": "North Carolina Democratic Party",
+                "description": "State Democratic Party organization",
+                "geographic_scope": Organization.GeographicScope.STATE_PROVINCE,
+                "service_area": nc,
+                "primary_subcategory": parties,
+                "parent_organization": dnc,
+                "is_active": True,
+                "is_verified": True,
+                "search_aliases": ["NCDP"],
+            },
+        )
+        Organization.objects.update_or_create(
+            slug="forsyth-county-democratic-party",
+            defaults={
+                "name": "Forsyth County Democratic Party",
+                "description": "Local Democratic Party organization for Forsyth County, NC",
+                "geographic_scope": Organization.GeographicScope.LOCAL,
+                "service_area": forsyth,
+                "headquarters_area": forsyth,
+                "headquarters_city": "Winston-Salem",
+                "primary_subcategory": parties,
+                "parent_organization": ncdp,
+                "is_active": True,
+                "is_verified": True,
+                "search_aliases": ["Forsyth Dems", "FCDP"],
+            },
+        )
+        self.stdout.write("Sample organizations: DNC, NCDP, Forsyth County Democratic Party")
 
     def _seed_us_fips(self):
         us = GeographicArea.objects.get(

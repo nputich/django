@@ -186,3 +186,23 @@ if os.getenv("EMAIL_HOST_USER"):
 else:
     EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
     DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "communiB <noreply@communib.com>")
+
+# Stage 2+: allow PENDING→ACTIVE simulation without PayPal (never enable casually in production).
+BILLING_SIMULATION_ENABLED = os.getenv("BILLING_SIMULATION_ENABLED", "").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
+# PayPal subscriptions (Stage 5+). Secrets via env / Secret Manager only.
+PAYPAL_MODE = os.getenv("PAYPAL_MODE", "disabled").strip().lower()  # disabled|sandbox|live
+PAYPAL_CLIENT_ID = os.getenv("PAYPAL_CLIENT_ID", "").strip()
+PAYPAL_CLIENT_SECRET = os.getenv("PAYPAL_CLIENT_SECRET", "").strip()
+PAYPAL_WEBHOOK_ID = os.getenv("PAYPAL_WEBHOOK_ID", "").strip()
+PAYPAL_SUBSCRIPTIONS_ENABLED = os.getenv("PAYPAL_SUBSCRIPTIONS_ENABLED", "").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+# Used for PayPal return/cancel URLs (browser). Local docker: http://localhost:10001
+FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:10001").rstrip("/")
