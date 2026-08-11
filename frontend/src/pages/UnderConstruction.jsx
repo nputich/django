@@ -11,16 +11,6 @@ const DEFAULT = {
 };
 
 const MESSAGES = {
-  "/pricing": {
-    title: "Pricing",
-    body: "Plans and pricing for organizations are not available yet. Please check back later.",
-    back: { to: "/", label: "← Back to home" },
-  },
-  "/contact": {
-    title: "Contact",
-    body: "Our contact page is under construction. Please check back soon.",
-    back: { to: "/", label: "← Back to home" },
-  },
   "/product": {
     title: "Product",
     body: "Product details and features are coming soon.",
@@ -34,11 +24,6 @@ const MESSAGES = {
   "/blog": {
     title: "Blog",
     body: "News and updates from communiB will appear here soon.",
-    back: { to: "/", label: "← Back to home" },
-  },
-  "/org": {
-    title: "Organization Accounts",
-    body: "Organization sign-up and management are not available yet. Please check back later.",
     back: { to: "/", label: "← Back to home" },
   },
   "/privacy": {

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import api from "../api";
+import CreateOrganizationLink from "../components/CreateOrganizationLink";
 import MarketingLayout from "../components/MarketingLayout";
 import SearchableSelect from "../components/SearchableSelect";
 import SiteLogo from "../components/SiteLogo";
@@ -13,8 +14,12 @@ import {
   parseDirectoryPath,
   scopeForBrowseLevel,
 } from "../directoryPaths";
+import {
+  claimAccessPath,
+} from "../constants/orgCreation";
 import "../styles/Landing.css";
 import "../styles/Directory.css";
+import "../styles/CreateOrganization.css";
 
 const DEBOUNCE_MS = 250;
 const US_SLUG = "us";
@@ -444,6 +449,15 @@ export default function CommunityDirectory() {
 
         <div className="directory-layout">
           <aside className="directory-filters" aria-label="Directory filters">
+            <p className="directory-create-banner">
+              Can&apos;t find your organization?{" "}
+              <CreateOrganizationLink
+                name={debouncedOrgQuery.trim() || undefined}
+              >
+                Create an Organization
+              </CreateOrganizationLink>
+            </p>
+
             <section className="directory-filter-block">
               <h2 className="directory-section-title">Find by Location</h2>
               <div className="directory-stack">
@@ -598,7 +612,10 @@ export default function CommunityDirectory() {
                   orgPayload &&
                   orgPayload.total === 0 && (
                     <p className="directory-empty">
-                      There are no organizations yet.
+                      There are no organizations yet.{" "}
+                      <CreateOrganizationLink>
+                        Create an Organization
+                      </CreateOrganizationLink>
                     </p>
                   )}
                 {!loadingOrgs && orgs.length > 0 && (
@@ -647,14 +664,21 @@ export default function CommunityDirectory() {
                             </span>
                           )}
                         </button>
+                        <Link
+                          to={claimAccessPath(org)}
+                          className="directory-claim-btn"
+                        >
+                          Claim Access
+                        </Link>
                       </li>
                     ))}
                   </ul>
                 ) : (
                   <p className="directory-empty">
-                    {pathState.category || pathState.subcategory
-                      ? "There is no group here yet"
-                      : "There are no organizations yet."}
+                    Don&apos;t see your organization?{" "}
+                    <CreateOrganizationLink name={debouncedOrgQuery.trim()}>
+                      Create an Organization
+                    </CreateOrganizationLink>
                   </p>
                 )}
               </section>
@@ -695,7 +719,10 @@ export default function CommunityDirectory() {
                 {loadingOrgs && <p className="directory-meta">Loading…</p>}
                 {!loadingOrgs && orgs.length === 0 && (
                   <p className="directory-empty">
-                    {emptyMessage || "There is no group here yet"}
+                    {emptyMessage || "There is no group here yet"}{" "}
+                    <CreateOrganizationLink>
+                      Create an Organization
+                    </CreateOrganizationLink>
                   </p>
                 )}
                 {!loadingOrgs && orgs.length > 0 && (

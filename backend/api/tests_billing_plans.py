@@ -5,6 +5,7 @@ from rest_framework.test import APIClient
 
 from api.billing_plans import (
     COMMUNIB_PAYPAL_PLANS,
+    COMMUNIB_PAYPAL_PLANS_SANDBOX,
     SERVICE_LEVEL_BASIC,
     SERVICE_LEVEL_COMMUNITY,
     SERVICE_LEVEL_COMMUNITY_PLUS,
@@ -17,6 +18,7 @@ from api.models import Organization, OrganizationMembership
 
 
 class PlanResolutionUnitTests(TestCase):
+    @override_settings(PAYPAL_MODE="live")
     def test_basic_community_community_plus_map_correctly(self):
         basic = resolve_paypal_checkout_plan("BASIC")
         self.assertEqual(basic["price"], "49.99")
@@ -37,6 +39,24 @@ class PlanResolutionUnitTests(TestCase):
         self.assertEqual(
             plus["paypal_plan_id"],
             COMMUNIB_PAYPAL_PLANS[SERVICE_LEVEL_COMMUNITY_PLUS]["plan_id"],
+        )
+
+    @override_settings(PAYPAL_MODE="sandbox")
+    def test_sandbox_mode_uses_sandbox_plan_ids(self):
+        basic = resolve_paypal_checkout_plan("BASIC")
+        self.assertEqual(
+            basic["paypal_plan_id"],
+            COMMUNIB_PAYPAL_PLANS_SANDBOX[SERVICE_LEVEL_BASIC]["plan_id"],
+        )
+        community = resolve_paypal_checkout_plan("COMMUNITY")
+        self.assertEqual(
+            community["paypal_plan_id"],
+            COMMUNIB_PAYPAL_PLANS_SANDBOX[SERVICE_LEVEL_COMMUNITY]["plan_id"],
+        )
+        plus = resolve_paypal_checkout_plan(SERVICE_LEVEL_COMMUNITY_PLUS)
+        self.assertEqual(
+            plus["paypal_plan_id"],
+            COMMUNIB_PAYPAL_PLANS_SANDBOX[SERVICE_LEVEL_COMMUNITY_PLUS]["plan_id"],
         )
 
     def test_free_and_enterprise_rejected(self):
@@ -75,6 +95,7 @@ class CheckoutPreviewApiTests(TestCase):
         )
         self.url = f"/api/organizations/{self.org.slug}/billing/checkout-preview/"
 
+    @override_settings(PAYPAL_MODE="live")
     def test_admin_gets_authoritative_plan_ignoring_client_price(self):
         self.client.force_authenticate(user=self.admin)
         res = self.client.post(

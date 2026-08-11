@@ -264,7 +264,10 @@ def organizations_for_directory(
     subcategory_slug: str = "",
     query: str = "",
 ) -> QuerySet[Organization]:
-    qs = Organization.objects.filter(is_active=True).select_related(
+    qs = Organization.objects.filter(
+        status=Organization.Status.ACTIVE,
+        is_active=True,
+    ).select_related(
         "service_area",
         "primary_subcategory",
         "primary_subcategory__parent",

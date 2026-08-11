@@ -3,9 +3,13 @@ Authoritative CommuniB service plan catalog (server-side).
 
 The browser may submit a service_level only. It must never dictate price or
 PayPal plan IDs — resolve those here.
+
+Sandbox and live PayPal each have their own plan IDs; prices/names match.
 """
 
 from __future__ import annotations
+
+from django.conf import settings
 
 
 class PlanResolutionError(ValueError):
@@ -35,31 +39,66 @@ SERVICE_LEVEL_LABELS = {
 
 ALL_SERVICE_LEVELS = frozenset(SERVICE_LEVEL_LABELS.keys())
 
-# Paid self-serve PayPal plans (Enterprise is contact-only; Free is default entitlement).
-COMMUNIB_PAYPAL_PLANS = {
+# Shared display/price metadata (identical across PayPal environments).
+_PAYPAL_PLAN_META = {
     SERVICE_LEVEL_BASIC: {
-        "plan_id": "P-8VM62345PE9955234NJ4SHHA",
         "price": "49.99",
         "name": "CommuniB Basic",
     },
     SERVICE_LEVEL_COMMUNITY: {
-        "plan_id": "P-6DH4658999088414HNJ4SI2Q",
         "price": "125.00",
         "name": "CommuniB Community",
     },
     SERVICE_LEVEL_COMMUNITY_PLUS: {
-        "plan_id": "P-0HL011378K8966320NJ4SJWI",
         "price": "300.00",
         "name": "CommuniB Community Plus",
     },
 }
+
+# Live PayPal plan IDs (production).
+COMMUNIB_PAYPAL_PLAN_IDS_LIVE = {
+    SERVICE_LEVEL_BASIC: "P-8VM62345PE9955234NJ4SHHA",
+    SERVICE_LEVEL_COMMUNITY: "P-6DH4658999088414HNJ4SI2Q",
+    SERVICE_LEVEL_COMMUNITY_PLUS: "P-0HL011378K8966320NJ4SJWI",
+}
+
+# Sandbox PayPal plan IDs (local / QA).
+COMMUNIB_PAYPAL_PLAN_IDS_SANDBOX = {
+    SERVICE_LEVEL_BASIC: "P-5KU44863YK174172XNJ5L3AY",
+    SERVICE_LEVEL_COMMUNITY: "P-51W57967WF047201WNJ5L3UY",
+    SERVICE_LEVEL_COMMUNITY_PLUS: "P-29M27945AN769032ANJ5L4LI",
+}
+
+
+def _plans_for_ids(plan_ids: dict) -> dict:
+    return {
+        level: {
+            **_PAYPAL_PLAN_META[level],
+            "plan_id": plan_ids[level],
+        }
+        for level in _PAYPAL_PLAN_META
+    }
+
+
+# Backward-compatible alias: live plans (tests / imports that expect a static map).
+COMMUNIB_PAYPAL_PLANS = _plans_for_ids(COMMUNIB_PAYPAL_PLAN_IDS_LIVE)
+COMMUNIB_PAYPAL_PLANS_SANDBOX = _plans_for_ids(COMMUNIB_PAYPAL_PLAN_IDS_SANDBOX)
+
+
+def paypal_plans_for_current_mode() -> dict:
+    """Return Basic/Community/Community Plus maps for the active PayPal mode."""
+    mode = (getattr(settings, "PAYPAL_MODE", "disabled") or "disabled").strip().lower()
+    if mode == "sandbox":
+        return COMMUNIB_PAYPAL_PLANS_SANDBOX
+    return COMMUNIB_PAYPAL_PLANS
+
 
 # Display + checkout metadata for the Billing & Service UI.
 COMMUNIB_SERVICE_PLANS = {
     SERVICE_LEVEL_BASIC: {
         "service_level": SERVICE_LEVEL_BASIC,
         "name": "Basic",
-        "price": COMMUNIB_PAYPAL_PLANS[SERVICE_LEVEL_BASIC]["price"],
+        "price": _PAYPAL_PLAN_META[SERVICE_LEVEL_BASIC]["price"],
         "price_display": "$49.99/month",
         "description": (
             "Dashboard tools and community engagement features for smaller organizations."
@@ -71,7 +110,7 @@ COMMUNIB_SERVICE_PLANS = {
     SERVICE_LEVEL_COMMUNITY: {
         "service_level": SERVICE_LEVEL_COMMUNITY,
         "name": "Community",
-        "price": COMMUNIB_PAYPAL_PLANS[SERVICE_LEVEL_COMMUNITY]["price"],
+        "price": _PAYPAL_PLAN_META[SERVICE_LEVEL_COMMUNITY]["price"],
         "price_display": "$125/month",
         "description": (
             "Higher meeting, survey, participation, and reporting capacity for "
@@ -84,7 +123,7 @@ COMMUNIB_SERVICE_PLANS = {
     SERVICE_LEVEL_COMMUNITY_PLUS: {
         "service_level": SERVICE_LEVEL_COMMUNITY_PLUS,
         "name": "Community Plus",
-        "price": COMMUNIB_PAYPAL_PLANS[SERVICE_LEVEL_COMMUNITY_PLUS]["price"],
+        "price": _PAYPAL_PLAN_META[SERVICE_LEVEL_COMMUNITY_PLUS]["price"],
         "price_display": "$300/month",
         "description": (
             "High-capacity engagement tools for elected offices, regional "
@@ -109,7 +148,7 @@ COMMUNIB_SERVICE_PLANS = {
     },
 }
 
-PAID_CHECKOUT_LEVELS = frozenset(COMMUNIB_PAYPAL_PLANS.keys())
+PAID_CHECKOUT_LEVELS = frozenset(_PAYPAL_PLAN_META.keys())
 
 
 def list_available_plans():
@@ -159,7 +198,7 @@ def resolve_paypal_checkout_plan(service_level) -> dict:
     Map a CommuniB service_level to the official PayPal plan + price.
 
     Rejects FREE, ENTERPRISE, and unknown levels. Never uses client-supplied
-    price or plan_id arguments.
+    price or plan_id arguments. Plan IDs follow PAYPAL_MODE (sandbox vs live).
     """
     level = normalize_service_level(service_level)
 
@@ -175,7 +214,7 @@ def resolve_paypal_checkout_plan(service_level) -> dict:
             code="enterprise_contact_only",
         )
 
-    paypal = COMMUNIB_PAYPAL_PLANS.get(level)
+    paypal = paypal_plans_for_current_mode().get(level)
     display = COMMUNIB_SERVICE_PLANS.get(level)
     if not paypal or not display:
         raise PlanResolutionError(

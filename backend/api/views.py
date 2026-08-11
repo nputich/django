@@ -12,6 +12,12 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from .contact_email import send_contact_notification
+from .organization_create import create_organization_for_user
+from .feature_entitlements import (
+    EntitlementDenied,
+    entitlement_denied_response,
+    require_capability,
+)
 from .models import AccessCode, ContactSubmission, Meeting, MeetingAttendance, MeetingSession, MeetingSlide, Organization, Survey, SurveyAnswer, SurveyQuestion
 
 logger = logging.getLogger(__name__)
@@ -86,6 +92,7 @@ from .serializers import (
     MeetingRestartSerializer,
     MeetingAddSlidesSerializer,
     MyOrganizationSerializer,
+    CreateOrganizationSerializer,
     OrganizationDashboardSerializer,
     OrganizationHubSerializer,
     SurveyDetailSerializer,
@@ -222,7 +229,12 @@ class SurveySubmitView(APIView):
 class OrganizationHubView(APIView):
     permission_classes = [AllowAny]
     def get(self, request, slug):
-        organization = get_object_or_404(Organization, slug=slug, is_active=True)
+        organization = get_object_or_404(
+            Organization,
+            slug=slug,
+            is_active=True,
+            status=Organization.Status.ACTIVE,
+        )
         return Response(OrganizationHubSerializer(organization).data)
 
 
@@ -235,6 +247,29 @@ class MyOrganizationsView(APIView):
             orgs, many=True, context={"request": request}
         )
         return Response({"organizations": serializer.data})
+
+
+class OrganizationCreateView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = CreateOrganizationSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        try:
+            org = create_organization_for_user(
+                user=request.user,
+                name=serializer.validated_data["name"],
+                description=serializer.validated_data.get("description", ""),
+            )
+        except ValueError as exc:
+            payload = exc.args[0] if exc.args else {}
+            if isinstance(payload, dict) and payload.get("code") == "closed_organization_exists":
+                return Response(payload, status=status.HTTP_409_CONFLICT)
+            raise
+        return Response(
+            MyOrganizationSerializer(org, context={"request": request}).data,
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class OrganizationDashboardView(APIView):
@@ -313,6 +348,10 @@ class OrganizationSurveyCreateView(APIView):
                 {"detail": "Organization not found or you are not an admin."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+        try:
+            require_capability(organization, "create_surveys")
+        except EntitlementDenied as exc:
+            return entitlement_denied_response(exc)
         serializer = DashboardSurveyCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -445,6 +484,10 @@ class OrganizationMeetingCreateView(APIView):
                 {"detail": "Organization not found or you are not an admin."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+        try:
+            require_capability(organization, "create_meetings")
+        except EntitlementDenied as exc:
+            return entitlement_denied_response(exc)
         serializer = DashboardMeetingCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -809,6 +852,10 @@ class OrganizationMeetingStartView(APIView):
         meeting, err = _get_org_meeting_admin(request, slug, pk)
         if err:
             return err
+        try:
+            require_capability(meeting.organization, "start_meetings")
+        except EntitlementDenied as exc:
+            return entitlement_denied_response(exc)
         serializer = MeetingStartSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
@@ -923,6 +970,10 @@ class OrganizationMeetingPoliticalClassifyView(APIView):
         meeting, err = _get_org_meeting_admin(request, slug, pk)
         if err:
             return err
+        try:
+            require_capability(meeting.organization, "run_new_ai_analysis")
+        except EntitlementDenied as exc:
+            return entitlement_denied_response(exc)
 
         slide_id = request.query_params.get("slide_id") or request.data.get("slide_id")
         if not slide_id:
@@ -1074,6 +1125,10 @@ class OrganizationMeetingRestartView(APIView):
         meeting, err = _get_org_meeting_admin(request, slug, pk)
         if err:
             return err
+        try:
+            require_capability(meeting.organization, "start_meetings")
+        except EntitlementDenied as exc:
+            return entitlement_denied_response(exc)
         serializer = MeetingRestartSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         session = get_latest_session(meeting)
@@ -1182,6 +1237,10 @@ class OrganizationMeetingProcessAIView(APIView):
         meeting, err = _get_org_meeting_admin(request, slug, pk)
         if err:
             return err
+        try:
+            require_capability(meeting.organization, "run_new_ai_analysis")
+        except EntitlementDenied as exc:
+            return entitlement_denied_response(exc)
 
         if meeting.ai_mode == Meeting.AIMode.NONE:
             return Response(

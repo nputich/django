@@ -39,6 +39,7 @@ from api.serializers import (
     PersonalBoardPostSerializer,
     UserProfileUpdateSerializer,
     build_me_payload,
+    serialize_post_author,
 )
 
 
@@ -47,6 +48,36 @@ class MeView(APIView):
 
     def get(self, request):
         return Response(build_me_payload(request.user, request))
+
+
+class PublicUserProfileView(APIView):
+    """Public account card for inbox / directory links (no private contact fields)."""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, username):
+        user = get_object_or_404(User, username__iexact=username)
+        # If the profile owner banned the viewer, hide the account.
+        if getattr(request.user, "is_authenticated", False):
+            from api.inbox_service import get_personal_mailbox, is_blocked
+
+            owner_box = get_personal_mailbox(user)
+            viewer_box = get_personal_mailbox(request.user)
+            if is_blocked(blocker=owner_box, blocked=viewer_box):
+                return Response(
+                    {"detail": "Account not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+        profile, _ = UserProfile.objects.get_or_create(user=user)
+        author = serialize_post_author(user, request)
+        return Response(
+            {
+                **author,
+                "city": profile.city,
+                "state": profile.state,
+            }
+        )
 
 
 class MeProfileView(APIView):

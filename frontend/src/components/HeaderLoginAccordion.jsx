@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "react-router-dom";
 import Form from "./Form";
 
 function ChevronDown({ className = "" }) {
@@ -21,7 +22,8 @@ function ChevronDown({ className = "" }) {
 }
 
 export default function HeaderLoginAccordion() {
-  const [open, setOpen] = useState(false);
+  const location = useLocation();
+  const [open, setOpen] = useState(Boolean(location.state?.from));
 
   return (
     <div

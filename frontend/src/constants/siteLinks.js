@@ -29,11 +29,9 @@ export const FOOTER_LINKS = [
 ];
 
 export const UNDER_CONSTRUCTION_ROUTES = [
-  "/pricing",
   "/product",
   "/demo",
   "/blog",
-  "/org",
   "/privacy",
   "/terms",
   "/careers",

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import api from "../api";
 import AppHeader from "../components/AppHeader";
@@ -21,6 +21,18 @@ export default function CreateSurvey() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [entitlementBlocked, setEntitlementBlocked] = useState(false);
+
+  useEffect(() => {
+    api
+      .get(`/api/organizations/${slug}/dashboard/`)
+      .then((res) => {
+        if (res.data.capabilities && !res.data.capabilities.create_surveys) {
+          setEntitlementBlocked(true);
+        }
+      })
+      .catch(() => {});
+  }, [slug]);
 
   const checkCode = useCallback(async (code) => {
     if (!code.trim()) {
@@ -106,6 +118,27 @@ export default function CreateSurvey() {
           <p>Add questions and an access code for public search.</p>
         </div>
 
+        {entitlementBlocked && (
+          <div className="dashboard-card">
+            <h2>Create a New Survey</h2>
+            <p>
+              New surveys require CommuniB Basic or higher. You can continue
+              viewing your previous surveys and results.
+            </p>
+            <div className="dashboard-actions">
+              <Link to={`/dashboard/${slug}`} className="dashboard-btn">
+                Back to dashboard
+              </Link>
+              <Link
+                to={`/dashboard/${slug}/billing`}
+                className="dashboard-btn dashboard-btn--primary"
+              >
+                View plans
+              </Link>
+            </div>
+          </div>
+        )}
+
         {success && (
           <div className="dashboard-success">
             <strong>Survey created!</strong>
@@ -116,6 +149,7 @@ export default function CreateSurvey() {
           </div>
         )}
 
+        {!entitlementBlocked && !success && (
         <form className="dashboard-form" onSubmit={handleSubmit}>
           <div className="dashboard-field">
             <label htmlFor="survey-title">Title</label>
@@ -249,6 +283,7 @@ export default function CreateSurvey() {
             {submitting ? "Creating..." : "Create survey"}
           </button>
         </form>
+        )}
       </main>
     </div>
   );

@@ -1,0 +1,24 @@
+.dashboard-danger-zone {
+  border-color: #b42318;
+  margin-top: 2rem;
+}
+
+.dashboard-danger-zone h2 {
+  color: #b42318;
+}
+
+.dashboard-btn--danger {
+  background: #b42318;
+  border-color: #b42318;
+  color: #fff;
+}
+
+.dashboard-btn--danger:hover:not(:disabled) {
+  background: #912018;
+  border-color: #912018;
+}
+
+.dashboard-btn--danger:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}

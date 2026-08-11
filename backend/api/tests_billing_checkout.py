@@ -1,9 +1,9 @@
 from django.contrib.auth.models import User
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from api.billing_plans import COMMUNIB_PAYPAL_PLANS, SERVICE_LEVEL_COMMUNITY
+from api.billing_plans import SERVICE_LEVEL_COMMUNITY, paypal_plans_for_current_mode
 from api.billing_service import (
     activate_organization_service,
     create_pending_organization_service,
@@ -12,6 +12,7 @@ from api.billing_service import (
 from api.models import Organization, OrganizationMembership, OrganizationService
 
 
+@override_settings(PAYPAL_SUBSCRIPTIONS_ENABLED=False)
 class PendingCheckoutApiTests(TestCase):
     def setUp(self):
         self.client = APIClient()
@@ -50,12 +51,11 @@ class PendingCheckoutApiTests(TestCase):
         self.assertEqual(pending["service_level"], "COMMUNITY")
         self.assertEqual(
             pending["paypal_plan_id"],
-            COMMUNIB_PAYPAL_PLANS[SERVICE_LEVEL_COMMUNITY]["plan_id"],
+            paypal_plans_for_current_mode()[SERVICE_LEVEL_COMMUNITY]["plan_id"],
         )
         self.assertEqual(pending["requested_by_id"], self.admin.id)
         self.assertTrue(pending["billing_reference"].startswith("COMMUNIB-SUB-"))
         self.assertEqual(res.data["checkout"]["price"], "125.00")
-        self.assertEqual(res.data["effective_service_level"], "FREE")
         self.assertFalse(res.data["paypal_contacted"])
 
         row = OrganizationService.objects.get(id=pending["id"])

@@ -112,12 +112,43 @@ class Organization(models.Model):
         REGIONAL = "regional", "Regional"
         LOCAL = "local", "Local"
 
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Active"
+        CLOSURE_PENDING = "closure_pending", "Closure pending"
+        CLOSED = "closed", "Closed"
+
     name = models.CharField(max_length=200)
     slug = models.SlugField(unique=True)
     description = models.TextField(blank=True)
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Legacy visibility flag; kept in sync with status (False when closed).",
+    )
+    status = models.CharField(
+        max_length=32,
+        choices=Status.choices,
+        default=Status.ACTIVE,
+        db_index=True,
+    )
     is_verified = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    closed_at = models.DateTimeField(null=True, blank=True)
+    closed_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="closed_organizations",
+    )
+    closure_effective_at = models.DateTimeField(null=True, blank=True)
+    restored_at = models.DateTimeField(null=True, blank=True)
+    restored_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="restored_organizations",
+    )
 
     # Directory dimensions (kept separate from HQ / affiliation).
     geographic_scope = models.CharField(
@@ -189,8 +220,10 @@ class ResourceType(models.Model):
         return self.name
 class OrganizationMembership(models.Model):
     class Role(models.TextChoices):
+        OWNER = "owner", "Owner"
         ADMIN = "admin", "Admin"
         MEMBER = "member", "Member"
+
     organization = models.ForeignKey(
         Organization, on_delete=models.CASCADE, related_name="memberships"
     )
@@ -198,10 +231,12 @@ class OrganizationMembership(models.Model):
         User, on_delete=models.CASCADE, related_name="org_memberships"
     )
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.MEMBER)
+
     class Meta:
         unique_together = ("organization", "user")
+
     def __str__(self):
-        return f"{self.user.username} @ {self.organization.name}"
+        return f"{self.user.username} @ {self.organization.name} ({self.role})"
 
 
 class OrganizationService(models.Model):
@@ -274,6 +309,10 @@ class OrganizationService(models.Model):
     started_at = models.DateTimeField(null=True, blank=True)
     current_period_end = models.DateTimeField(null=True, blank=True)
     cancelled_at = models.DateTimeField(null=True, blank=True)
+    cancel_at_period_end = models.BooleanField(
+        default=False,
+        help_text="When True, keep ACTIVE paid access until current_period_end, then expire.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -690,6 +729,181 @@ class BoardPostReply(models.Model):
 
     class Meta:
         ordering = ["created_at"]
+
+
+class Mailbox(models.Model):
+    """
+    Unified inbox identity for a personal account or an organization.
+
+    Personal and org inboxes share the same Conversation / Message tables.
+    """
+
+    class Kind(models.TextChoices):
+        PERSONAL = "personal", "Personal"
+        ORGANIZATION = "organization", "Organization"
+
+    kind = models.CharField(max_length=20, choices=Kind.choices)
+    user = models.OneToOneField(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="mailbox",
+    )
+    organization = models.OneToOneField(
+        Organization,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="mailbox",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(kind="personal", user__isnull=False, organization__isnull=True)
+                    | models.Q(
+                        kind="organization",
+                        user__isnull=True,
+                        organization__isnull=False,
+                    )
+                ),
+                name="mailbox_owner_matches_kind",
+            )
+        ]
+
+    def __str__(self):
+        if self.kind == self.Kind.PERSONAL and self.user_id:
+            return f"mailbox:user:{self.user.username}"
+        if self.organization_id:
+            return f"mailbox:org:{self.organization.slug}"
+        return f"mailbox:{self.pk}"
+
+    @property
+    def display_name(self) -> str:
+        if self.kind == self.Kind.ORGANIZATION and self.organization_id:
+            return self.organization.name
+        if self.user_id:
+            profile = getattr(self.user, "profile", None)
+            if profile and profile.display_name:
+                return profile.display_name
+            return self.user.username
+        return "Mailbox"
+
+
+class MailboxBlock(models.Model):
+    """
+    Blocker mailbox bans blocked mailbox.
+    Blocked party cannot message or view the blocker's account/conversations.
+    """
+
+    blocker = models.ForeignKey(
+        Mailbox, on_delete=models.CASCADE, related_name="blocks_created"
+    )
+    blocked = models.ForeignKey(
+        Mailbox, on_delete=models.CASCADE, related_name="blocks_received"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("blocker", "blocked")
+        indexes = [
+            models.Index(fields=["blocker", "blocked"]),
+            models.Index(fields=["blocked", "blocker"]),
+        ]
+
+    def __str__(self):
+        return f"block:{self.blocker_id}->{self.blocked_id}"
+
+
+class Conversation(models.Model):
+    subject = models.CharField(max_length=200, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+
+class ConversationParticipant(models.Model):
+    """Per-mailbox view of a conversation (folder + read state)."""
+
+    class Folder(models.TextChoices):
+        PRIMARY = "primary", "Inbox"
+        UNKNOWN = "unknown", "Unknown / Message requests"
+        ARCHIVED = "archived", "Archived"
+
+    conversation = models.ForeignKey(
+        Conversation, on_delete=models.CASCADE, related_name="participants"
+    )
+    mailbox = models.ForeignKey(
+        Mailbox, on_delete=models.CASCADE, related_name="conversation_links"
+    )
+    folder = models.CharField(
+        max_length=20,
+        choices=Folder.choices,
+        default=Folder.PRIMARY,
+        db_index=True,
+    )
+    last_read_at = models.DateTimeField(null=True, blank=True)
+    joined_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("conversation", "mailbox")
+        indexes = [
+            models.Index(fields=["mailbox", "folder", "-joined_at"]),
+        ]
+
+
+class InboxMessage(models.Model):
+    """Unified message row — drafts and sent messages for any mailbox."""
+
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        SENT = "sent", "Sent"
+
+    conversation = models.ForeignKey(
+        Conversation,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="messages",
+    )
+    sender_mailbox = models.ForeignKey(
+        Mailbox, on_delete=models.CASCADE, related_name="sent_messages"
+    )
+    # Optional compose targeting before send (resolved into participants on send).
+    draft_to_mailbox = models.ForeignKey(
+        Mailbox,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="draft_targets",
+    )
+    subject = models.CharField(max_length=200, blank=True)
+    body = models.TextField(blank=True)
+    status = models.CharField(
+        max_length=10,
+        choices=Status.choices,
+        default=Status.DRAFT,
+        db_index=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["created_at"]
+        indexes = [
+            models.Index(fields=["sender_mailbox", "status", "-updated_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.status}:{self.pk}:{self.subject[:40]}"
+
+
 class AccessCode(models.Model):
     code = models.CharField(max_length=32, db_index=True)
     organization = models.ForeignKey(
@@ -759,3 +973,54 @@ class ContactSubmission(models.Model):
 
     def __str__(self):
         return f"{self.subject} — {self.email}"
+class OrganizationAuditEvent(models.Model):
+    """Append-only audit trail for ownership, billing, and closure actions."""
+
+    class EventType(models.TextChoices):
+        OWNERSHIP_TRANSFERRED = "ownership_transferred", "Ownership transferred"
+        OWNERSHIP_CANCELED = "ownership_canceled", "Ownership canceled"
+        SUBSCRIPTION_CANCEL_REQUESTED = (
+            "subscription_cancel_requested",
+            "Subscription cancel requested",
+        )
+        SUBSCRIPTION_CANCELED = "subscription_canceled", "Subscription canceled"
+        PAYPAL_WEBHOOK = "paypal_webhook", "PayPal webhook"
+        ORGANIZATION_CLOSURE_REQUESTED = (
+            "organization_closure_requested",
+            "Organization closure requested",
+        )
+        ORGANIZATION_CLOSURE_CANCELED = (
+            "organization_closure_canceled",
+            "Organization closure canceled",
+        )
+        ORGANIZATION_CLOSED = "organization_closed", "Organization closed"
+        ORGANIZATION_RESTORED = "organization_restored", "Organization restored"
+        ORGANIZATION_CLAIM_REQUESTED = (
+            "organization_claim_requested",
+            "Organization claim requested",
+        )
+
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="audit_events",
+    )
+    actor = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="organization_audit_events",
+    )
+    event_type = models.CharField(max_length=64, choices=EventType.choices, db_index=True)
+    event_data = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["organization", "event_type", "-created_at"]),
+        ]
+
+    def __str__(self):
+        return f"{self.organization_id}:{self.event_type}:{self.pk}"

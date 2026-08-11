@@ -173,3 +173,178 @@ def create_subscription(
         "status": payload.get("status") or "",
         "raw": payload,
     }
+
+
+def cancel_subscription(subscription_id: str, *, reason: str = "Cancelled by organization owner") -> dict:
+    """
+    Cancel a PayPal subscription (stops future renewals).
+    Raises PayPalError without mutating CommuniB state — callers must not mark
+    local cancellation successful if this fails.
+    """
+    sub_id = (subscription_id or "").strip()
+    if not sub_id:
+        raise PayPalError("Missing PayPal subscription id.", code="paypal_missing_id")
+
+    token = get_access_token()
+    url = f"{paypal_api_base()}/v1/billing/subscriptions/{urllib.parse.quote(sub_id)}/cancel"
+    body = json.dumps({"reason": reason[:128]}).encode("utf-8")
+    req = urllib.request.Request(
+        url,
+        data=body,
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            raw = resp.read().decode("utf-8", errors="replace")
+            payload = json.loads(raw) if raw.strip() else {}
+            return payload
+    except urllib.error.HTTPError as exc:
+        body_text = exc.read().decode("utf-8", errors="replace")
+        # 422 often means already cancelled — treat as success for idempotency.
+        if exc.code in (404, 422):
+            logger.info(
+                "PayPal cancel subscription treated as done status=%s body=%s",
+                exc.code,
+                body_text[:300],
+            )
+            return {"status": "CANCELLED", "idempotent": True}
+        logger.warning(
+            "PayPal cancel subscription failed status=%s body=%s",
+            exc.code,
+            body_text[:500],
+        )
+        raise PayPalError(
+            "PayPal could not cancel the subscription. Please try again.",
+            code="paypal_cancel_failed",
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise PayPalError(
+            "Could not reach PayPal to cancel the subscription.",
+            code="paypal_unreachable",
+        ) from exc
+
+
+def verify_webhook_signature(
+    *,
+    headers: dict,
+    event: dict,
+    webhook_id: str | None = None,
+) -> bool:
+    """
+    Verify a PayPal webhook using /v1/notifications/verify-webhook-signature.
+
+    headers should include PAYPAL-TRANSMISSION-* / PAYPAL-AUTH-ALGO / PAYPAL-CERT-URL
+    (case-insensitive keys accepted).
+    """
+    wh_id = (webhook_id or getattr(settings, "PAYPAL_WEBHOOK_ID", "") or "").strip()
+    if not wh_id:
+        raise PayPalError(
+            "PAYPAL_WEBHOOK_ID is not configured.",
+            code="paypal_webhook_not_configured",
+        )
+
+    def _h(name: str) -> str:
+        target = name.lower()
+        for key, value in headers.items():
+            if str(key).lower() == target:
+                return (value or "").strip()
+        return ""
+
+    auth_algo = _h("PAYPAL-AUTH-ALGO")
+    cert_url = _h("PAYPAL-CERT-URL")
+    transmission_id = _h("PAYPAL-TRANSMISSION-ID")
+    transmission_sig = _h("PAYPAL-TRANSMISSION-SIG")
+    transmission_time = _h("PAYPAL-TRANSMISSION-TIME")
+    if not all(
+        [auth_algo, cert_url, transmission_id, transmission_sig, transmission_time]
+    ):
+        raise PayPalError(
+            "Missing PayPal webhook transmission headers.",
+            code="paypal_webhook_headers_missing",
+        )
+
+    token = get_access_token()
+    url = f"{paypal_api_base()}/v1/notifications/verify-webhook-signature"
+    body = {
+        "auth_algo": auth_algo,
+        "cert_url": cert_url,
+        "transmission_id": transmission_id,
+        "transmission_sig": transmission_sig,
+        "transmission_time": transmission_time,
+        "webhook_id": wh_id,
+        "webhook_event": event,
+    }
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(body).encode("utf-8"),
+        method="POST",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=45) as resp:
+            payload = json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        body_text = exc.read().decode("utf-8", errors="replace")
+        logger.warning(
+            "PayPal verify webhook failed status=%s body=%s",
+            exc.code,
+            body_text[:500],
+        )
+        raise PayPalError(
+            "PayPal could not verify the webhook signature.",
+            code="paypal_webhook_verify_failed",
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise PayPalError(
+            "Could not reach PayPal to verify the webhook.",
+            code="paypal_unreachable",
+        ) from exc
+
+    status_value = (payload.get("verification_status") or "").upper()
+    return status_value == "SUCCESS"
+
+
+def get_subscription(subscription_id: str) -> dict:
+    """Fetch subscription details (for billing period sync)."""
+    sub_id = (subscription_id or "").strip()
+    if not sub_id:
+        raise PayPalError("Missing PayPal subscription id.", code="paypal_missing_id")
+    token = get_access_token()
+    url = f"{paypal_api_base()}/v1/billing/subscriptions/{urllib.parse.quote(sub_id)}"
+    req = urllib.request.Request(
+        url,
+        method="GET",
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+        },
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+    except urllib.error.HTTPError as exc:
+        body_text = exc.read().decode("utf-8", errors="replace")
+        logger.warning(
+            "PayPal get subscription failed status=%s body=%s",
+            exc.code,
+            body_text[:500],
+        )
+        raise PayPalError(
+            "PayPal could not fetch the subscription.",
+            code="paypal_subscription_fetch_failed",
+        ) from exc
+    except urllib.error.URLError as exc:
+        raise PayPalError(
+            "Could not reach PayPal.",
+            code="paypal_unreachable",
+        ) from exc

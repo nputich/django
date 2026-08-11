@@ -209,10 +209,33 @@ BILLING_SIMULATION_ENABLED = os.getenv("BILLING_SIMULATION_ENABLED", "").lower()
 )
 
 # PayPal subscriptions (Stage 5+). Secrets via env / Secret Manager only.
+# Google Secret Manager names (communib project):
+#   PAYPAL_LIVE_CLIENT_ID / PAYPAL_LIVE_SECRET
+#   PAYPAL_SANDBOX_CLIENT_ID / PAYPAL_SANDBOX_SECRET
+# Cloud Run may map those onto PAYPAL_CLIENT_ID / PAYPAL_CLIENT_SECRET,
+# or expose the GSM names directly — both are supported below.
+# Local Docker: PAYPAL_*_FILE mounts from secrets/ via pull-paypal-sandbox-local.ps1
 PAYPAL_MODE = os.getenv("PAYPAL_MODE", "disabled").strip().lower()  # disabled|sandbox|live
-PAYPAL_CLIENT_ID = os.getenv("PAYPAL_CLIENT_ID", "").strip()
-PAYPAL_CLIENT_SECRET = os.getenv("PAYPAL_CLIENT_SECRET", "").strip()
-PAYPAL_WEBHOOK_ID = os.getenv("PAYPAL_WEBHOOK_ID", "").strip()
+_paypal_client_id = _env_or_file("PAYPAL_CLIENT_ID")
+_paypal_client_secret = _env_or_file("PAYPAL_CLIENT_SECRET")
+if not _paypal_client_id or not _paypal_client_secret:
+    if PAYPAL_MODE == "live":
+        _paypal_client_id = _paypal_client_id or _env_or_file("PAYPAL_LIVE_CLIENT_ID")
+        _paypal_client_secret = _paypal_client_secret or _env_or_file("PAYPAL_LIVE_SECRET")
+    elif PAYPAL_MODE == "sandbox":
+        _paypal_client_id = _paypal_client_id or _env_or_file("PAYPAL_SANDBOX_CLIENT_ID")
+        _paypal_client_secret = _paypal_client_secret or _env_or_file(
+            "PAYPAL_SANDBOX_SECRET"
+        )
+PAYPAL_CLIENT_ID = _paypal_client_id
+PAYPAL_CLIENT_SECRET = _paypal_client_secret
+_paypal_webhook_id = _env_or_file("PAYPAL_WEBHOOK_ID")
+if not _paypal_webhook_id:
+    if PAYPAL_MODE == "live":
+        _paypal_webhook_id = _env_or_file("PAYPAL_LIVE_WEBHOOK_ID")
+    elif PAYPAL_MODE == "sandbox":
+        _paypal_webhook_id = _env_or_file("PAYPAL_SANDBOX_WEBHOOK_ID")
+PAYPAL_WEBHOOK_ID = _paypal_webhook_id
 PAYPAL_SUBSCRIPTIONS_ENABLED = os.getenv("PAYPAL_SUBSCRIPTIONS_ENABLED", "").lower() in (
     "1",
     "true",

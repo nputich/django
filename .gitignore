@@ -220,6 +220,9 @@ secrets
 data/
 data
 
+# Uploaded profile pictures / media (local Docker volume)
+backend/media/
+
 grafana-storage/
 grafana-storage
 chrome_hits.txt

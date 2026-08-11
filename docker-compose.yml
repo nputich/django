@@ -1,62 +1,77 @@
-version: '3.8'
-
-services:
-  db:
-    image: postgres:16 # Use the official postgres image
-    restart: always # Ensures the container restarts if it fails
-    environment:
-      POSTGRES_USER: dbuser 
-      POSTGRES_USER_PASSWORD_FILE: /run/secrets/postgres_user_password
-      POSTGRES_DB: communib
-      POSTGRES_HOST_AUTH_METHOD: "trust"
-    volumes:
-      - pgdata:/var/lib/postgresql/data # Mount a named volume for data persistence
-    ports:
-      - "5432:5432" # Map port 5432 on the host
-    secrets:
-      - postgres_user_password
-
-  communib-backend: # Name of the backend service
-    build: backend
-    environment:
-      POSTGRES_USER_PASSWORD_FILE: /run/secrets/postgres_user_password
-      DB_NAME: communib
-      DB_USER: dbuser
-      DB_PWD: postgres_user_password
-      DB_HOST: host.docker.internal
-      DB_PORT: 5432
-      FRONTEND_BASE_URL: http://localhost:10001
-      PAYPAL_MODE: disabled
-      PAYPAL_SUBSCRIPTIONS_ENABLED: "false"
-      # Contact form SMTP (password from secrets/gmail_key.txt via pull-gmail-key-local.ps1)
-      EMAIL_HOST: smtp.gmail.com
-      EMAIL_PORT: "587"
-      EMAIL_USE_TLS: "true"
-      EMAIL_HOST_USER: contactcommunib@gmail.com
-      EMAIL_HOST_PASSWORD_FILE: /run/secrets/gmail_key
-      CONTACT_INBOX_EMAIL: contactcommunib@gmail.com
-      DEFAULT_FROM_EMAIL: contactcommunib@gmail.com
-    ports:
-      - "8001:8080"
-    secrets:
-      - postgres_user_password
-      - gmail_key
- 
-  communib-frontend: # Name of the frontend service
-    build:
-      context: frontend
-      args:
-        # Browser calls the host-mapped backend (not Cloud Run) for local QA.
-        VITE_API_URL: http://localhost:8001
-        VITE_APP_ENV: local
-    ports: 
-      - "10001:80"
-  
-volumes:
-  pgdata: # Define the named volume
-
-secrets:
-  postgres_user_password:
-    file: ./secrets/postgres_user_password.txt
-  gmail_key:
-    file: ./secrets/gmail_key.txt
+version: '3.8'
+
+services:
+  db:
+    image: postgres:16 # Use the official postgres image
+    restart: always # Ensures the container restarts if it fails
+    environment:
+      POSTGRES_USER: dbuser 
+      POSTGRES_USER_PASSWORD_FILE: /run/secrets/postgres_user_password
+      POSTGRES_DB: communib
+      POSTGRES_HOST_AUTH_METHOD: "trust"
+    volumes:
+      - pgdata:/var/lib/postgresql/data # Mount a named volume for data persistence
+    ports:
+      - "5432:5432" # Map port 5432 on the host
+    secrets:
+      - postgres_user_password
+
+  communib-backend: # Name of the backend service
+    build: backend
+    environment:
+      POSTGRES_USER_PASSWORD_FILE: /run/secrets/postgres_user_password
+      DB_NAME: communib
+      DB_USER: dbuser
+      DB_PWD: postgres_user_password
+      DB_HOST: host.docker.internal
+      DB_PORT: 5432
+      FRONTEND_BASE_URL: http://localhost:10001
+      PAYPAL_MODE: sandbox
+      PAYPAL_SUBSCRIPTIONS_ENABLED: "true"
+      PAYPAL_CLIENT_ID_FILE: /run/secrets/paypal_sandbox_client_id
+      PAYPAL_CLIENT_SECRET_FILE: /run/secrets/paypal_sandbox_secret
+      PAYPAL_WEBHOOK_ID_FILE: /run/secrets/paypal_sandbox_webhook_id
+      # Contact form SMTP (password from secrets/gmail_key.txt via pull-gmail-key-local.ps1)
+      EMAIL_HOST: smtp.gmail.com
+      EMAIL_PORT: "587"
+      EMAIL_USE_TLS: "true"
+      EMAIL_HOST_USER: contactcommunib@gmail.com
+      EMAIL_HOST_PASSWORD_FILE: /run/secrets/gmail_key
+      CONTACT_INBOX_EMAIL: contactcommunib@gmail.com
+      DEFAULT_FROM_EMAIL: contactcommunib@gmail.com
+    volumes:
+      # Persist uploaded profile pictures / media across rebuilds
+      - ./backend/media:/app/media
+    ports:
+      - "8001:8080"
+    secrets:
+      - postgres_user_password
+      - gmail_key
+      - paypal_sandbox_client_id
+      - paypal_sandbox_secret
+      - paypal_sandbox_webhook_id
+ 
+  communib-frontend: # Name of the frontend service
+    build:
+      context: frontend
+      args:
+        # Browser calls the host-mapped backend (not Cloud Run) for local QA.
+        VITE_API_URL: http://localhost:8001
+        VITE_APP_ENV: local
+    ports: 
+      - "10001:80"
+  
+volumes:
+  pgdata: # Define the named volume
+
+secrets:
+  postgres_user_password:
+    file: ./secrets/postgres_user_password.txt
+  gmail_key:
+    file: ./secrets/gmail_key.txt
+  paypal_sandbox_client_id:
+    file: ./secrets/paypal_sandbox_client_id.txt
+  paypal_sandbox_secret:
+    file: ./secrets/paypal_sandbox_secret.txt
+  paypal_sandbox_webhook_id:
+    file: ./secrets/paypal_sandbox_webhook_id.txt

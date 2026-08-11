@@ -74,12 +74,15 @@ export default function OrgBilling() {
       "";
 
     const finishSuccessUi = (extra = {}) => {
+      const activated = Boolean(extra.activated);
       setResultModal({
-        title: "Subscription submitted",
-        body:
-          "Your PayPal subscription has been received. CommuniB is confirming your subscription.",
-        emphasis:
-          "Your service will become active after confirmation. This page alone does not activate paid service.",
+        title: activated ? "Subscription active" : "Subscription submitted",
+        body: activated
+          ? "PayPal confirmed your subscription. Your organization's paid service is now active."
+          : "Your PayPal subscription has been received. CommuniB is confirming your subscription.",
+        emphasis: activated
+          ? `Effective service: ${extra.effective || "paid"}.`
+          : "Paid service activates after PayPal confirms the subscription. Refresh this page if it still shows pending.",
         ...extra,
       });
       const next = new URLSearchParams(searchParams);
@@ -104,7 +107,9 @@ export default function OrgBilling() {
       })
       .then((res) => {
         finishSuccessUi({
-          reference: res.data.pending_service?.billing_reference,
+          activated: res.data.activated,
+          reference: res.data.service?.billing_reference
+            || res.data.pending_service?.billing_reference,
           effective: res.data.effective_service_level,
         });
       })
@@ -194,6 +199,17 @@ export default function OrgBilling() {
               <p className="billing-org-name">{orgName}</p>
             </div>
 
+            {data.paypal_sandbox && (
+              <div
+                className="billing-sandbox-banner"
+                role="status"
+                aria-live="polite"
+              >
+                Sandbox mode is activated. No PayPal transaction will take
+                place.
+              </div>
+            )}
+
             <section className="billing-current" aria-labelledby={`${titleId}-current`}>
               <h2 id={`${titleId}-current`} className="billing-section-title">
                 Current Service
@@ -266,9 +282,11 @@ export default function OrgBilling() {
             </section>
 
             <p className="billing-footnote">
-              {paypalReady
-                ? "Choosing a plan starts PayPal checkout. Paid service stays inactive until CommuniB confirms the subscription."
-                : "PayPal is not enabled in this environment. Choosing a plan creates a PENDING checkout only and does not charge or activate service."}
+              {data.paypal_sandbox
+                ? "Sandbox mode is activated. No PayPal transaction will take place. Checkout uses the PayPal sandbox environment only."
+                : paypalReady
+                  ? "Choosing a plan starts PayPal checkout. Paid service stays inactive until CommuniB confirms the subscription."
+                  : "PayPal is not enabled in this environment. Choosing a plan creates a PENDING checkout only and does not charge or activate service."}
             </p>
           </>
         )}
@@ -296,10 +314,21 @@ export default function OrgBilling() {
               {confirmPlan.price_display}
             </p>
             <p className="billing-modal-body">
-              {paypalReady
-                ? "This will start a PayPal subscription checkout."
-                : "This will create a pending CommuniB checkout record (PayPal is not configured here)."}
+              {data?.paypal_sandbox
+                ? "This will open PayPal sandbox checkout for testing."
+                : paypalReady
+                  ? "This will start a PayPal subscription checkout."
+                  : "This will create a pending CommuniB checkout record (PayPal is not configured here)."}
             </p>
+            {data?.paypal_sandbox && (
+              <div
+                className="billing-sandbox-banner billing-sandbox-banner--modal"
+                role="status"
+              >
+                Sandbox mode is activated. No PayPal transaction will take
+                place.
+              </div>
+            )}
             <div className="billing-modal-actions">
               <button
                 type="button"

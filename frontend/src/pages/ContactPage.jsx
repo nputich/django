@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import api from "../api";
 import MarketingLayout from "../components/MarketingLayout";
 import SiteLogo from "../components/SiteLogo";
@@ -10,10 +10,13 @@ import "../styles/Contact.css";
 const MESSAGE_MAX = 2000;
 
 export default function ContactPage() {
+  const [searchParams] = useSearchParams();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
-  const [subject, setSubject] = useState("");
-  const [message, setMessage] = useState("");
+  const [subject, setSubject] = useState(() => searchParams.get("subject") || "");
+  const [message, setMessage] = useState(() =>
+    (searchParams.get("message") || "").slice(0, MESSAGE_MAX)
+  );
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [submitting, setSubmitting] = useState(false);

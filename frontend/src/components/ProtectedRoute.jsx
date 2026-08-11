@@ -99,7 +99,7 @@ function ProtectedRoute({ children, skipProfileCheck = false }) {
   }
 
   if (!isAuthorized) {
-    return <Navigate to="/" replace />;
+    return <Navigate to="/" replace state={{ from: location }} />;
   }
 
   if (

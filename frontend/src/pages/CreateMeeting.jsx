@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import api from "../api";
 import AppHeader from "../components/AppHeader";
@@ -54,6 +54,18 @@ export default function CreateMeeting() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const [entitlementBlocked, setEntitlementBlocked] = useState(false);
+
+  useEffect(() => {
+    api
+      .get(`/api/organizations/${slug}/dashboard/`)
+      .then((res) => {
+        if (res.data.capabilities && !res.data.capabilities.create_meetings) {
+          setEntitlementBlocked(true);
+        }
+      })
+      .catch(() => {});
+  }, [slug]);
 
   const checkCode = useCallback(async (code) => {
     if (!code.trim()) {
@@ -195,6 +207,27 @@ export default function CreateMeeting() {
           </p>
         </div>
 
+        {entitlementBlocked && (
+          <div className="dashboard-card">
+            <h2>Create a New Meeting</h2>
+            <p>
+              New meetings require CommuniB Basic or higher. Your previous
+              meetings, responses, and reports remain available.
+            </p>
+            <div className="dashboard-actions">
+              <Link to={`/dashboard/${slug}`} className="dashboard-btn">
+                Back to dashboard
+              </Link>
+              <Link
+                to={`/dashboard/${slug}/billing`}
+                className="dashboard-btn dashboard-btn--primary"
+              >
+                View plans
+              </Link>
+            </div>
+          </div>
+        )}
+
         {success && (
           <div className="dashboard-success">
             <strong>Meeting created!</strong>
@@ -206,6 +239,7 @@ export default function CreateMeeting() {
           </div>
         )}
 
+        {!entitlementBlocked && !success && (
         <form className="dashboard-form" onSubmit={handleSubmit}>
           <div className="dashboard-field">
             <label htmlFor="meeting-title">Title</label>
@@ -428,6 +462,7 @@ export default function CreateMeeting() {
             {submitting ? "Creating..." : "Create meeting"}
           </button>
         </form>
+        )}
       </main>
     </div>
   );

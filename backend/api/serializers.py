@@ -102,10 +102,19 @@ class OrganizationHubSerializer(serializers.ModelSerializer):
 
 class MyOrganizationSerializer(serializers.ModelSerializer):
     role = serializers.SerializerMethodField()
+    status = serializers.CharField(read_only=True)
 
     class Meta:
         model = Organization
-        fields = ["id", "name", "slug", "description", "is_verified", "role"]
+        fields = [
+            "id",
+            "name",
+            "slug",
+            "description",
+            "is_verified",
+            "role",
+            "status",
+        ]
 
     def get_role(self, obj):
         user = self.context["request"].user
@@ -113,6 +122,19 @@ class MyOrganizationSerializer(serializers.ModelSerializer):
             organization=obj, user=user
         ).first()
         return membership.role if membership else None
+
+
+class CreateOrganizationSerializer(serializers.Serializer):
+    name = serializers.CharField(max_length=200)
+    description = serializers.CharField(
+        max_length=5000, required=False, allow_blank=True, default=""
+    )
+
+    def validate_name(self, value):
+        name = (value or "").strip()
+        if len(name) < 2:
+            raise serializers.ValidationError("Enter an organization name.")
+        return name
 
 
 class DashboardAccessCodeSerializer(serializers.ModelSerializer):
@@ -234,6 +256,8 @@ class OrganizationDashboardSerializer(serializers.ModelSerializer):
     surveys = DashboardSurveySerializer(many=True, read_only=True)
     meetings = DashboardMeetingSerializer(many=True, read_only=True)
     board = serializers.SerializerMethodField()
+    capabilities = serializers.SerializerMethodField()
+    lifecycle = serializers.SerializerMethodField()
 
     class Meta:
         model = Organization
@@ -243,15 +267,28 @@ class OrganizationDashboardSerializer(serializers.ModelSerializer):
             "slug",
             "description",
             "is_verified",
+            "status",
             "surveys",
             "meetings",
             "board",
+            "capabilities",
+            "lifecycle",
         ]
 
     def get_board(self, obj):
         if not hasattr(obj, "board"):
             return None
         return OrganizationBoardPublicSerializer(obj.board).data
+
+    def get_capabilities(self, obj):
+        from .feature_entitlements import get_organization_capabilities
+
+        return get_organization_capabilities(obj)
+
+    def get_lifecycle(self, obj):
+        from .organization_lifecycle import serialize_lifecycle
+
+        return serialize_lifecycle(obj)
 
 
 def _profile_picture_url(profile, request):
@@ -409,6 +446,51 @@ class OrganizationBoardSettingsSerializer(serializers.Serializer):
     posting_mode = serializers.ChoiceField(
         choices=OrganizationBoard.PostingMode.choices, required=False
     )
+
+
+class InboxComposeSerializer(serializers.Serializer):
+    subject = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    body = serializers.CharField()
+    to_username = serializers.CharField(required=False, allow_blank=True)
+    to_organization_slug = serializers.CharField(required=False, allow_blank=True)
+
+    def validate(self, attrs):
+        username = (attrs.get("to_username") or "").strip()
+        org_slug = (attrs.get("to_organization_slug") or "").strip()
+        attrs["to_username"] = username or None
+        attrs["to_organization_slug"] = org_slug or None
+        if bool(attrs["to_username"]) == bool(attrs["to_organization_slug"]):
+            raise serializers.ValidationError(
+                "Provide exactly one of to_username or to_organization_slug."
+            )
+        if not (attrs.get("body") or "").strip():
+            raise serializers.ValidationError({"body": "Message body is required."})
+        return attrs
+
+
+class InboxDraftSaveSerializer(serializers.Serializer):
+    id = serializers.IntegerField(required=False)
+    subject = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    body = serializers.CharField(required=False, allow_blank=True)
+    to_username = serializers.CharField(required=False, allow_blank=True)
+    to_organization_slug = serializers.CharField(required=False, allow_blank=True)
+    conversation_id = serializers.IntegerField(required=False, allow_null=True)
+
+    def validate(self, attrs):
+        if "to_username" in attrs:
+            attrs["to_username"] = (attrs.get("to_username") or "").strip() or None
+        if "to_organization_slug" in attrs:
+            attrs["to_organization_slug"] = (
+                attrs.get("to_organization_slug") or ""
+            ).strip() or None
+        username = attrs.get("to_username")
+        org_slug = attrs.get("to_organization_slug")
+        if username is not None or org_slug is not None:
+            if bool(username) == bool(org_slug):
+                raise serializers.ValidationError(
+                    "Provide exactly one of to_username or to_organization_slug."
+                )
+        return attrs
 
 
 class SurveyQuestionCreateSerializer(serializers.Serializer):

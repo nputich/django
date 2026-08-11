@@ -1,0 +1,117 @@
+@import "./theme.css";
+@import "./CreateOrganization.css";
+
+.org-pricing-page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 0.5rem 1.25rem 3rem;
+}
+
+.org-pricing-header {
+  text-align: center;
+  margin-bottom: 1.75rem;
+}
+
+.org-pricing-title {
+  margin: 0 0 0.5rem;
+  font-size: 1.75rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--cb-text);
+}
+
+.org-pricing-lead {
+  margin: 0;
+  color: var(--cb-text-secondary);
+  font-size: 1rem;
+  line-height: 1.5;
+}
+
+.org-pricing-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.org-pricing-card {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1.2rem 1.25rem;
+  border: 1px solid var(--cb-border);
+  border-radius: var(--cb-radius-lg);
+  background: var(--cb-bg);
+}
+
+.org-pricing-card--free {
+  border-color: color-mix(in srgb, var(--cb-orange) 40%, var(--cb-border));
+  background: var(--cb-orange-light);
+}
+
+.org-pricing-copy {
+  flex: 1 1 14rem;
+  min-width: 0;
+}
+
+.org-pricing-name {
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--cb-text);
+}
+
+.org-pricing-price {
+  margin: 0 0 0.55rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--cb-text);
+}
+
+.org-pricing-desc {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.5;
+  color: var(--cb-text-secondary);
+}
+
+.org-pricing-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.7rem 1.15rem;
+  border-radius: 10px;
+  border: 1px solid var(--cb-border);
+  background: var(--cb-bg);
+  color: var(--cb-text);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.org-pricing-btn:hover {
+  border-color: var(--cb-orange);
+  color: var(--cb-orange);
+}
+
+.org-pricing-footnote {
+  margin: 1.75rem 0 0;
+  text-align: center;
+  font-size: 0.875rem;
+  color: var(--cb-text-secondary);
+}
+
+.org-pricing-footnote a {
+  color: var(--cb-orange);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.org-pricing-footnote a:hover {
+  text-decoration: underline;
+}

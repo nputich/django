@@ -2,9 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../api";
 import AppHeader from "../components/AppHeader";
+import CreateOrganizationLink from "../components/CreateOrganizationLink";
 import PostingBoard from "../components/PostingBoard";
 import "../styles/Dashboard.css";
 import "../styles/Board.css";
+import "../styles/CreateOrganization.css";
 
 export default function DashboardHome() {
   const [organizations, setOrganizations] = useState([]);
@@ -59,7 +61,7 @@ export default function DashboardHome() {
               : "Your dashboard"}
           </h1>
           <p>
-            Your personal posting board and organizations you manage.
+            Your personal posting board, messages, and organizations you manage.
             <Link to="/account" style={{ marginLeft: "0.5rem" }}>
               Account settings
             </Link>
@@ -68,6 +70,14 @@ export default function DashboardHome() {
 
         {loading && <p className="dashboard-empty">Loading...</p>}
         {error && <p className="dashboard-error">{error}</p>}
+
+        {!loading && !error && (
+          <div className="dashboard-actions" style={{ marginBottom: "1.25rem" }}>
+            <Link to="/dashboard/inbox" className="dashboard-btn dashboard-btn--primary">
+              Messages
+            </Link>
+          </div>
+        )}
 
         {boardData && (
           <div className="dashboard-card">
@@ -83,30 +93,41 @@ export default function DashboardHome() {
           </div>
         )}
 
-        {!loading && !error && organizations.length === 0 && (
-          <div className="dashboard-card">
-            <p className="dashboard-empty">
-              You are not an admin of any organization yet. Ask a site
-              administrator to add you as an organization admin.
-            </p>
-          </div>
-        )}
-
-        {!loading && organizations.length > 0 && (
+        {!loading && !error && (
           <>
-            <h2 className="dashboard-section-title">Your organizations</h2>
-            <div className="dashboard-org-picker">
-              {organizations.map((org) => (
-                <Link
-                  key={org.id}
-                  to={`/dashboard/${org.slug}`}
-                  className="dashboard-org-link"
-                >
-                  <strong>{org.name}</strong>
-                  <span>{org.description || `/${org.slug}`}</span>
-                </Link>
-              ))}
-            </div>
+            <h2 className="dashboard-section-title">My Organizations</h2>
+            {organizations.length === 0 ? (
+              <div className="dashboard-card">
+                <p className="dashboard-empty">
+                  You do not manage any organizations yet.
+                </p>
+                <div className="dashboard-org-create-row">
+                  <CreateOrganizationLink asButton>
+                    + Create an Organization
+                  </CreateOrganizationLink>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="dashboard-org-picker">
+                  {organizations.map((org) => (
+                    <Link
+                      key={org.id}
+                      to={`/dashboard/${org.slug}`}
+                      className="dashboard-org-link"
+                    >
+                      <strong>{org.name}</strong>
+                      <span>{org.description || `/${org.slug}`}</span>
+                    </Link>
+                  ))}
+                </div>
+                <div className="dashboard-org-create-row">
+                  <CreateOrganizationLink>
+                    + Create an Organization
+                  </CreateOrganizationLink>
+                </div>
+              </>
+            )}
           </>
         )}
       </main>

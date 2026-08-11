@@ -4,6 +4,7 @@ import api from "../api";
 import AppHeader from "../components/AppHeader";
 import DashboardCollapsibleSection from "../components/DashboardCollapsibleSection";
 import PostingBoard from "../components/PostingBoard";
+import UpgradeRequiredModal from "../components/UpgradeRequiredModal";
 import "../styles/Dashboard.css";
 import "../styles/Board.css";
 
@@ -29,6 +30,17 @@ export default function OrgDashboard() {
   const [boardMode, setBoardMode] = useState("public");
   const [boardSaving, setBoardSaving] = useState(false);
   const [boardMessage, setBoardMessage] = useState("");
+  const [upgradeModal, setUpgradeModal] = useState(null);
+
+  const caps = org?.capabilities || {};
+  const canCreateMeetings = caps.create_meetings !== false;
+  const canStartMeetings = caps.start_meetings !== false;
+  const canCreateSurveys = caps.create_surveys !== false;
+  const billingPath = `/dashboard/${slug}/billing`;
+
+  const openUpgrade = (title, body) => {
+    setUpgradeModal({ title, body });
+  };
 
   const loadDashboard = useCallback(() => {
     setLoading(true);
@@ -74,7 +86,15 @@ export default function OrgDashboard() {
       await api.post(`/api/organizations/${slug}/meetings/${meetingId}/start/`);
       await loadDashboard();
     } catch (err) {
-      setError(err.response?.data?.detail || "Could not start meeting.");
+      if (err.response?.data?.upgrade_required) {
+        openUpgrade(
+          "Start Meeting",
+          err.response.data.detail ||
+            "Starting meetings requires CommuniB Basic or higher."
+        );
+      } else {
+        setError(err.response?.data?.detail || "Could not start meeting.");
+      }
     } finally {
       setStartingId(null);
     }
@@ -139,26 +159,31 @@ export default function OrgDashboard() {
             <div className="dashboard-header">
               <h1>{org.name}</h1>
               <p>{org.description || "Organization dashboard"}</p>
+              <p className="dashboard-meta">
+                Service:{" "}
+                <strong>
+                  {caps.is_free
+                    ? "Free Organization"
+                    : caps.service_level_label || caps.service_level || "—"}
+                </strong>
+              </p>
             </div>
 
             <div className="dashboard-actions">
               <Link
-                to={`/dashboard/${slug}/surveys/new`}
-                className="dashboard-btn dashboard-btn--primary"
-              >
-                Create survey
-              </Link>
-              <Link
-                to={`/dashboard/${slug}/meetings/new`}
-                className="dashboard-btn dashboard-btn--primary"
-              >
-                Create meeting
-              </Link>
-              <Link
-                to={`/dashboard/${slug}/billing`}
+                to={`/dashboard/${slug}/inbox`}
                 className="dashboard-btn"
               >
+                Messages
+              </Link>
+              <Link to={billingPath} className="dashboard-btn">
                 Billing &amp; Service
+              </Link>
+              <Link
+                to={`/dashboard/${slug}/settings`}
+                className="dashboard-btn"
+              >
+                Ownership &amp; Organization
               </Link>
               <Link
                 to={`/org/${slug}/hub`}
@@ -169,6 +194,40 @@ export default function OrgDashboard() {
                 View public hub
               </Link>
             </div>
+
+            {org.lifecycle?.status === "closure_pending" && (
+              <div className="dashboard-card">
+                <p>
+                  Organization scheduled to close on{" "}
+                  <strong>
+                    {org.lifecycle.closure_effective_at
+                      ? new Date(
+                          org.lifecycle.closure_effective_at
+                        ).toLocaleDateString()
+                      : "the paid-through date"}
+                  </strong>
+                  .{" "}
+                  <Link to={`/dashboard/${slug}/settings`}>
+                    Manage closure
+                  </Link>
+                </p>
+              </div>
+            )}
+
+            {caps.is_free && (
+              <div className="dashboard-card dashboard-upgrade-nudge">
+                <p>
+                  Want to run another engagement? Upgrade to create new
+                  meetings, surveys, and community participation activities.
+                </p>
+                <Link
+                  to={billingPath}
+                  className="dashboard-btn dashboard-btn--primary"
+                >
+                  View plans
+                </Link>
+              </div>
+            )}
 
             <DashboardCollapsibleSection id="org-board" title="Posting board" defaultOpen>
               <p className="dashboard-meta">
@@ -230,7 +289,7 @@ export default function OrgDashboard() {
               )}
             </DashboardCollapsibleSection>
 
-            <DashboardCollapsibleSection id="org-surveys" title="Surveys">
+            <DashboardCollapsibleSection id="org-surveys" title="Surveys" defaultOpen>
               {org.surveys.length === 0 ? (
                 <p className="dashboard-empty">No surveys yet.</p>
               ) : (
@@ -258,9 +317,35 @@ export default function OrgDashboard() {
                   ))}
                 </ul>
               )}
+              {canCreateSurveys ? (
+                <Link
+                  to={`/dashboard/${slug}/surveys/new`}
+                  className="dashboard-btn dashboard-btn--primary"
+                  style={{ marginTop: "0.75rem", display: "inline-flex" }}
+                >
+                  Create new survey
+                </Link>
+              ) : (
+                <div className="dashboard-locked-action">
+                  <button
+                    type="button"
+                    className="dashboard-btn dashboard-btn--locked"
+                    aria-label="Create new survey requires Basic or higher"
+                    onClick={() =>
+                      openUpgrade(
+                        "Create a New Survey",
+                        "New surveys require CommuniB Basic or higher. You can continue viewing your previous surveys and results."
+                      )
+                    }
+                  >
+                    🔒 Create new survey
+                  </button>
+                  <p className="dashboard-lock-hint">Requires Basic or higher</p>
+                </div>
+              )}
             </DashboardCollapsibleSection>
 
-            <DashboardCollapsibleSection id="org-meetings" title="Meetings">
+            <DashboardCollapsibleSection id="org-meetings" title="Meetings" defaultOpen>
               {org.meetings.length === 0 ? (
                 <p className="dashboard-empty">No meetings yet.</p>
               ) : (
@@ -271,29 +356,50 @@ export default function OrgDashboard() {
                         <h3>{meeting.title}</h3>
                         <p className="dashboard-meta">
                           {meeting.access_mode} · {meeting.status} ·{" "}
-                          <Link to={`/m/${meeting.id}`}>Open meeting</Link> ·{" "}
+                          <Link to={`/m/${meeting.id}`}>View meeting</Link> ·{" "}
                           <Link to={`/dashboard/${slug}/meetings/${meeting.id}/edit`}>
                             Edit
                           </Link>
-                        </p>
-                        {meeting.status === "scheduled" && (
-                          <button
-                            type="button"
-                            className="dashboard-btn dashboard-btn--primary"
-                            style={{ marginTop: "0.5rem" }}
-                            disabled={startingId === meeting.id}
-                            onClick={() => handleStartMeeting(meeting.id)}
+                          {" · "}
+                          <Link
+                            to={`/dashboard/${slug}/meetings/${meeting.id}/host`}
                           >
-                            {startingId === meeting.id ? "Starting..." : "Start meeting"}
-                          </button>
-                        )}
-                        <Link
-                          to={`/dashboard/${slug}/meetings/${meeting.id}/host`}
-                          className="dashboard-btn"
-                          style={{ marginTop: "0.5rem", display: "inline-flex" }}
-                        >
-                          Host controls
-                        </Link>
+                            View results / host
+                          </Link>
+                        </p>
+                        {meeting.status === "scheduled" &&
+                          (canStartMeetings ? (
+                            <button
+                              type="button"
+                              className="dashboard-btn dashboard-btn--primary"
+                              style={{ marginTop: "0.5rem" }}
+                              disabled={startingId === meeting.id}
+                              onClick={() => handleStartMeeting(meeting.id)}
+                            >
+                              {startingId === meeting.id
+                                ? "Starting..."
+                                : "Start meeting"}
+                            </button>
+                          ) : (
+                            <div className="dashboard-locked-action">
+                              <button
+                                type="button"
+                                className="dashboard-btn dashboard-btn--locked"
+                                aria-label="Start meeting requires Basic or higher"
+                                onClick={() =>
+                                  openUpgrade(
+                                    "Start Meeting",
+                                    "Starting meetings requires CommuniB Basic or higher. You can still view previous meeting results."
+                                  )
+                                }
+                              >
+                                🔒 Start meeting
+                              </button>
+                              <p className="dashboard-lock-hint">
+                                Requires Basic or higher
+                              </p>
+                            </div>
+                          ))}
                       </div>
                       <div>
                         {(meeting.access_codes ?? []).map((code) => (
@@ -306,10 +412,44 @@ export default function OrgDashboard() {
                   ))}
                 </ul>
               )}
+              {canCreateMeetings ? (
+                <Link
+                  to={`/dashboard/${slug}/meetings/new`}
+                  className="dashboard-btn dashboard-btn--primary"
+                  style={{ marginTop: "0.75rem", display: "inline-flex" }}
+                >
+                  Create new meeting
+                </Link>
+              ) : (
+                <div className="dashboard-locked-action">
+                  <button
+                    type="button"
+                    className="dashboard-btn dashboard-btn--locked"
+                    aria-label="Create new meeting requires Basic or higher"
+                    onClick={() =>
+                      openUpgrade(
+                        "Create a New Meeting",
+                        "New meetings require CommuniB Basic or higher. Your previous meetings, responses, and reports remain available."
+                      )
+                    }
+                  >
+                    🔒 Create new meeting
+                  </button>
+                  <p className="dashboard-lock-hint">Requires Basic or higher</p>
+                </div>
+              )}
             </DashboardCollapsibleSection>
           </>
         )}
       </main>
+
+      <UpgradeRequiredModal
+        open={Boolean(upgradeModal)}
+        title={upgradeModal?.title || ""}
+        body={upgradeModal?.body || ""}
+        billingPath={billingPath}
+        onClose={() => setUpgradeModal(null)}
+      />
     </div>
   );
 }

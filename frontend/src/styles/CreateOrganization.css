@@ -1,0 +1,154 @@
+@import "./theme.css";
+
+.create-org-page {
+  max-width: 560px;
+}
+
+.create-org-plan-note {
+  margin: 0.75rem 0 0;
+  padding: 0.75rem 0.9rem;
+  background: var(--cb-orange-light);
+  border-radius: var(--cb-radius);
+  color: var(--cb-text);
+  font-size: 0.9375rem;
+  line-height: 1.45;
+}
+
+.create-org-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  padding: 1.25rem;
+  border: 1px solid var(--cb-border);
+  border-radius: var(--cb-radius-lg);
+  background: var(--cb-bg);
+}
+
+.create-org-field label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--cb-text);
+}
+
+.create-org-field label span {
+  font-weight: 500;
+  color: var(--cb-text-muted);
+}
+
+.create-org-field input,
+.create-org-field textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--cb-border);
+  border-radius: 10px;
+  font: inherit;
+  color: var(--cb-text);
+  background: var(--cb-bg);
+}
+
+.create-org-field input:focus,
+.create-org-field textarea:focus {
+  outline: none;
+  border-color: var(--cb-orange);
+}
+
+.create-org-link {
+  color: var(--cb-orange);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.create-org-link:hover {
+  color: var(--cb-orange-hover);
+  text-decoration: underline;
+}
+
+.create-org-link--button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.7rem 1.15rem;
+  border-radius: 10px;
+  background: var(--cb-orange);
+  border: 1px solid var(--cb-orange);
+  color: #fff;
+  font-weight: 700;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.create-org-link--button:hover {
+  background: var(--cb-orange-hover);
+  border-color: var(--cb-orange-hover);
+  color: #fff;
+  text-decoration: none;
+}
+
+.create-org-prompt {
+  margin: 0.85rem 0 0;
+  font-size: 0.9375rem;
+  color: var(--cb-text-secondary);
+  line-height: 1.45;
+}
+
+.create-org-prompt .create-org-link {
+  margin-left: 0.25rem;
+}
+
+.directory-create-banner {
+  margin: 0 0 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--cb-orange) 35%, var(--cb-border));
+  border-radius: var(--cb-radius);
+  background: var(--cb-orange-light);
+  font-size: 0.9375rem;
+  color: var(--cb-text);
+  line-height: 1.45;
+}
+
+.directory-claim-btn {
+  display: inline-block;
+  margin-top: 0.35rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--cb-orange);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.directory-claim-btn:hover {
+  text-decoration: underline;
+  color: var(--cb-orange-hover);
+}
+
+.dashboard-org-create-row {
+  margin-top: 0.85rem;
+}
+
+.landing-nav-account-secondary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.65rem;
+  width: 100%;
+  margin-top: 0.15rem;
+  padding-top: 0.35rem;
+  border-top: 1px solid var(--cb-border);
+}
+
+.landing-nav-account-secondary a {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--cb-text-secondary);
+  text-decoration: none;
+}
+
+.landing-nav-account-secondary a:hover {
+  color: var(--cb-orange);
+}

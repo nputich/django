@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import api from "../api";
 import { ACCESS_TOKEN, REFRESH_TOKEN } from "../constants";
 import "../styles/Form.css";
@@ -9,7 +9,7 @@ function Form({ route, method, compact = false, header = false, hideFooter = fal
     const [username, setUsername] = useState("");
     const [password, setPassword] = useState("");
     const [loading, setLoading] = useState(false);
-    const navigate = useNavigate();
+    const location = useLocation();
     const name = method === "login" ? "Login" : "Register";
 
     const handleSubmit = async (e) => {
@@ -18,12 +18,28 @@ function Form({ route, method, compact = false, header = false, hideFooter = fal
 
         try {
             const res = await api.post(route, { username, password });
+            const redirectTo = () => {
+                const from = location.state?.from;
+                if (from && typeof from.pathname === "string") {
+                    return `${from.pathname}${from.search || ""}`;
+                }
+                return "/dashboard";
+            };
             if (method === "login") {
                 localStorage.setItem(ACCESS_TOKEN, res.data.access);
                 localStorage.setItem(REFRESH_TOKEN, res.data.refresh);
-                window.location.href = "/dashboard";
+                const next = redirectTo();
+                window.location.href = next.startsWith("/") ? next : "/dashboard";
             } else {
-                navigate("/");
+                // Auto sign-in after register so "create organization" return works.
+                const tokenRes = await api.post("/api/token/", {
+                    username,
+                    password,
+                });
+                localStorage.setItem(ACCESS_TOKEN, tokenRes.data.access);
+                localStorage.setItem(REFRESH_TOKEN, tokenRes.data.refresh);
+                const next = redirectTo();
+                window.location.href = next.startsWith("/") ? next : "/dashboard";
             }
         } catch (error) {
             alert(error);
@@ -73,11 +89,17 @@ function Form({ route, method, compact = false, header = false, hideFooter = fal
                 <p className={`form-footer${compact ? " form-footer--compact" : ""}`}>
                     {method === "login" ? (
                         <>
-                            New here? <Link to="/register">Register</Link>
+                            New here?{" "}
+                            <Link to="/register" state={location.state}>
+                                Register
+                            </Link>
                         </>
                     ) : (
                         <>
-                            Already have an account? <Link to="/">Sign in</Link>
+                            Already have an account?{" "}
+                            <Link to="/" state={location.state}>
+                                Sign in
+                            </Link>
                         </>
                     )}
                 </p>

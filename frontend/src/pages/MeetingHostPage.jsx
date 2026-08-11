@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import api from "../api";
 import AppHeader from "../components/AppHeader";
 import HostResultsPanel from "../components/HostResultsPanel";
+import UpgradeRequiredModal from "../components/UpgradeRequiredModal";
 import "../styles/Dashboard.css";
 
 function emptyStandardSlide(order) {
@@ -34,6 +35,12 @@ export default function MeetingHostPage() {
   const [exporting, setExporting] = useState(false);
   const [showResults, setShowResults] = useState(false);
   const [resultsSlideId, setResultsSlideId] = useState(null);
+  const [capabilities, setCapabilities] = useState(null);
+  const [upgradeModal, setUpgradeModal] = useState(null);
+
+  const canStart = capabilities?.start_meetings !== false;
+  const canRunAi = capabilities?.run_new_ai_analysis !== false;
+  const billingPath = `/dashboard/${slug}/billing`;
 
   const loadLive = useCallback(async () => {
     const res = await api.get(
@@ -64,6 +71,15 @@ export default function MeetingHostPage() {
   }, [loadLive]);
 
   useEffect(() => {
+    api
+      .get(`/api/organizations/${slug}/dashboard/`)
+      .then((res) => {
+        if (res.data.capabilities) setCapabilities(res.data.capabilities);
+      })
+      .catch(() => {});
+  }, [slug]);
+
+  useEffect(() => {
     if (loading || error) return undefined;
     const interval = setInterval(() => {
       loadLive().catch(() => {});
@@ -85,7 +101,20 @@ export default function MeetingHostPage() {
         await loadLive();
       }
     } catch (err) {
-      setActionError(err.response?.data?.detail || "Action failed.");
+      if (err.response?.data?.upgrade_required) {
+        setUpgradeModal({
+          title: path.includes("ai")
+            ? "Run New AI Analysis"
+            : path.includes("start") || path.includes("restart")
+              ? "Start Meeting"
+              : "Upgrade required",
+          body:
+            err.response.data.detail ||
+            "This action requires a paid CommuniB service.",
+        });
+      } else {
+        setActionError(err.response?.data?.detail || "Action failed.");
+      }
     } finally {
       setBusy(false);
     }
@@ -257,18 +286,37 @@ export default function MeetingHostPage() {
                   ))}
                 </select>
               </div>
-              <button
-                type="button"
-                className="dashboard-btn dashboard-btn--primary"
-                disabled={busy}
-                onClick={() =>
-                  runAction("start/", {
-                    slide_id: startSlideId ? Number(startSlideId) : undefined,
-                  })
-                }
-              >
-                Start meeting
-              </button>
+              {canStart ? (
+                <button
+                  type="button"
+                  className="dashboard-btn dashboard-btn--primary"
+                  disabled={busy}
+                  onClick={() =>
+                    runAction("start/", {
+                      slide_id: startSlideId ? Number(startSlideId) : undefined,
+                    })
+                  }
+                >
+                  Start meeting
+                </button>
+              ) : (
+                <div className="dashboard-locked-action">
+                  <button
+                    type="button"
+                    className="dashboard-btn dashboard-btn--locked"
+                    aria-label="Start meeting requires Basic or higher"
+                    onClick={() =>
+                      setUpgradeModal({
+                        title: "Start Meeting",
+                        body: "Starting meetings requires CommuniB Basic or higher. You can still view previous meeting results.",
+                      })
+                    }
+                  >
+                    🔒 Start meeting
+                  </button>
+                  <p className="dashboard-lock-hint">Requires Basic or higher</p>
+                </div>
+              )}
             </div>
           )}
 
@@ -398,18 +446,37 @@ export default function MeetingHostPage() {
                   ))}
                 </select>
               </div>
-              <button
-                type="button"
-                className="dashboard-btn"
-                disabled={busy}
-                onClick={() =>
-                  runAction("restart/", {
-                    slide_id: restartSlideId ? Number(restartSlideId) : undefined,
-                  })
-                }
-              >
-                Restart meeting
-              </button>
+              {canStart ? (
+                <button
+                  type="button"
+                  className="dashboard-btn"
+                  disabled={busy}
+                  onClick={() =>
+                    runAction("restart/", {
+                      slide_id: restartSlideId ? Number(restartSlideId) : undefined,
+                    })
+                  }
+                >
+                  Restart meeting
+                </button>
+              ) : (
+                <div className="dashboard-locked-action">
+                  <button
+                    type="button"
+                    className="dashboard-btn dashboard-btn--locked"
+                    aria-label="Restart meeting requires Basic or higher"
+                    onClick={() =>
+                      setUpgradeModal({
+                        title: "Restart Meeting",
+                        body: "Starting meetings requires CommuniB Basic or higher. Prior session data remains available for viewing and export.",
+                      })
+                    }
+                  >
+                    🔒 Restart meeting
+                  </button>
+                  <p className="dashboard-lock-hint">Requires Basic or higher</p>
+                </div>
+              )}
               <p className="dashboard-meta">
                 Creates a new session. Prior session data is kept for export.
               </p>
@@ -620,30 +687,58 @@ export default function MeetingHostPage() {
               responses in the selected session (rule-based demo if no API key is configured).
             </p>
             <div className="host-control-row">
-              <button
-                type="button"
-                className="dashboard-btn dashboard-btn--primary"
-                disabled={busy}
-                onClick={async () => {
-                  setBusy(true);
-                  setActionError("");
-                  try {
-                    await api.post(
-                      `/api/organizations/${slug}/meetings/${meetingId}/ai/process/`,
-                      { session_id: exportSessionId }
-                    );
-                    await loadLive();
-                  } catch (err) {
-                    setActionError(
-                      err.response?.data?.detail || "AI processing failed."
-                    );
-                  } finally {
-                    setBusy(false);
-                  }
-                }}
-              >
-                Run AI on session
-              </button>
+              {canRunAi ? (
+                <button
+                  type="button"
+                  className="dashboard-btn dashboard-btn--primary"
+                  disabled={busy}
+                  onClick={async () => {
+                    setBusy(true);
+                    setActionError("");
+                    try {
+                      await api.post(
+                        `/api/organizations/${slug}/meetings/${meetingId}/ai/process/`,
+                        { session_id: exportSessionId }
+                      );
+                      await loadLive();
+                    } catch (err) {
+                      if (err.response?.data?.upgrade_required) {
+                        setUpgradeModal({
+                          title: "Run New AI Analysis",
+                          body:
+                            err.response.data.detail ||
+                            "Running new AI analysis requires a paid CommuniB service.",
+                        });
+                      } else {
+                        setActionError(
+                          err.response?.data?.detail || "AI processing failed."
+                        );
+                      }
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
+                >
+                  Run AI on session
+                </button>
+              ) : (
+                <div className="dashboard-locked-action">
+                  <button
+                    type="button"
+                    className="dashboard-btn dashboard-btn--locked"
+                    aria-label="Run new AI analysis requires paid service"
+                    onClick={() =>
+                      setUpgradeModal({
+                        title: "Run New AI Analysis",
+                        body: "Running new AI analysis requires a paid CommuniB service. Previously generated AI summaries remain available.",
+                      })
+                    }
+                  >
+                    🔒 Run new AI analysis
+                  </button>
+                  <p className="dashboard-lock-hint">Requires paid service</p>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -659,6 +754,14 @@ export default function MeetingHostPage() {
           onClose={() => setShowResults(false)}
         />
       )}
+
+      <UpgradeRequiredModal
+        open={Boolean(upgradeModal)}
+        title={upgradeModal?.title || ""}
+        body={upgradeModal?.body || ""}
+        billingPath={billingPath}
+        onClose={() => setUpgradeModal(null)}
+      />
     </div>
   );
 }

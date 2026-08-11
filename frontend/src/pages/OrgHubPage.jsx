@@ -78,6 +78,14 @@ export default function OrgHubPage() {
           <Link to={`/org/${org.slug}/board`}>View posting board</Link>
         </section>
       )}
+
+      <section className="hub-section">
+        <h2>Message this organization</h2>
+        <p>Send a private message to the organization inbox.</p>
+        <Link to={`/dashboard/inbox?to_org=${encodeURIComponent(org.slug)}`}>
+          Message {org.name}
+        </Link>
+      </section>
     </div>
   );
 }

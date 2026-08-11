@@ -372,6 +372,117 @@
   max-width: 1100px;
 }
 
+.dashboard-service-badge {
+  margin: 0.5rem 0 0;
+  font-size: 0.9rem;
+  color: var(--cb-text-secondary);
+}
+
+.dashboard-upgrade-hint {
+  margin: 0 0 1.25rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: var(--cb-radius);
+  background: var(--cb-orange-light);
+  border: 1px solid color-mix(in srgb, var(--cb-orange) 30%, var(--cb-border));
+  color: var(--cb-text);
+  font-size: 0.9375rem;
+  line-height: 1.45;
+}
+
+.dashboard-upgrade-hint a {
+  color: var(--cb-orange);
+  font-weight: 700;
+}
+
+.dashboard-btn--locked {
+  opacity: 1;
+  background: var(--cb-bg-subtle);
+  border-color: var(--cb-border-strong, var(--cb-border));
+  color: var(--cb-text-secondary);
+  cursor: pointer;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.15rem;
+}
+
+.dashboard-btn--locked:hover {
+  border-color: var(--cb-orange);
+  color: var(--cb-text);
+}
+
+.dashboard-lock-hint {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--cb-text-muted);
+}
+
+.dashboard-locked-action {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.25rem;
+}
+
+.dashboard-upgrade-nudge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.dashboard-upgrade-nudge p {
+  margin: 0;
+  flex: 1 1 14rem;
+}
+
+.upgrade-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  z-index: 80;
+}
+
+.upgrade-modal {
+  width: min(28rem, 100%);
+  background: var(--cb-bg);
+  border-radius: var(--cb-radius-lg);
+  border: 1px solid var(--cb-border);
+  box-shadow: var(--cb-shadow-hover, 0 12px 40px rgba(0, 0, 0, 0.18));
+  padding: 1.25rem 1.35rem;
+  text-align: left;
+}
+
+.upgrade-modal h2 {
+  margin: 0 0 0.65rem;
+  font-size: 1.2rem;
+}
+
+.upgrade-modal p {
+  margin: 0 0 0.75rem;
+  color: var(--cb-text-secondary);
+  line-height: 1.5;
+}
+
+.upgrade-modal-reassure {
+  color: var(--cb-text) !important;
+  font-weight: 500;
+}
+
+.upgrade-modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
 .host-controls {
   display: grid;
   gap: 1rem;

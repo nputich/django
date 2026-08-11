@@ -3,15 +3,68 @@ from . import views
 from . import profile_board_views
 from . import directory_views
 from . import billing_views
+from . import inbox_views
+from . import organization_lifecycle_views
 
 urlpatterns = [
     path("me/", profile_board_views.MeView.as_view(), name="me"),
     path("me/profile/", profile_board_views.MeProfileView.as_view(), name="me-profile"),
+    path(
+        "users/<str:username>/",
+        profile_board_views.PublicUserProfileView.as_view(),
+        name="public-user-profile",
+    ),
     path("me/board/", profile_board_views.PersonalBoardView.as_view(), name="me-board"),
     path(
         "me/board/posts/<int:pk>/",
         profile_board_views.PersonalBoardPostDeleteView.as_view(),
         name="me-board-post-delete",
+    ),
+    path("me/inbox/", inbox_views.InboxConversationListView.as_view(), name="me-inbox"),
+    path(
+        "me/inbox/summary/",
+        inbox_views.InboxSummaryView.as_view(),
+        name="me-inbox-summary",
+    ),
+    path(
+        "me/inbox/drafts/",
+        inbox_views.InboxDraftListView.as_view(),
+        name="me-inbox-drafts",
+    ),
+    path(
+        "me/inbox/drafts/<int:pk>/",
+        inbox_views.InboxDraftDetailView.as_view(),
+        name="me-inbox-draft-detail",
+    ),
+    path(
+        "me/inbox/drafts/<int:pk>/send/",
+        inbox_views.InboxDraftSendView.as_view(),
+        name="me-inbox-draft-send",
+    ),
+    path(
+        "me/inbox/conversations/<int:pk>/",
+        inbox_views.InboxConversationDetailView.as_view(),
+        name="me-inbox-conversation",
+    ),
+    path(
+        "me/inbox/conversations/<int:pk>/ban/",
+        inbox_views.InboxConversationBanView.as_view(),
+        name="me-inbox-ban",
+    ),
+    path(
+        "me/inbox/conversations/<int:pk>/reply/",
+        inbox_views.InboxReplyView.as_view(),
+        name="me-inbox-reply",
+    ),
+    path(
+        "me/inbox/conversations/<int:pk>/accept/",
+        inbox_views.InboxConversationAcceptView.as_view(),
+        name="me-inbox-accept",
+    ),
+    path(
+        "me/inbox/conversations/<int:pk>/decline/",
+        inbox_views.InboxConversationDeclineView.as_view(),
+        name="me-inbox-decline",
     ),
     path("directory/scopes/", directory_views.DirectoryScopesView.as_view(), name="directory-scopes"),
     path("directory/geo/", directory_views.DirectoryGeoSearchView.as_view(), name="directory-geo"),
@@ -30,6 +83,11 @@ urlpatterns = [
     path("surveys/<int:pk>/submit/", views.SurveySubmitView.as_view(), name="survey-submit"),
     path("organizations/<slug:slug>/hub/", views.OrganizationHubView.as_view(), name="org-hub"),
     path("me/organizations/", views.MyOrganizationsView.as_view(), name="my-organizations"),
+    path(
+        "organizations/",
+        views.OrganizationCreateView.as_view(),
+        name="organization-create",
+    ),
     path(
         "organizations/<slug:slug>/dashboard/",
         views.OrganizationDashboardView.as_view(),
@@ -54,6 +112,51 @@ urlpatterns = [
         "organizations/<slug:slug>/billing/paypal/confirm/",
         billing_views.OrganizationBillingPayPalConfirmView.as_view(),
         name="org-billing-paypal-confirm",
+    ),
+    path(
+        "billing/paypal/webhook/",
+        billing_views.PayPalWebhookView.as_view(),
+        name="billing-paypal-webhook",
+    ),
+    path(
+        "organizations/<slug:slug>/billing/cancel/",
+        organization_lifecycle_views.OrganizationSubscriptionCancelView.as_view(),
+        name="org-billing-cancel",
+    ),
+    path(
+        "organizations/<slug:slug>/ownership/",
+        organization_lifecycle_views.OrganizationOwnershipSettingsView.as_view(),
+        name="org-ownership-settings",
+    ),
+    path(
+        "organizations/<slug:slug>/ownership/transfer/",
+        organization_lifecycle_views.OrganizationOwnershipTransferView.as_view(),
+        name="org-ownership-transfer",
+    ),
+    path(
+        "organizations/<slug:slug>/ownership/cancel/",
+        organization_lifecycle_views.OrganizationOwnershipCancelView.as_view(),
+        name="org-ownership-cancel",
+    ),
+    path(
+        "organizations/<slug:slug>/close/",
+        organization_lifecycle_views.OrganizationCloseView.as_view(),
+        name="org-close",
+    ),
+    path(
+        "organizations/<slug:slug>/cancel-closure/",
+        organization_lifecycle_views.OrganizationCancelClosureView.as_view(),
+        name="org-cancel-closure",
+    ),
+    path(
+        "organizations/<slug:slug>/claim-request/",
+        organization_lifecycle_views.OrganizationClaimRequestView.as_view(),
+        name="org-claim-request",
+    ),
+    path(
+        "admin/organizations/<slug:slug>/restore/",
+        organization_lifecycle_views.AdminOrganizationRestoreView.as_view(),
+        name="admin-org-restore",
     ),
     path(
         "organizations/<slug:slug>/surveys/",
@@ -185,6 +288,56 @@ urlpatterns = [
         "organizations/<slug:slug>/board/posts/<int:pk>/replies/<int:reply_pk>/",
         profile_board_views.OrganizationBoardReplyDeleteView.as_view(),
         name="org-board-reply-delete",
+    ),
+    path(
+        "organizations/<slug:slug>/inbox/",
+        inbox_views.InboxConversationListView.as_view(),
+        name="org-inbox",
+    ),
+    path(
+        "organizations/<slug:slug>/inbox/summary/",
+        inbox_views.InboxSummaryView.as_view(),
+        name="org-inbox-summary",
+    ),
+    path(
+        "organizations/<slug:slug>/inbox/drafts/",
+        inbox_views.InboxDraftListView.as_view(),
+        name="org-inbox-drafts",
+    ),
+    path(
+        "organizations/<slug:slug>/inbox/drafts/<int:pk>/",
+        inbox_views.InboxDraftDetailView.as_view(),
+        name="org-inbox-draft-detail",
+    ),
+    path(
+        "organizations/<slug:slug>/inbox/drafts/<int:pk>/send/",
+        inbox_views.InboxDraftSendView.as_view(),
+        name="org-inbox-draft-send",
+    ),
+    path(
+        "organizations/<slug:slug>/inbox/conversations/<int:pk>/",
+        inbox_views.InboxConversationDetailView.as_view(),
+        name="org-inbox-conversation",
+    ),
+    path(
+        "organizations/<slug:slug>/inbox/conversations/<int:pk>/ban/",
+        inbox_views.InboxConversationBanView.as_view(),
+        name="org-inbox-ban",
+    ),
+    path(
+        "organizations/<slug:slug>/inbox/conversations/<int:pk>/reply/",
+        inbox_views.InboxReplyView.as_view(),
+        name="org-inbox-reply",
+    ),
+    path(
+        "organizations/<slug:slug>/inbox/conversations/<int:pk>/accept/",
+        inbox_views.InboxConversationAcceptView.as_view(),
+        name="org-inbox-accept",
+    ),
+    path(
+        "organizations/<slug:slug>/inbox/conversations/<int:pk>/decline/",
+        inbox_views.InboxConversationDeclineView.as_view(),
+        name="org-inbox-decline",
     ),
     path("contact/", views.ContactSubmitView.as_view(), name="contact-submit"),
 ]
