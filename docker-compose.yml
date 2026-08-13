@@ -31,6 +31,7 @@ services:
       PAYPAL_CLIENT_ID_FILE: /run/secrets/paypal_sandbox_client_id
       PAYPAL_CLIENT_SECRET_FILE: /run/secrets/paypal_sandbox_secret
       PAYPAL_WEBHOOK_ID_FILE: /run/secrets/paypal_sandbox_webhook_id
+      COMMUNIB_BASIC_ACCESS_CODE: SUPERBASIC
       # Contact form SMTP (password from secrets/gmail_key.txt via pull-gmail-key-local.ps1)
       EMAIL_HOST: smtp.gmail.com
       EMAIL_PORT: "587"

@@ -6,15 +6,17 @@ import "../styles/CreateOrganization.css";
 export default function HeaderAccountLinks() {
   return (
     <nav className="landing-nav-account" aria-label="Account">
-      <Link className="landing-nav-pill" to="/dashboard">
-        Dashboard
-      </Link>
-      <Link className="landing-nav-pill" to="/account">
-        Account
-      </Link>
-      <Link className="landing-nav-pill landing-nav-pill--logout" to="/logout">
-        Log out
-      </Link>
+      <div className="landing-nav-account-primary">
+        <Link className="landing-nav-pill" to="/dashboard">
+          Dashboard
+        </Link>
+        <Link className="landing-nav-pill" to="/account">
+          Account
+        </Link>
+        <Link className="landing-nav-pill landing-nav-pill--logout" to="/logout">
+          Log out
+        </Link>
+      </div>
       <div className="landing-nav-account-secondary">
         <Link to="/dashboard/inbox">Messages</Link>
         <Link to="/dashboard">My Organizations</Link>

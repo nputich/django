@@ -17,6 +17,8 @@ export default function OrgBilling() {
   const [confirmPlan, setConfirmPlan] = useState(null);
   const [resultModal, setResultModal] = useState(null);
   const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [accessCode, setAccessCode] = useState("");
+  const [accessCodeError, setAccessCodeError] = useState("");
 
   const loadBilling = useCallback(() => {
     setLoading(true);
@@ -44,6 +46,8 @@ export default function OrgBilling() {
     setConfirmPlan(null);
     setResultModal(null);
     setCheckoutBusy(false);
+    setAccessCode("");
+    setAccessCodeError("");
     paypalHandled.current = false;
   }, [slug]);
 
@@ -129,6 +133,8 @@ export default function OrgBilling() {
     if (checkoutBusy) return;
     setConfirmPlan(null);
     setResultModal(null);
+    setAccessCode("");
+    setAccessCodeError("");
   };
 
   const handleChoosePlan = (plan) => {
@@ -136,6 +142,8 @@ export default function OrgBilling() {
       return;
     }
     setResultModal(null);
+    setAccessCode("");
+    setAccessCodeError("");
     setConfirmPlan(plan);
   };
 
@@ -143,6 +151,7 @@ export default function OrgBilling() {
     if (!confirmPlan || checkoutBusy) return;
     setCheckoutBusy(true);
     setError("");
+    setAccessCodeError("");
     try {
       const res = await api.post(`/api/organizations/${slug}/billing/checkout/`, {
         service_level: confirmPlan.service_level,
@@ -176,10 +185,47 @@ export default function OrgBilling() {
     }
   };
 
+  const handleRedeemAccessCode = async () => {
+    if (!confirmPlan || checkoutBusy) return;
+    setCheckoutBusy(true);
+    setAccessCodeError("");
+    setError("");
+    try {
+      const res = await api.post(
+        `/api/organizations/${slug}/billing/access-code/`,
+        {
+          access_code: accessCode,
+          service_level: "BASIC",
+        }
+      );
+      setConfirmPlan(null);
+      setAccessCode("");
+      setResultModal({
+        title: "Basic service activated",
+        body:
+          res.data.detail ||
+          "Access code accepted. Basic is active without a PayPal subscription.",
+        reference: res.data.service?.billing_reference,
+        effective: res.data.effective_service_level,
+        activated: true,
+        emphasis: "Billing source: access code (no PayPal transaction).",
+      });
+      await loadBilling();
+    } catch (err) {
+      setAccessCodeError(
+        err.response?.data?.detail || "Could not redeem that access code."
+      );
+    } finally {
+      setCheckoutBusy(false);
+    }
+  };
+
   const orgName = data?.organization?.name;
   const current = data?.current_service;
   const pending = data?.pending_checkout;
   const paypalReady = data?.checkout_mode === "paypal";
+  const showBasicAccessCode =
+    confirmPlan?.service_level === "BASIC" && data?.basic_access_code_enabled;
 
   return (
     <div className="dashboard">
@@ -219,6 +265,11 @@ export default function OrgBilling() {
                 <p className="billing-current-level">{current?.service_level}</p>
                 {current?.status && (
                   <p className="billing-current-status">Status: {current.status}</p>
+                )}
+                {current?.billing_source && current.billing_source !== "FREE" && (
+                  <p className="billing-current-status">
+                    Billing source: {current.billing_source}
+                  </p>
                 )}
               </div>
             </section>
@@ -329,6 +380,38 @@ export default function OrgBilling() {
                 place.
               </div>
             )}
+            {showBasicAccessCode && (
+              <div className="billing-access-code">
+                <p className="billing-access-code-label">
+                  Or activate Basic with an access code (no PayPal):
+                </p>
+                <div className="billing-access-code-row">
+                  <input
+                    type="text"
+                    className="billing-access-code-input"
+                    value={accessCode}
+                    onChange={(e) => setAccessCode(e.target.value)}
+                    placeholder="Enter access code"
+                    autoComplete="off"
+                    disabled={checkoutBusy}
+                    aria-label="Access code"
+                  />
+                  <button
+                    type="button"
+                    className="dashboard-btn"
+                    onClick={handleRedeemAccessCode}
+                    disabled={checkoutBusy || !accessCode.trim()}
+                  >
+                    {checkoutBusy ? "Working…" : "Apply code"}
+                  </button>
+                </div>
+                {accessCodeError && (
+                  <p className="dashboard-error billing-access-code-error">
+                    {accessCodeError}
+                  </p>
+                )}
+              </div>
+            )}
             <div className="billing-modal-actions">
               <button
                 type="button"
@@ -344,7 +427,7 @@ export default function OrgBilling() {
                 onClick={handleContinueCheckout}
                 disabled={checkoutBusy}
               >
-                {checkoutBusy ? "Working…" : "Continue"}
+                {checkoutBusy ? "Working…" : "Continue with PayPal"}
               </button>
             </div>
           </div>

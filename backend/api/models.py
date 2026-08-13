@@ -330,6 +330,64 @@ class OrganizationService(models.Model):
         )
 
 
+class AccessCodeRedemption(models.Model):
+    """
+    History of access-code grants (complimentary / promo / temp codes).
+
+    Temporary codes (e.g. SUPERBASIC from env) are validated in application
+    code; this table records who redeemed what for which organization.
+    Future AccessCode catalog rows can link here without changing callers.
+    """
+
+    code = models.CharField(
+        max_length=64,
+        db_index=True,
+        help_text="Normalized access code that was redeemed (uppercase).",
+    )
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="access_code_redemptions",
+    )
+    redeemed_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="access_code_redemptions",
+    )
+    organization_service = models.ForeignKey(
+        OrganizationService,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="access_code_redemptions",
+    )
+    service_level = models.CharField(
+        max_length=32,
+        choices=OrganizationService.ServiceLevel.choices,
+    )
+    redeemed_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    # Reserved for a future AccessCode catalog FK / metadata.
+    notes = models.CharField(max_length=255, blank=True, default="")
+
+    class Meta:
+        ordering = ["-redeemed_at", "-id"]
+        indexes = [
+            models.Index(fields=["organization", "code"]),
+            models.Index(fields=["code", "-redeemed_at"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization", "code"],
+                name="uniq_access_code_redemption_per_org_code",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.code} → {self.organization_id} ({self.service_level})"
+
+
 class Survey(models.Model):
     organization = models.ForeignKey(
         Organization, on_delete=models.CASCADE, related_name="surveys"
@@ -941,6 +999,15 @@ class AccessCode(models.Model):
         elif type_slug == "organization":
             if self.survey_id or self.meeting_id:
                 raise ValidationError("Organization codes cannot link to survey or meeting.")
+            duplicate = AccessCode.objects.filter(
+                code__iexact=self.code,
+                is_active=True,
+                resource_type__slug="organization",
+                survey__isnull=True,
+                meeting__isnull=True,
+            ).exclude(pk=self.pk)
+            if duplicate.exists():
+                raise ValidationError("This Community Code is already used by another organization.")
         else:
             raise ValidationError(f"Unsupported resource type: {type_slug}")
         if type_slug in ("survey", "meeting"):

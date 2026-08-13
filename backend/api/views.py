@@ -255,17 +255,39 @@ class OrganizationCreateView(APIView):
     def post(self, request):
         serializer = CreateOrganizationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
         try:
             org = create_organization_for_user(
                 user=request.user,
-                name=serializer.validated_data["name"],
-                description=serializer.validated_data.get("description", ""),
+                name=data["name"],
+                description=data.get("description", ""),
+                community_code=data.get("community_code") or None,
+                geographic_scope=data.get("geographic_scope"),
+                country_id=data.get("country_id"),
+                state_id=data.get("state_id"),
+                county_id=data.get("county_id"),
+                primary_subcategory_id=data.get("primary_subcategory_id"),
             )
         except ValueError as exc:
             payload = exc.args[0] if exc.args else {}
             if isinstance(payload, dict) and payload.get("code") == "closed_organization_exists":
                 return Response(payload, status=status.HTTP_409_CONFLICT)
+            if isinstance(payload, dict) and payload.get("code") in {
+                "invalid_community_code",
+                "directory_placement_required",
+                "invalid_directory_placement",
+            }:
+                return Response(payload, status=status.HTTP_400_BAD_REQUEST)
             raise
+        org = (
+            Organization.objects.select_related(
+                "service_area",
+                "primary_subcategory",
+                "primary_subcategory__parent",
+            )
+            .prefetch_related("service_area__parent", "service_area__parent__parent")
+            .get(pk=org.pk)
+        )
         return Response(
             MyOrganizationSerializer(org, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
@@ -283,7 +305,13 @@ class OrganizationDashboardView(APIView):
                 {"detail": "Organization not found or you are not an admin."},
                 status=status.HTTP_404_NOT_FOUND,
             )
-        organization = Organization.objects.prefetch_related(
+        organization = Organization.objects.select_related(
+            "service_area",
+            "service_area__parent",
+            "service_area__parent__parent",
+            "primary_subcategory",
+            "primary_subcategory__parent",
+        ).prefetch_related(
             Prefetch(
                 "surveys",
                 queryset=Survey.objects.order_by("-created_at").prefetch_related(
@@ -297,6 +325,13 @@ class OrganizationDashboardView(APIView):
                 ),
             ),
             "board",
+            Prefetch(
+                "codes",
+                queryset=AccessCode.objects.filter(
+                    resource_type__slug="organization",
+                    is_active=True,
+                ).order_by("-is_primary", "id"),
+            ),
         ).get(pk=organization.pk)
         return Response(OrganizationDashboardSerializer(organization).data)
 

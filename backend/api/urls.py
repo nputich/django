@@ -2,6 +2,7 @@ from django.urls import path
 from . import views
 from . import profile_board_views
 from . import directory_views
+from . import directory_placement_views
 from . import billing_views
 from . import inbox_views
 from . import organization_lifecycle_views
@@ -94,6 +95,11 @@ urlpatterns = [
         name="org-dashboard",
     ),
     path(
+        "organizations/<slug:slug>/directory-placement/",
+        directory_placement_views.OrganizationDirectoryPlacementView.as_view(),
+        name="org-directory-placement",
+    ),
+    path(
         "organizations/<slug:slug>/billing/",
         billing_views.OrganizationBillingView.as_view(),
         name="org-billing",
@@ -107,6 +113,11 @@ urlpatterns = [
         "organizations/<slug:slug>/billing/checkout/",
         billing_views.OrganizationBillingCheckoutStartView.as_view(),
         name="org-billing-checkout-start",
+    ),
+    path(
+        "organizations/<slug:slug>/billing/access-code/",
+        billing_views.OrganizationBillingAccessCodeRedeemView.as_view(),
+        name="org-billing-access-code",
     ),
     path(
         "organizations/<slug:slug>/billing/paypal/confirm/",

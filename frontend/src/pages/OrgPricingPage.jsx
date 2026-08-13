@@ -6,7 +6,6 @@ import MarketingLayout from "../components/MarketingLayout";
 import SiteLogo from "../components/SiteLogo";
 import { ensureValidSession } from "../auth";
 import {
-  CREATE_ORGANIZATION_PATH,
   PAID_PLAN_LEVELS,
   createOrganizationPath,
 } from "../constants/orgCreation";
@@ -51,6 +50,16 @@ const PLANS = [
   },
 ];
 
+function registerThenCreateOrg(navigate, planId) {
+  const to = createOrganizationPath(planId ? { plan: planId } : {});
+  const qIndex = to.indexOf("?");
+  const pathname = qIndex >= 0 ? to.slice(0, qIndex) : to;
+  const search = qIndex >= 0 ? to.slice(qIndex) : "";
+  navigate("/register", {
+    state: { from: { pathname, search } },
+  });
+}
+
 export default function OrgPricingPage() {
   const navigate = useNavigate();
   const [orgs, setOrgs] = useState(null);
@@ -67,8 +76,12 @@ export default function OrgPricingPage() {
   }, []);
 
   const handlePaidPlan = (planId) => {
+    if (!ensureValidSession()) {
+      registerThenCreateOrg(navigate, planId);
+      return;
+    }
     const list = orgs || [];
-    if (!ensureValidSession() || list.length === 0) {
+    if (list.length === 0) {
       navigate(createOrganizationPath({ plan: planId }));
       return;
     }
@@ -133,7 +146,7 @@ export default function OrgPricingPage() {
           Already manage an organization?{" "}
           <Link to="/dashboard">Go to your dashboard</Link>
           {" · "}
-          <Link to={CREATE_ORGANIZATION_PATH}>Create another organization</Link>
+          <CreateOrganizationLink>Create another organization</CreateOrganizationLink>
         </p>
       </div>
     </MarketingLayout>

@@ -219,3 +219,37 @@
     justify-content: center;
   }
 }
+
+.billing-access-code {
+  margin: 1rem 0 0;
+  padding-top: 1rem;
+  border-top: 1px solid var(--cb-border);
+}
+
+.billing-access-code-label {
+  margin: 0 0 0.65rem;
+  font-size: 0.95rem;
+  color: var(--cb-text);
+}
+
+.billing-access-code-row {
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.billing-access-code-input {
+  flex: 1 1 12rem;
+  min-width: 0;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--cb-border);
+  border-radius: var(--cb-radius);
+  font-size: 1rem;
+  background: var(--cb-bg);
+  color: var(--cb-text);
+}
+
+.billing-access-code-error {
+  margin: 0.55rem 0 0;
+}

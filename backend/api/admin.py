@@ -1,6 +1,7 @@
 from django.contrib import admin
 from .models import (
     AccessCode,
+    AccessCodeRedemption,
     BoardPost,
     ContactSubmission,
     GeographicArea,
@@ -104,6 +105,27 @@ class OrganizationServiceAdmin(admin.ModelAdmin):
     )
     readonly_fields = ("created_at", "updated_at")
     raw_id_fields = ("organization", "requested_by")
+
+
+@admin.register(AccessCodeRedemption)
+class AccessCodeRedemptionAdmin(admin.ModelAdmin):
+    list_display = (
+        "code",
+        "organization",
+        "service_level",
+        "redeemed_by",
+        "redeemed_at",
+        "organization_service",
+    )
+    list_filter = ("service_level", "code")
+    search_fields = (
+        "code",
+        "organization__name",
+        "organization__slug",
+        "redeemed_by__username",
+    )
+    readonly_fields = ("redeemed_at",)
+    raw_id_fields = ("organization", "redeemed_by", "organization_service")
 
 
 class SurveyQuestionInline(admin.TabularInline):

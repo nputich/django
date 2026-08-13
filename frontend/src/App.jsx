@@ -21,6 +21,7 @@ import OrgDashboard from "./pages/OrgDashboard";
 import OrgBilling from "./pages/OrgBilling";
 import BillingEntry from "./pages/BillingEntry";
 import OrgOwnershipSettings from "./pages/OrgOwnershipSettings";
+import OrgDirectoryPlacement from "./pages/OrgDirectoryPlacement";
 import CreateSurvey from "./pages/CreateSurvey";
 import CreateMeeting from "./pages/CreateMeeting";
 import EditSurvey from "./pages/EditSurvey";
@@ -140,6 +141,14 @@ function App() {
           element={
             <ProtectedRoute>
               <OrgOwnershipSettings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/:slug/directory"
+          element={
+            <ProtectedRoute>
+              <OrgDirectoryPlacement />
             </ProtectedRoute>
           }
         />

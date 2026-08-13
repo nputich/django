@@ -103,6 +103,8 @@ class OrganizationHubSerializer(serializers.ModelSerializer):
 class MyOrganizationSerializer(serializers.ModelSerializer):
     role = serializers.SerializerMethodField()
     status = serializers.CharField(read_only=True)
+    community_code = serializers.SerializerMethodField()
+    directory_placement = serializers.SerializerMethodField()
 
     class Meta:
         model = Organization
@@ -114,6 +116,8 @@ class MyOrganizationSerializer(serializers.ModelSerializer):
             "is_verified",
             "role",
             "status",
+            "community_code",
+            "directory_placement",
         ]
 
     def get_role(self, obj):
@@ -123,18 +127,48 @@ class MyOrganizationSerializer(serializers.ModelSerializer):
         ).first()
         return membership.role if membership else None
 
+    def get_community_code(self, obj):
+        from .org_access import get_primary_community_code
+
+        row = get_primary_community_code(obj)
+        return row.code if row else None
+
+    def get_directory_placement(self, obj):
+        from .directory_placement import serialize_directory_placement
+
+        return serialize_directory_placement(obj)
+
 
 class CreateOrganizationSerializer(serializers.Serializer):
     name = serializers.CharField(max_length=200)
     description = serializers.CharField(
         max_length=5000, required=False, allow_blank=True, default=""
     )
+    community_code = serializers.CharField(
+        max_length=32, required=False, allow_blank=True, default=""
+    )
+    geographic_scope = serializers.ChoiceField(
+        choices=[
+            ("international", "International"),
+            ("national", "National"),
+            ("state_province", "State / Province"),
+            ("local", "Local"),
+        ],
+        required=True,
+    )
+    country_id = serializers.IntegerField(required=False, allow_null=True)
+    state_id = serializers.IntegerField(required=False, allow_null=True)
+    county_id = serializers.IntegerField(required=False, allow_null=True)
+    primary_subcategory_id = serializers.IntegerField(required=True)
 
     def validate_name(self, value):
         name = (value or "").strip()
         if len(name) < 2:
             raise serializers.ValidationError("Enter an organization name.")
         return name
+
+    def validate_community_code(self, value):
+        return (value or "").strip()
 
 
 class DashboardAccessCodeSerializer(serializers.ModelSerializer):
@@ -258,6 +292,8 @@ class OrganizationDashboardSerializer(serializers.ModelSerializer):
     board = serializers.SerializerMethodField()
     capabilities = serializers.SerializerMethodField()
     lifecycle = serializers.SerializerMethodField()
+    community_code = serializers.SerializerMethodField()
+    directory_placement = serializers.SerializerMethodField()
 
     class Meta:
         model = Organization
@@ -273,6 +309,8 @@ class OrganizationDashboardSerializer(serializers.ModelSerializer):
             "board",
             "capabilities",
             "lifecycle",
+            "community_code",
+            "directory_placement",
         ]
 
     def get_board(self, obj):
@@ -289,6 +327,17 @@ class OrganizationDashboardSerializer(serializers.ModelSerializer):
         from .organization_lifecycle import serialize_lifecycle
 
         return serialize_lifecycle(obj)
+
+    def get_community_code(self, obj):
+        from .org_access import get_primary_community_code
+
+        row = get_primary_community_code(obj)
+        return row.code if row else None
+
+    def get_directory_placement(self, obj):
+        from .directory_placement import serialize_directory_placement
+
+        return serialize_directory_placement(obj)
 
 
 def _profile_picture_url(profile, request):

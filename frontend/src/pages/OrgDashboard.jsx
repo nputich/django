@@ -159,6 +159,52 @@ export default function OrgDashboard() {
             <div className="dashboard-header">
               <h1>{org.name}</h1>
               <p>{org.description || "Organization dashboard"}</p>
+              {org.community_code && (
+                <div className="org-identity-block">
+                  <p className="org-community-code-label">Community Code</p>
+                  <div className="org-community-code-row">
+                    <code className="org-community-code">{org.community_code}</code>
+                    <button
+                      type="button"
+                      className="dashboard-btn"
+                      onClick={() => {
+                        if (navigator.clipboard?.writeText) {
+                          navigator.clipboard.writeText(org.community_code);
+                        }
+                      }}
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+              )}
+              {org.directory_placement && (
+                <div className="org-directory-block">
+                  <p className="org-community-code-label">Directory Placement</p>
+                  {org.directory_placement.summary ? (
+                    <p className="org-directory-summary">
+                      {org.directory_placement.summary}
+                    </p>
+                  ) : (
+                    <p className="dashboard-meta">
+                      Not listed in Explore Communities yet.
+                    </p>
+                  )}
+                  {org.directory_placement.breadcrumb?.length > 0 && (
+                    <ol className="org-directory-breadcrumb">
+                      {org.directory_placement.breadcrumb.map((part) => (
+                        <li key={part}>{part}</li>
+                      ))}
+                    </ol>
+                  )}
+                  <Link
+                    to={`/dashboard/${slug}/directory`}
+                    className="dashboard-btn"
+                  >
+                    Edit Directory Placement
+                  </Link>
+                </div>
+              )}
               <p className="dashboard-meta">
                 Service:{" "}
                 <strong>

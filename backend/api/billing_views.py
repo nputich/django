@@ -12,6 +12,12 @@ from rest_framework.views import APIView
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 
+from .access_codes import (
+    AccessCodeError,
+    basic_access_code_configured,
+    redeem_basic_access_code,
+    serialize_access_code_activation,
+)
 from .billing_plans import (
     PlanResolutionError,
     list_available_plans,
@@ -96,6 +102,8 @@ class OrganizationBillingView(APIView):
                 "checkout_mode": _checkout_mode(),
                 "paypal_mode": paypal_mode(),
                 "paypal_sandbox": paypal_mode() == "sandbox",
+                # Never include the actual code value in API responses.
+                "basic_access_code_enabled": basic_access_code_configured(),
             }
         )
 
@@ -203,6 +211,78 @@ class OrganizationBillingCheckoutStartView(APIView):
                 "message": message,
             },
             status=status.HTTP_201_CREATED,
+        )
+
+
+class OrganizationBillingAccessCodeRedeemView(APIView):
+    """
+    POST { access_code, service_level? }
+
+    Redeem a server-configured access code to activate Basic without PayPal.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, slug):
+        organization, error = _require_admin_org(request, slug)
+        if error:
+            return error
+
+        raw_code = request.data.get("access_code") or request.data.get("accessCode") or ""
+        raw_level = (
+            request.data.get("service_level")
+            or request.data.get("serviceLevel")
+            or "BASIC"
+        )
+        if str(raw_level).strip().upper() != "BASIC":
+            return Response(
+                {
+                    "detail": "Access codes currently only activate the Basic plan.",
+                    "code": "access_code_level_unsupported",
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            service, redemption = redeem_basic_access_code(
+                organization=organization,
+                user=request.user,
+                code=raw_code,
+            )
+        except AccessCodeError as exc:
+            http_status = status.HTTP_400_BAD_REQUEST
+            if exc.code in {
+                "active_subscription_exists",
+                "access_code_already_redeemed",
+            }:
+                http_status = status.HTTP_409_CONFLICT
+            return Response(
+                {"detail": str(exc), "code": exc.code},
+                status=http_status,
+            )
+
+        return Response(
+            {
+                "detail": (
+                    "Access code accepted. Basic service is now active for this "
+                    "organization. No PayPal subscription was created."
+                ),
+                "organization": {
+                    "id": organization.id,
+                    "name": organization.name,
+                    "slug": organization.slug,
+                },
+                "service": serialize_organization_service(service),
+                "activation": serialize_access_code_activation(
+                    service, redemption=redemption
+                ),
+                "effective_service_level": organization.get_current_service_level(),
+                "entitlement_changed": True,
+                "activated": True,
+                "paypal_contacted": False,
+                "billing_source": service.billing_source,
+            },
+            status=status.HTTP_200_OK,
         )
 
 

@@ -2,6 +2,9 @@ import { useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api";
 import AppHeader from "../components/AppHeader";
+import DirectoryPlacementFields, {
+  placementToApiPayload,
+} from "../components/DirectoryPlacementFields";
 import MarketingLayout from "../components/MarketingLayout";
 import { ensureValidSession } from "../auth";
 import { PAID_PLAN_LEVELS, claimAccessPath } from "../constants/orgCreation";
@@ -25,6 +28,15 @@ export default function CreateOrganization() {
 
   const [name, setName] = useState(initialName);
   const [description, setDescription] = useState("");
+  const [communityCode, setCommunityCode] = useState("");
+  const [placement, setPlacement] = useState({
+    geographic_scope: "local",
+    country_id: null,
+    state_id: null,
+    county_id: null,
+    primary_category_id: null,
+    primary_subcategory_id: null,
+  });
   const [error, setError] = useState("");
   const [closedConflict, setClosedConflict] = useState(null);
   const [submitting, setSubmitting] = useState(false);
@@ -48,6 +60,8 @@ export default function CreateOrganization() {
       const res = await api.post("/api/organizations/", {
         name: name.trim(),
         description: description.trim(),
+        community_code: communityCode.trim(),
+        ...placementToApiPayload(placement),
       });
       const slug = res.data.slug;
       if (intendedPlan) {
@@ -67,8 +81,11 @@ export default function CreateOrganization() {
         setError("Sign in to create an organization.");
       } else {
         const detail =
-          data?.name?.[0] ||
           data?.detail ||
+          data?.name?.[0] ||
+          data?.community_code?.[0] ||
+          data?.geographic_scope?.[0] ||
+          data?.primary_subcategory_id?.[0] ||
           (typeof data === "object" && data
             ? Object.values(data).flat()?.[0]
             : null) ||
@@ -98,18 +115,14 @@ export default function CreateOrganization() {
           </p>
           <div className="dashboard-actions">
             <Link
-              to="/"
+              to="/register"
               state={{ from }}
               className="dashboard-btn dashboard-btn--primary"
             >
-              Sign in
-            </Link>
-            <Link
-              to="/register"
-              state={{ from }}
-              className="dashboard-btn"
-            >
               Create an account
+            </Link>
+            <Link to="/" state={{ from }} className="dashboard-btn">
+              Sign in
             </Link>
           </div>
           <p className="enter-code-alt">
@@ -123,15 +136,15 @@ export default function CreateOrganization() {
   return (
     <div className="dashboard">
       <AppHeader />
-      <main className="dashboard-main create-org-page">
+      <main className="dashboard-main create-org-page create-org-page--wide">
         <div className="dashboard-header">
           <p className="dashboard-back">
             <Link to="/dashboard">← Back to dashboard</Link>
           </p>
           <h1>Create an Organization</h1>
           <p>
-            Start on the free organization plan. You can upgrade anytime from
-            Billing &amp; Service.
+            Start on the free organization plan. Choose a Community Code and
+            where you appear in Explore Communities.
           </p>
           {planNote && <p className="create-org-plan-note">{planNote}</p>}
         </div>
@@ -147,7 +160,7 @@ export default function CreateOrganization() {
               maxLength={200}
               required
               autoFocus
-              placeholder="e.g. Forsyth Example Organization"
+              placeholder="e.g. Forsyth County Democratic Party"
             />
           </div>
           <div className="create-org-field">
@@ -158,11 +171,35 @@ export default function CreateOrganization() {
               id="org-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              rows={4}
+              rows={3}
               maxLength={5000}
               placeholder="What does this organization do?"
             />
           </div>
+          <div className="create-org-field">
+            <label htmlFor="org-community-code">
+              Community Code <span>(optional)</span>
+            </label>
+            <input
+              id="org-community-code"
+              type="text"
+              value={communityCode}
+              onChange={(e) => setCommunityCode(e.target.value.toUpperCase())}
+              maxLength={32}
+              autoComplete="off"
+              placeholder="e.g. FORSYTHDEMS"
+            />
+            <p className="create-org-help">
+              Enter a Community Code or leave this blank and CommuniB will
+              generate one for you.
+            </p>
+          </div>
+
+          <h2 className="create-org-section-title">
+            Where should this community appear?
+          </h2>
+          <DirectoryPlacementFields value={placement} onChange={setPlacement} />
+
           {error && <p className="dashboard-error">{error}</p>}
           {closedConflict?.organization && (
             <div className="dashboard-card">
@@ -180,29 +217,17 @@ export default function CreateOrganization() {
                 >
                   Claim Organization / Request Access
                 </Link>
-                <button
-                  type="button"
-                  className="dashboard-btn"
-                  onClick={async () => {
-                    try {
-                      await api.post(
-                        `/api/organizations/${closedConflict.organization.slug}/claim-request/`,
-                        { message: "Requesting restoration / access." }
-                      );
-                    } catch {
-                      /* contact link remains available */
-                    }
-                  }}
-                >
-                  Record claim request
-                </button>
               </div>
             </div>
           )}
           <button
             type="submit"
             className="dashboard-btn dashboard-btn--primary"
-            disabled={submitting || name.trim().length < 2}
+            disabled={
+              submitting ||
+              name.trim().length < 2 ||
+              !placement.primary_subcategory_id
+            }
           >
             {submitting ? "Creating…" : "Create organization"}
           </button>

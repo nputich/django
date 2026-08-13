@@ -243,3 +243,7 @@ PAYPAL_SUBSCRIPTIONS_ENABLED = os.getenv("PAYPAL_SUBSCRIPTIONS_ENABLED", "").low
 )
 # Used for PayPal return/cancel URLs (browser). Local docker: http://localhost:10001
 FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:10001").rstrip("/")
+
+# Temporary Basic complimentary access code (server-side only; never expose to clients).
+# Empty disables access-code redemption. Local Docker sets SUPERBASIC via compose.
+COMMUNIB_BASIC_ACCESS_CODE = _env_or_file("COMMUNIB_BASIC_ACCESS_CODE").strip()

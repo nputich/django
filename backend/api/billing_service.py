@@ -199,14 +199,10 @@ def start_pending_checkout(
     resolved = resolve_paypal_checkout_plan(service_level)
 
     active = get_active_organization_service(organization)
-    if (
-        active
-        and active.billing_source == OrganizationService.BillingSource.PAYPAL
-        and active.status == OrganizationService.Status.ACTIVE
-    ):
+    if active and active.status == OrganizationService.Status.ACTIVE:
         raise CheckoutError(
-            "This organization already has an active PayPal subscription. "
-            "Use plan change flow instead of starting a new checkout.",
+            "This organization already has an active paid service. "
+            "Cancel or change the current plan before starting a new checkout.",
             code="active_subscription_exists",
         )
 

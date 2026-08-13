@@ -95,17 +95,26 @@
 
 .landing-nav-account {
   display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  justify-content: flex-start;
+  gap: 0.35rem;
+  width: 100%;
+  height: auto;
+}
+
+.landing-nav-account-primary {
+  display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 0.45rem;
-  width: 100%;
-  height: 100%;
 }
 
 .landing-nav-login--account {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
 }
 
 .landing-nav-brand {
@@ -149,6 +158,10 @@
   height: 2.775rem;
 }
 
+.landing-nav-login--account {
+  height: auto;
+}
+
 /* Mobile login accordion — trigger hidden on desktop */
 .landing-login-accordion {
   width: 100%;
@@ -182,6 +195,14 @@
   gap: 0.5rem;
   max-width: none;
   min-width: 0;
+}
+
+.landing-nav-scroll {
+  display: contents;
+}
+
+.landing-nav-scroll-btn {
+  display: none;
 }
 
 .landing-nav-register {
@@ -895,10 +916,6 @@
     margin-bottom: 0.5rem;
   }
 
-  .landing-main--home .landing-logo {
-    max-height: 140px;
-  }
-
   .landing-code-section {
     margin-top: 0.25rem;
     margin-bottom: 1.5rem;
@@ -922,10 +939,88 @@
     gap: 1.75rem;
   }
 
+  .landing-nav-scroll {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 0.15rem;
+    width: 100%;
+    min-width: 0;
+  }
+
   .landing-nav-links {
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
+    justify-content: flex-start;
+    gap: 0.5rem;
+    max-width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+    padding: 0.1rem 0.15rem 0.35rem;
+  }
+
+  .landing-nav-links::-webkit-scrollbar {
+    display: none;
+  }
+
+  .landing-nav-scroll-btn {
+    display: inline-flex;
+    align-items: center;
     justify-content: center;
-    gap: 1rem;
+    flex-shrink: 0;
+    width: 2.25rem;
+    height: 2.25rem;
+    margin: 0;
+    padding: 0;
+    border: 1px solid var(--cb-border);
+    border-radius: 999px;
+    background: var(--cb-bg);
+    color: var(--cb-text-secondary);
+    box-shadow: var(--cb-shadow-sm);
+    cursor: pointer;
+    transition: opacity 0.15s, background-color 0.15s, color 0.15s,
+      border-color 0.15s;
+  }
+
+  .landing-nav-scroll-btn:hover:not(:disabled) {
+    background: var(--cb-bg-subtle);
+    color: var(--cb-text);
+    border-color: color-mix(in srgb, var(--cb-orange) 40%, var(--cb-border));
+  }
+
+  .landing-nav-scroll-btn:disabled {
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .landing-nav-scroll--more .landing-nav-scroll-btn:not(:disabled) {
+    opacity: 1;
+  }
+
+  .landing-nav-scroll-icon {
+    display: block;
+  }
+
+  .landing-nav--dev .landing-nav-scroll-btn {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.28);
+    color: #f9fafb;
+  }
+
+  .landing-nav--dev .landing-nav-scroll-btn:hover:not(:disabled) {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.45);
+    color: #fff;
+  }
+
+  .landing-nav-account {
+    align-items: stretch;
+  }
+
+  .landing-nav-account-primary {
+    justify-content: center;
   }
 
   .landing-nav-register {

@@ -4,6 +4,118 @@
   max-width: 560px;
 }
 
+.create-org-page--wide {
+  max-width: 720px;
+}
+
+.create-org-section-title {
+  margin: 0.5rem 0 0;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--cb-text);
+}
+
+.create-org-help {
+  margin: 0.4rem 0 0;
+  font-size: 0.875rem;
+  line-height: 1.4;
+  color: var(--cb-text-muted);
+}
+
+.directory-placement-fieldset {
+  margin: 0;
+  padding: 0.85rem 0 0;
+  border: none;
+  border-top: 1px solid var(--cb-border);
+}
+
+.directory-placement-fieldset legend {
+  padding: 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--cb-text);
+}
+
+.create-org-field select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--cb-border);
+  border-radius: 10px;
+  font: inherit;
+  color: var(--cb-text);
+  background: var(--cb-bg);
+}
+
+.directory-placement-preview {
+  margin-top: 0.75rem;
+  padding: 0.85rem 1rem;
+  border-radius: var(--cb-radius);
+  background: var(--cb-bg-subtle);
+  border: 1px solid var(--cb-border);
+}
+
+.directory-placement-preview-label {
+  margin: 0 0 0.35rem;
+  font-size: 0.875rem;
+  color: var(--cb-text-muted);
+}
+
+.directory-placement-preview-value {
+  margin: 0;
+  font-weight: 700;
+  color: var(--cb-text);
+}
+
+.org-identity-block,
+.org-directory-block {
+  margin: 1rem 0;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--cb-border);
+  border-radius: var(--cb-radius);
+  background: var(--cb-bg-subtle);
+}
+
+.org-community-code-label {
+  margin: 0 0 0.35rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--cb-text-muted);
+}
+
+.org-community-code-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.org-community-code {
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--cb-text);
+}
+
+.org-directory-summary {
+  margin: 0 0 0.55rem;
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--cb-text);
+}
+
+.org-directory-breadcrumb {
+  margin: 0 0 0.85rem;
+  padding-left: 1.1rem;
+  color: var(--cb-text);
+}
+
+.org-directory-breadcrumb li + li {
+  margin-top: 0.15rem;
+}
+
 .create-org-plan-note {
   margin: 0.75rem 0 0;
   padding: 0.75rem 0.9rem;
@@ -134,8 +246,10 @@
 
 .landing-nav-account-secondary {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem 0.65rem;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: flex-end;
+  gap: 0.35rem;
   width: 100%;
   margin-top: 0.15rem;
   padding-top: 0.35rem;
@@ -145,10 +259,22 @@
 .landing-nav-account-secondary a {
   font-size: 0.8125rem;
   font-weight: 600;
+  line-height: 1.35;
   color: var(--cb-text-secondary);
   text-decoration: none;
+  text-align: right;
 }
 
 .landing-nav-account-secondary a:hover {
   color: var(--cb-orange);
+}
+
+@media (max-width: 900px) {
+  .landing-nav-account-secondary {
+    align-items: center;
+  }
+
+  .landing-nav-account-secondary a {
+    text-align: center;
+  }
 }
