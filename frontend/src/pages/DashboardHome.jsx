@@ -103,6 +103,10 @@ export default function DashboardHome() {
               onCreatePost={handleCreatePost}
               onDeletePost={handleDeletePost}
               onVotePoll={handleVotePoll}
+              composerAvatar={profile}
+              composerPrompt="Write a note for yourself…"
+              composerPostPlaceholder="Write a note for yourself…"
+              composerQuestionPlaceholder="What do you want to ask yourself?"
               emptyMessage="Your personal board is empty. Add a note for yourself."
             />
           </div>

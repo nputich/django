@@ -568,7 +568,14 @@ function WallPostCard({
   );
 }
 
-function WallComposer({ canPost, onCreatePost, composerAvatar }) {
+function WallComposer({
+  canPost,
+  onCreatePost,
+  composerAvatar,
+  promptPlaceholder = "Share something with your community…",
+  postPlaceholder = "Share something with your community…",
+  questionPlaceholder = "What do you want to ask your community?",
+}) {
   const [expanded, setExpanded] = useState(false);
   const [postType, setPostType] = useState("post");
   const [body, setBody] = useState("");
@@ -652,7 +659,7 @@ function WallComposer({ canPost, onCreatePost, composerAvatar }) {
             onClick={() => setExpanded(true)}
           >
             <AuthorAvatar author={composerAvatar} />
-            <span>Share something with your community…</span>
+            <span>{promptPlaceholder}</span>
           </button>
           <div className="wall-composer-types">
             {POST_TYPES.map((t) => (
@@ -790,9 +797,7 @@ function WallComposer({ canPost, onCreatePost, composerAvatar }) {
               className="wall-input"
               rows={3}
               placeholder={
-                postType === "question"
-                  ? "What do you want to ask your community?"
-                  : "Share something with your community…"
+                postType === "question" ? questionPlaceholder : postPlaceholder
               }
               value={body}
               onChange={(e) => setBody(e.target.value)}
@@ -836,6 +841,9 @@ export default function PostingBoard({
   onMeetingRsvp,
   emptyMessage = "No posts yet.",
   composerAvatar = null,
+  composerPrompt = "Share something with your community…",
+  composerPostPlaceholder = "Share something with your community…",
+  composerQuestionPlaceholder = "What do you want to ask your community?",
   visibilityLabel,
 }) {
   const feedVisibility = useMemo(
@@ -861,6 +869,9 @@ export default function PostingBoard({
           canPost={canPost}
           onCreatePost={onCreatePost}
           composerAvatar={composerAvatar}
+          promptPlaceholder={composerPrompt}
+          postPlaceholder={composerPostPlaceholder}
+          questionPlaceholder={composerQuestionPlaceholder}
         />
 
         {posts.length === 0 ? (

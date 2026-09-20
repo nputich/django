@@ -679,6 +679,7 @@ class BoardPostCreateSerializer(serializers.Serializer):
     event_location = serializers.CharField(
         max_length=255, required=False, allow_blank=True
     )
+    attachment = serializers.FileField(required=False, allow_null=True)
 
 
 class BoardPostReplyCreateSerializer(serializers.Serializer):
@@ -713,6 +714,7 @@ class BoardPostSerializer(serializers.ModelSerializer):
     poll = serializers.SerializerMethodField()
     type_label = serializers.SerializerMethodField()
     meeting = serializers.SerializerMethodField()
+    attachment = serializers.SerializerMethodField()
 
     class Meta:
         model = BoardPost
@@ -727,6 +729,7 @@ class BoardPostSerializer(serializers.ModelSerializer):
             "event_location",
             "poll",
             "meeting",
+            "attachment",
             "author",
             "can_delete",
             "created_at",
@@ -758,6 +761,11 @@ class BoardPostSerializer(serializers.ModelSerializer):
         user = request.user if request else None
         return serialize_meeting_wall_card(obj.meeting, user)
 
+    def get_attachment(self, obj):
+        from api.board_attachments import serialize_attachment
+
+        return serialize_attachment(obj, self.context.get("request"))
+
     def get_type_label(self, obj):
         return {
             WallPostType.POST: "",
@@ -773,6 +781,7 @@ class PersonalBoardPostSerializer(serializers.ModelSerializer):
     can_delete = serializers.SerializerMethodField()
     poll = serializers.SerializerMethodField()
     type_label = serializers.SerializerMethodField()
+    attachment = serializers.SerializerMethodField()
 
     class Meta:
         model = PersonalBoardPost
@@ -786,6 +795,7 @@ class PersonalBoardPostSerializer(serializers.ModelSerializer):
             "event_ends_at",
             "event_location",
             "poll",
+            "attachment",
             "author",
             "can_delete",
             "created_at",
@@ -807,6 +817,11 @@ class PersonalBoardPostSerializer(serializers.ModelSerializer):
         user = request.user if request else None
         return serialize_personal_poll(obj, user)
 
+    def get_attachment(self, obj):
+        from api.board_attachments import serialize_attachment
+
+        return serialize_attachment(obj, self.context.get("request"))
+
     def get_type_label(self, obj):
         return {
             WallPostType.POST: "",
@@ -820,12 +835,17 @@ class OrganizationBoardPublicSerializer(serializers.ModelSerializer):
     posting_mode_label = serializers.CharField(
         source="get_posting_mode_display", read_only=True
     )
+    visibility_label = serializers.CharField(
+        source="get_visibility_display", read_only=True
+    )
 
     class Meta:
         model = OrganizationBoard
         fields = [
             "id",
             "title",
+            "visibility",
+            "visibility_label",
             "posting_mode",
             "posting_mode_label",
             "hub_preview_count",
@@ -835,6 +855,9 @@ class OrganizationBoardPublicSerializer(serializers.ModelSerializer):
 class OrganizationBoardSettingsSerializer(serializers.Serializer):
     title = serializers.CharField(
         max_length=200, required=False, allow_blank=True
+    )
+    visibility = serializers.ChoiceField(
+        choices=OrganizationBoard.Visibility.choices, required=False
     )
     posting_mode = serializers.ChoiceField(
         choices=OrganizationBoard.PostingMode.choices, required=False

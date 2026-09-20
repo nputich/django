@@ -7,6 +7,7 @@ import "../styles/Dashboard.css";
 export default function OrgBoardSettings() {
   const { slug } = useParams();
   const [title, setTitle] = useState("");
+  const [visibility, setVisibility] = useState("public");
   const [mode, setMode] = useState("public");
   const [hubPreviewCount, setHubPreviewCount] = useState(5);
   const [loading, setLoading] = useState(true);
@@ -26,6 +27,7 @@ export default function OrgBoardSettings() {
         setOrgName(dashRes.data.name || slug);
         const board = boardRes.data.board || dashRes.data.board || {};
         setTitle(board.title || "");
+        setVisibility(board.visibility || "public");
         setMode(board.posting_mode || "public");
         setHubPreviewCount(
           typeof board.hub_preview_count === "number"
@@ -53,6 +55,7 @@ export default function OrgBoardSettings() {
     try {
       await api.patch(`/api/organizations/${slug}/board/settings/`, {
         title: title.trim(),
+        visibility,
         posting_mode: mode,
         hub_preview_count: Number(hubPreviewCount),
       });
@@ -70,6 +73,8 @@ export default function OrgBoardSettings() {
     }
   };
 
+  const wallIsPublic = visibility === "public";
+
   return (
     <div className="dashboard">
       <AppHeader />
@@ -79,7 +84,9 @@ export default function OrgBoardSettings() {
         </Link>
         <div className="dashboard-header">
           <h1>Board settings</h1>
-          <p>Control who can post on your organization&apos;s board.</p>
+          <p>
+            Control who can see your organization wall and who can post on it.
+          </p>
         </div>
 
         {loading && <p className="dashboard-empty">Loading…</p>}
@@ -101,6 +108,27 @@ export default function OrgBoardSettings() {
               </small>
             </div>
             <div className="dashboard-field">
+              <label htmlFor="board-visibility">Wall visibility</label>
+              <select
+                id="board-visibility"
+                value={visibility}
+                onChange={(e) => setVisibility(e.target.value)}
+              >
+                <option value="public">Public — anyone can see posts</option>
+                <option value="members_only">
+                  Members only — not visible to the public
+                </option>
+                <option value="private">
+                  Private — only organization admins
+                </option>
+              </select>
+              <small className="dashboard-meta">
+                Announcements and posts on this wall follow wall visibility. A
+                public document announced here is still not shown on a
+                non-public wall.
+              </small>
+            </div>
+            <div className="dashboard-field">
               <label htmlFor="board-mode">Who can post</label>
               <select
                 id="board-mode"
@@ -111,6 +139,9 @@ export default function OrgBoardSettings() {
                 <option value="members_only">Members only</option>
                 <option value="restricted">Restricted (admins only)</option>
               </select>
+              <small className="dashboard-meta">
+                Posting still requires permission to see the wall.
+              </small>
             </div>
             <div className="dashboard-field">
               <label htmlFor="hub-preview-count">
@@ -123,10 +154,12 @@ export default function OrgBoardSettings() {
                 max={25}
                 value={hubPreviewCount}
                 onChange={(e) => setHubPreviewCount(e.target.value)}
+                disabled={!wallIsPublic}
               />
               <small className="dashboard-meta">
-                Newest posts appear on the public hub page. Use 0 to hide the
-                board preview there.
+                {wallIsPublic
+                  ? "Newest posts appear on the public hub page. Use 0 to hide the board preview there."
+                  : "Hub preview only applies when wall visibility is Public."}
               </small>
             </div>
             <button

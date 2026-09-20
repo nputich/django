@@ -4,6 +4,7 @@ from .models import (
     AccessCodeRedemption,
     BoardPost,
     ContactSubmission,
+    DocumentShareList,
     GeographicArea,
     Meeting,
     MeetingAttendance,
@@ -18,6 +19,8 @@ from .models import (
     QuestionTagLink,
     MeetingSummary,
     Note,
+    OrgDocument,
+    OrgDocumentShare,
     Organization,
     OrganizationBoard,
     OrganizationMembership,
@@ -366,7 +369,25 @@ class PoliticalClassificationAdmin(admin.ModelAdmin):
 
 @admin.register(OrganizationBoard)
 class OrganizationBoardAdmin(admin.ModelAdmin):
-    list_display = ("organization", "title", "posting_mode")
+    list_display = ("organization", "title", "visibility", "posting_mode")
+
+
+@admin.register(OrgDocument)
+class OrgDocumentAdmin(admin.ModelAdmin):
+    list_display = ("title", "organization", "visibility", "uploaded_by", "created_at")
+    list_filter = ("visibility",)
+    search_fields = ("title", "original_name", "organization__name")
+
+
+@admin.register(OrgDocumentShare)
+class OrgDocumentShareAdmin(admin.ModelAdmin):
+    list_display = ("document", "status", "user", "shared_organization", "share_list", "created_at")
+    list_filter = ("status",)
+
+
+@admin.register(DocumentShareList)
+class DocumentShareListAdmin(admin.ModelAdmin):
+    list_display = ("name", "organization", "created_at")
 
 
 @admin.register(UserProfile)

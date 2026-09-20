@@ -29,6 +29,7 @@ import OrgRelationshipsSettings from "./pages/OrgRelationshipsSettings";
 import OrgUmbrellaPortal from "./pages/OrgUmbrellaPortal";
 import OrgReportsPage from "./pages/OrgReportsPage";
 import OrgSharedMeetingsPage from "./pages/OrgSharedMeetingsPage";
+import OrgDocumentsPage from "./pages/OrgDocumentsPage";
 import PersonalBoardSettings from "./pages/PersonalBoardSettings";
 import OrgDirectoryPlacement from "./pages/OrgDirectoryPlacement";
 import CreateSurvey from "./pages/CreateSurvey";
@@ -199,6 +200,14 @@ function App() {
           element={
             <ProtectedRoute>
               <OrgSharedMeetingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/:slug/documents"
+          element={
+            <ProtectedRoute>
+              <OrgDocumentsPage />
             </ProtectedRoute>
           }
         />

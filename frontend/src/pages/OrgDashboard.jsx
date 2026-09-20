@@ -248,6 +248,12 @@ export default function OrgDashboard() {
                 Reports
               </Link>
               <Link
+                to={`/dashboard/${slug}/documents`}
+                className="dashboard-btn"
+              >
+                Documents
+              </Link>
+              <Link
                 to={`/dashboard/${slug}/shared-with-us`}
                 className="dashboard-btn"
               >
@@ -317,7 +323,11 @@ export default function OrgDashboard() {
                     "Community wall"
                   }
                   postingMode={boardData.board?.posting_mode}
-                  postingModeLabel={boardData.board?.posting_mode_label}
+                  postingModeLabel={
+                    boardData.board?.visibility_label
+                      ? `${boardData.board.visibility_label} · ${boardData.board?.posting_mode_label || ""}`.trim()
+                      : boardData.board?.posting_mode_label
+                  }
                   posts={boardData.posts}
                   canPost={boardData.can_post}
                   canReply={boardData.can_reply}

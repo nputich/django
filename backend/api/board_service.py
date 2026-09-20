@@ -48,16 +48,19 @@ def is_org_admin(organization: Organization, user: User | None) -> bool:
 
 
 def can_view_org_board(board: OrganizationBoard, user: User | None) -> bool:
-    if board.posting_mode in (
-        OrganizationBoard.PostingMode.PUBLIC,
-        OrganizationBoard.PostingMode.RESTRICTED,
-    ):
+    visibility = getattr(board, "visibility", None) or OrganizationBoard.Visibility.PUBLIC
+    if visibility == OrganizationBoard.Visibility.PUBLIC:
         return True
+    if visibility == OrganizationBoard.Visibility.PRIVATE:
+        return is_org_admin(board.organization, user)
+    # members_only
     return is_org_member(board.organization, user)
 
 
 def can_post_org_board(board: OrganizationBoard, user: User | None) -> bool:
     if not user or not user.is_authenticated:
+        return False
+    if not can_view_org_board(board, user):
         return False
     if board.posting_mode == OrganizationBoard.PostingMode.RESTRICTED:
         return is_org_admin(board.organization, user)

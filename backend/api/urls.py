@@ -12,10 +12,16 @@ from . import umbrella_views
 from . import question_tag_views
 from . import meeting_sharing_views
 from . import reporting_views
+from . import document_views
 
 urlpatterns = [
     path("me/", profile_board_views.MeView.as_view(), name="me"),
     path("me/profile/", profile_board_views.MeProfileView.as_view(), name="me-profile"),
+    path(
+        "users/lookup/",
+        document_views.UserLookupView.as_view(),
+        name="user-lookup",
+    ),
     path(
         "users/<str:username>/",
         profile_board_views.PublicUserProfileView.as_view(),
@@ -438,6 +444,46 @@ urlpatterns = [
         "organizations/<slug:slug>/board/",
         profile_board_views.OrganizationBoardView.as_view(),
         name="org-board",
+    ),
+    path(
+        "organizations/<slug:slug>/documents/",
+        document_views.OrganizationDocumentListView.as_view(),
+        name="org-documents",
+    ),
+    path(
+        "organizations/<slug:slug>/documents/share-lists/",
+        document_views.OrganizationDocumentShareListView.as_view(),
+        name="org-document-share-lists",
+    ),
+    path(
+        "organizations/<slug:slug>/documents/share-lists/<int:list_id>/members/",
+        document_views.OrganizationDocumentShareListMemberView.as_view(),
+        name="org-document-share-list-members",
+    ),
+    path(
+        "organizations/<slug:slug>/documents/share-lists/<int:list_id>/members/<int:member_id>/",
+        document_views.OrganizationDocumentShareListMemberView.as_view(),
+        name="org-document-share-list-member-delete",
+    ),
+    path(
+        "organizations/<slug:slug>/documents/<int:pk>/",
+        document_views.OrganizationDocumentDetailView.as_view(),
+        name="org-document-detail",
+    ),
+    path(
+        "organizations/<slug:slug>/documents/<int:pk>/download/",
+        document_views.OrganizationDocumentDownloadView.as_view(),
+        name="org-document-download",
+    ),
+    path(
+        "organizations/<slug:slug>/documents/<int:pk>/shares/",
+        document_views.OrganizationDocumentSharesView.as_view(),
+        name="org-document-shares",
+    ),
+    path(
+        "organizations/<slug:slug>/documents/<int:pk>/shares/<int:share_id>/revoke/",
+        document_views.OrganizationDocumentShareRevokeView.as_view(),
+        name="org-document-share-revoke",
     ),
     path(
         "organizations/<slug:slug>/board/settings/",

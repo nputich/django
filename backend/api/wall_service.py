@@ -34,6 +34,8 @@ def _parse_dt(value):
 
 
 def normalize_wall_create_data(data: dict) -> dict:
+    from api.board_attachments import validate_wall_attachment
+
     post_type = (data.get("post_type") or WallPostType.POST).strip().lower()
     if post_type not in VALID_POST_TYPES:
         raise ValidationError({"post_type": "Unsupported post type."})
@@ -53,10 +55,12 @@ def normalize_wall_create_data(data: dict) -> dict:
     event_starts_at = _parse_dt(data.get("event_starts_at"))
     event_ends_at = _parse_dt(data.get("event_ends_at"))
     event_location = (data.get("event_location") or "").strip()[:255]
+    attachment = data.get("attachment")
+    validate_wall_attachment(attachment)
 
     if post_type == WallPostType.POST:
-        if not body:
-            raise ValidationError({"body": "Write something to post."})
+        if not body and not attachment:
+            raise ValidationError({"body": "Write something or attach a file."})
     elif post_type == WallPostType.QUESTION:
         if not body:
             raise ValidationError({"body": "Enter your question."})
@@ -77,7 +81,7 @@ def normalize_wall_create_data(data: dict) -> dict:
             {"post_type": "Meeting posts are created when a meeting is scheduled."}
         )
 
-    return {
+    result = {
         "post_type": post_type,
         "title": title,
         "body": body,
@@ -86,6 +90,10 @@ def normalize_wall_create_data(data: dict) -> dict:
         "event_ends_at": event_ends_at,
         "event_location": event_location,
     }
+    if attachment is not None:
+        result["attachment"] = attachment
+        result["attachment_name"] = (getattr(attachment, "name", "") or "")[:255]
+    return result
 
 
 @transaction.atomic

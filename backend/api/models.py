@@ -1227,6 +1227,12 @@ class PersonalBoardPost(models.Model):
     event_starts_at = models.DateTimeField(null=True, blank=True)
     event_ends_at = models.DateTimeField(null=True, blank=True)
     event_location = models.CharField(max_length=255, blank=True, default="")
+    attachment = models.FileField(
+        upload_to="wall_attachments/personal/",
+        blank=True,
+        null=True,
+    )
+    attachment_name = models.CharField(max_length=255, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -1264,6 +1270,11 @@ class PersonalBoardPollVote(models.Model):
 
 
 class OrganizationBoard(models.Model):
+    class Visibility(models.TextChoices):
+        PUBLIC = "public", "Public"
+        MEMBERS_ONLY = "members_only", "Members only"
+        PRIVATE = "private", "Private (admins only)"
+
     class PostingMode(models.TextChoices):
         PUBLIC = "public", "Public"
         MEMBERS_ONLY = "members_only", "Members only"
@@ -1273,6 +1284,12 @@ class OrganizationBoard(models.Model):
         Organization, on_delete=models.CASCADE, related_name="board"
     )
     title = models.CharField(max_length=200, blank=True, default="")
+    visibility = models.CharField(
+        max_length=20,
+        choices=Visibility.choices,
+        default=Visibility.PUBLIC,
+        help_text="Who can see posts on this wall (hub preview only when Public).",
+    )
     posting_mode = models.CharField(
         max_length=20,
         choices=PostingMode.choices,
@@ -1309,6 +1326,12 @@ class BoardPost(models.Model):
         on_delete=models.CASCADE,
         related_name="wall_post",
     )
+    attachment = models.FileField(
+        upload_to="wall_attachments/org/",
+        blank=True,
+        null=True,
+    )
+    attachment_name = models.CharField(max_length=255, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -1766,3 +1789,167 @@ class OrganizationAuditEvent(models.Model):
 
     def __str__(self):
         return f"{self.organization_id}:{self.event_type}:{self.pk}"
+
+
+class OrgDocument(models.Model):
+    """
+    First-class organization document with its own visibility ACL.
+
+    public     — anyone can open
+    private    — only the uploader
+    restricted — uploader + explicit shares (people, orgs, custom lists)
+    """
+
+    class Visibility(models.TextChoices):
+        PUBLIC = "public", "Public"
+        PRIVATE = "private", "Private"
+        RESTRICTED = "restricted", "Restricted"
+
+    organization = models.ForeignKey(
+        Organization, on_delete=models.CASCADE, related_name="documents"
+    )
+    uploaded_by = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="uploaded_org_documents"
+    )
+    title = models.CharField(max_length=255, blank=True, default="")
+    original_name = models.CharField(max_length=255)
+    file = models.FileField(upload_to="org_documents/%Y/%m/")
+    content_type = models.CharField(max_length=128, blank=True, default="")
+    size_bytes = models.PositiveBigIntegerField(default=0)
+    visibility = models.CharField(
+        max_length=16,
+        choices=Visibility.choices,
+        default=Visibility.PRIVATE,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["organization", "visibility", "-created_at"]),
+        ]
+
+    def __str__(self):
+        return self.title or self.original_name
+
+
+class DocumentShareList(models.Model):
+    """Named custom audience list for document sharing within an organization."""
+
+    organization = models.ForeignKey(
+        Organization, on_delete=models.CASCADE, related_name="document_share_lists"
+    )
+    name = models.CharField(max_length=120)
+    created_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["name", "id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization", "name"],
+                name="uniq_document_share_list_name_per_org",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.organization_id}:{self.name}"
+
+
+class DocumentShareListMember(models.Model):
+    share_list = models.ForeignKey(
+        DocumentShareList, on_delete=models.CASCADE, related_name="members"
+    )
+    user = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.CASCADE, related_name="+"
+    )
+    shared_organization = models.ForeignKey(
+        Organization,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="+",
+    )
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(user__isnull=False, shared_organization__isnull=True)
+                    | models.Q(user__isnull=True, shared_organization__isnull=False)
+                ),
+                name="document_share_list_member_one_target",
+            )
+        ]
+
+
+class OrgDocumentShare(models.Model):
+    """Explicit share of a document to a person, organization, or custom list."""
+
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Active"
+        REVOKED = "revoked", "Revoked"
+
+    document = models.ForeignKey(
+        OrgDocument, on_delete=models.CASCADE, related_name="shares"
+    )
+    user = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="document_shares_received",
+    )
+    shared_organization = models.ForeignKey(
+        Organization,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="documents_shared_with_us",
+    )
+    share_list = models.ForeignKey(
+        DocumentShareList,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="document_shares",
+    )
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.ACTIVE
+    )
+    created_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        indexes = [models.Index(fields=["document", "status"])]
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(
+                        user__isnull=False,
+                        shared_organization__isnull=True,
+                        share_list__isnull=True,
+                    )
+                    | models.Q(
+                        user__isnull=True,
+                        shared_organization__isnull=False,
+                        share_list__isnull=True,
+                    )
+                    | models.Q(
+                        user__isnull=True,
+                        shared_organization__isnull=True,
+                        share_list__isnull=False,
+                    )
+                ),
+                name="org_document_share_one_target",
+            )
+        ]
+
+    def __str__(self):
+        return f"doc {self.document_id} share [{self.status}]"

@@ -48,6 +48,13 @@ export default function OrgDashboardSettingsMenu({ slug }) {
           </Link>
           <Link
             role="menuitem"
+            to={`/dashboard/${slug}/documents`}
+            onClick={() => setOpen(false)}
+          >
+            Documents
+          </Link>
+          <Link
+            role="menuitem"
             to={`/dashboard/${slug}/board-settings`}
             onClick={() => setOpen(false)}
           >
