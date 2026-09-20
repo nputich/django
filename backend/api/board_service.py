@@ -34,12 +34,16 @@ def is_org_member(organization: Organization, user: User | None) -> bool:
 
 
 def is_org_admin(organization: Organization, user: User | None) -> bool:
+    """True for organization owners and admins (dashboard / inbox managers)."""
     if not user or not user.is_authenticated:
         return False
     return OrganizationMembership.objects.filter(
         organization=organization,
         user=user,
-        role=OrganizationMembership.Role.ADMIN,
+        role__in=(
+            OrganizationMembership.Role.OWNER,
+            OrganizationMembership.Role.ADMIN,
+        ),
     ).exists()
 
 

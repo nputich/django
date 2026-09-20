@@ -58,7 +58,9 @@ export default function ContactPage() {
       <SiteLogo />
       <h1 className="enter-code-title">Contact Us</h1>
       <p className="enter-code-subtitle">
-        Send us a message and we will get back to you as soon as we can.
+        Send us a message and we will get back to you as soon as we can. You can
+        also email{" "}
+        <a href="mailto:contact@communibetter.com">contact@communibetter.com</a>.
       </p>
 
       {success && <p className="contact-success">{success}</p>}

@@ -7,16 +7,26 @@ from .models import (
     GeographicArea,
     Meeting,
     MeetingAttendance,
+    MeetingExpectedAttendance,
     MeetingQuestion,
     MeetingResponse,
     MeetingResponseAI,
     MeetingSession,
+    MeetingShare,
     MeetingSlide,
+    QuestionTag,
+    QuestionTagLink,
+    MeetingSummary,
     Note,
     Organization,
     OrganizationBoard,
     OrganizationMembership,
+    OrganizationRelationship,
     OrganizationService,
+    OrganizationUsagePeriod,
+    AiUsageEvent,
+    SurveySubmission,
+    UmbrellaLicense,
     OrgCategory,
     ParticipantProfileValue,
     PersonalBoard,
@@ -83,6 +93,38 @@ class OrganizationMembershipAdmin(admin.ModelAdmin):
     list_display = ("organization", "user", "role")
 
 
+@admin.register(OrganizationRelationship)
+class OrganizationRelationshipAdmin(admin.ModelAdmin):
+    list_display = (
+        "kind",
+        "from_organization",
+        "to_organization",
+        "status",
+        "initiated_by_organization",
+        "public",
+        "created_at",
+        "responded_at",
+        "ended_at",
+    )
+    list_filter = ("kind", "status", "public")
+    search_fields = (
+        "from_organization__name",
+        "from_organization__slug",
+        "to_organization__name",
+        "to_organization__slug",
+    )
+    raw_id_fields = (
+        "from_organization",
+        "to_organization",
+        "initiated_by_organization",
+        "ended_by_organization",
+        "requested_by",
+        "responded_by",
+        "conversation",
+    )
+    readonly_fields = ("created_at",)
+
+
 @admin.register(OrganizationService)
 class OrganizationServiceAdmin(admin.ModelAdmin):
     list_display = (
@@ -105,6 +147,70 @@ class OrganizationServiceAdmin(admin.ModelAdmin):
     )
     readonly_fields = ("created_at", "updated_at")
     raw_id_fields = ("organization", "requested_by")
+
+
+@admin.register(QuestionTag)
+class QuestionTagAdmin(admin.ModelAdmin):
+    list_display = ("label", "slug", "category", "organization", "is_active", "created_at")
+    list_filter = ("category", "is_active")
+    search_fields = ("label", "slug", "organization__name")
+    raw_id_fields = ("organization", "created_by")
+
+
+@admin.register(QuestionTagLink)
+class QuestionTagLinkAdmin(admin.ModelAdmin):
+    list_display = ("tag", "organization", "question_key", "slide", "survey_question", "created_at")
+    list_filter = ("tag__category",)
+    search_fields = ("question_key", "tag__label", "organization__name")
+    raw_id_fields = ("organization", "tag", "slide", "survey_question", "created_by")
+
+
+@admin.register(MeetingShare)
+class MeetingShareAdmin(admin.ModelAdmin):
+    list_display = ("meeting", "organization", "status", "declared_before_start", "created_at", "revoked_at")
+    list_filter = ("status", "declared_before_start")
+    search_fields = ("meeting__title", "organization__name")
+    raw_id_fields = ("meeting", "organization", "created_by", "revoked_by")
+
+
+@admin.register(UmbrellaLicense)
+class UmbrellaLicenseAdmin(admin.ModelAdmin):
+    list_display = ("organization", "code", "is_active", "max_members", "created_at", "rotated_at")
+    list_filter = ("is_active",)
+    search_fields = ("code", "organization__name", "organization__slug")
+    raw_id_fields = ("organization", "created_by")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(OrganizationUsagePeriod)
+class OrganizationUsagePeriodAdmin(admin.ModelAdmin):
+    list_display = (
+        "organization",
+        "service_level",
+        "period_start",
+        "period_end",
+        "survey_submissions_used",
+        "meetings_started_used",
+        "ai_meeting_runs_used",
+        "board_posts_used",
+    )
+    list_filter = ("service_level",)
+    search_fields = ("organization__name", "organization__slug")
+    raw_id_fields = ("organization",)
+
+
+@admin.register(AiUsageEvent)
+class AiUsageEventAdmin(admin.ModelAdmin):
+    list_display = (
+        "organization",
+        "meeting",
+        "provider",
+        "consumed_run",
+        "success",
+        "created_at",
+    )
+    list_filter = ("provider", "consumed_run", "success")
+    raw_id_fields = ("organization", "meeting", "usage_period")
 
 
 @admin.register(AccessCodeRedemption)
@@ -144,6 +250,12 @@ class SurveyAnswerAdmin(admin.ModelAdmin):
     list_display = ("survey", "question", "response_session", "created_at")
 
 
+@admin.register(SurveySubmission)
+class SurveySubmissionAdmin(admin.ModelAdmin):
+    list_display = ("survey", "organization", "response_session", "created_at")
+    raw_id_fields = ("survey", "organization", "usage_period")
+
+
 class MeetingSlideInline(admin.TabularInline):
     model = MeetingSlide
     extra = 1
@@ -165,11 +277,39 @@ class MeetingAdmin(admin.ModelAdmin):
         "access_mode",
         "status",
         "scheduled_start_at",
+        "results_visible_to_community",
+        "minutes_creator",
         "is_anonymous",
         "ai_mode",
     )
-    list_filter = ("status", "access_mode", "ai_mode", "is_anonymous")
+    list_filter = (
+        "status",
+        "access_mode",
+        "ai_mode",
+        "is_anonymous",
+        "results_visible_to_community",
+        "minutes_creator",
+    )
     inlines = [MeetingSlideInline, MeetingSessionInline]
+
+
+@admin.register(MeetingExpectedAttendance)
+class MeetingExpectedAttendanceAdmin(admin.ModelAdmin):
+    list_display = ("meeting", "user", "status", "updated_at")
+    list_filter = ("status",)
+
+
+@admin.register(MeetingSummary)
+class MeetingSummaryAdmin(admin.ModelAdmin):
+    list_display = (
+        "meeting",
+        "status",
+        "is_organizer_authored",
+        "author",
+        "published_at",
+        "updated_at",
+    )
+    list_filter = ("status", "is_organizer_authored")
 
 
 @admin.register(MeetingSlide)
@@ -242,12 +382,14 @@ class PersonalBoardAdmin(admin.ModelAdmin):
 
 @admin.register(PersonalBoardPost)
 class PersonalBoardPostAdmin(admin.ModelAdmin):
-    list_display = ("board", "title", "created_at")
+    list_display = ("board", "post_type", "title", "created_at")
+    list_filter = ("post_type",)
 
 
 @admin.register(BoardPost)
 class BoardPostAdmin(admin.ModelAdmin):
-    list_display = ("board", "title", "author", "created_at")
+    list_display = ("board", "post_type", "title", "author", "created_at")
+    list_filter = ("post_type",)
 
 
 @admin.register(AccessCode)

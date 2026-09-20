@@ -15,6 +15,9 @@ from api.models import (
 )
 from api.political_issue_classifier import classification_summary
 
+# Groups at or below this size are omitted from demographic answer breakdowns.
+DEMOGRAPHIC_MIN_CELL_COUNT = 5
+
 
 def _normalize_profile_value(value: Any) -> str:
     if value is None:
@@ -392,7 +395,12 @@ def get_slide_analytics(
             "value": str(split_value).strip(),
         }
 
-    if slide.slide_type == MeetingSlide.SlideType.STANDARD:
+    filtered_respondents = _distinct_respondents(filtered_responses)
+    suppressed = False
+    if split_meta and filtered_respondents <= DEMOGRAPHIC_MIN_CELL_COUNT:
+        suppressed = True
+        bars = []
+    elif slide.slide_type == MeetingSlide.SlideType.STANDARD:
         bars = _analytics_standard(slide, filtered_responses, limit)
     else:
         bars = _analytics_issues(slide, filtered_responses, limit)
@@ -412,10 +420,12 @@ def get_slide_analytics(
         "slide_title": slide.title or slide.prompt or slide.slide_type,
         "question_format": slide.question_format or "",
         "total_respondents": _distinct_respondents(all_responses),
-        "filtered_respondents": _distinct_respondents(filtered_responses),
-        "response_row_count": len(filtered_responses),
+        "filtered_respondents": filtered_respondents,
+        "response_row_count": 0 if suppressed else len(filtered_responses),
         "split": split_meta,
         "bars": bars,
+        "suppressed": suppressed,
+        "min_cell_count": DEMOGRAPHIC_MIN_CELL_COUNT if split_meta else None,
         "demographic_fields": get_demographic_fields(meeting),
         "split_values": get_demographic_values(session, split_field) if split_field else [],
         "individual_responses": individual_responses,
@@ -450,28 +460,55 @@ def get_slide_analytics_compare(
             field_label = field["label"]
             break
 
-    counters: list[Counter] = []
-    comparison_payloads: list[dict[str, Any]] = []
+    # Count every demographic group first. If any group is too small, do not
+    # allow answer analysis by this factor — overall ("All") only. Still return
+    # headcounts so organizers can see why the split is unavailable.
+    group_sizes: list[dict[str, Any]] = []
     for value in split_values:
         attendance_ids = _filtered_attendance_ids(session, split_field, value)
         filtered = _responses_for_slide(session, slide, attendance_ids)
-        counter = _counts_for_responses(slide, filtered)
-        counters.append(counter)
-        comparison_payloads.append(
+        respondents = _distinct_respondents(filtered)
+        group_sizes.append(
             {
                 "value": value,
-                "filtered_respondents": _distinct_respondents(filtered),
+                "filtered_respondents": respondents,
                 "response_row_count": len(filtered),
-                "counts": counter,
+                "filtered": filtered,
             }
         )
 
+    group_counts = [
+        {"value": g["value"], "filtered_respondents": g["filtered_respondents"]}
+        for g in group_sizes
+        if g["filtered_respondents"] > 0
+    ]
+    too_small = [
+        g for g in group_counts if g["filtered_respondents"] <= DEMOGRAPHIC_MIN_CELL_COUNT
+    ]
+    split_blocked = bool(too_small) and bool(group_counts)
+
     overall_counter = _counts_for_responses(slide, all_responses)
-    counters.append(overall_counter)
+    counters: list[Counter] = [overall_counter]
+    comparison_payloads: list[dict[str, Any]] = []
+    if not split_blocked:
+        for g in group_sizes:
+            if g["filtered_respondents"] <= 0:
+                continue
+            counter = _counts_for_responses(slide, g["filtered"])
+            counters.append(counter)
+            comparison_payloads.append(
+                {
+                    "value": g["value"],
+                    "filtered_respondents": g["filtered_respondents"],
+                    "response_row_count": g["response_row_count"],
+                    "counts": counter,
+                }
+            )
+
     label_order = _label_order_for_compare(slide, counters, limit)
+    align_rows = bool(label_order)
 
     comparisons = []
-    align_rows = bool(label_order)
     for item in comparison_payloads:
         bars = _bars_from_counter(
             item["counts"],
@@ -515,6 +552,8 @@ def get_slide_analytics_compare(
             "field_key": split_field,
             "field_label": field_label,
             "mode": "compare",
+            "min_cell_count": DEMOGRAPHIC_MIN_CELL_COUNT,
+            "blocked": split_blocked,
         },
         "label_order": label_order,
         "overall": {
@@ -523,6 +562,9 @@ def get_slide_analytics_compare(
             "bars": overall_bars,
         },
         "comparisons": comparisons,
+        "suppressed_groups": too_small,
+        "group_counts": group_counts,
+        "split_blocked": split_blocked,
         "demographic_fields": get_demographic_fields(meeting),
         "split_values": split_values,
         "individual_responses": individual_responses,

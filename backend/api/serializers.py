@@ -1,6 +1,10 @@
 from django.contrib.auth.models import User
 from rest_framework import serializers
-from .board_service import can_delete_org_post, can_delete_org_reply
+from .board_service import (
+    can_delete_org_post,
+    can_delete_org_reply,
+    can_delete_personal_post,
+)
 from .models import (
     AccessCode,
     BoardPost,
@@ -8,6 +12,7 @@ from .models import (
     Meeting,
     MeetingSession,
     MeetingSlide,
+    MeetingSummary,
     Note,
     Organization,
     OrganizationBoard,
@@ -17,6 +22,7 @@ from .models import (
     SurveyAnswer,
     SurveyQuestion,
     UserProfile,
+    WallPostType,
 )
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
@@ -32,12 +38,62 @@ class NoteSerializer(serializers.ModelSerializer):
         fields = ["id", "title", "content", "created_at", "author"]
         extra_kwargs = {"author": {"read_only": True}}
 class SurveyQuestionSerializer(serializers.ModelSerializer):
+    content = serializers.SerializerMethodField()
+
     class Meta:
         model = SurveyQuestion
-        fields = ["id", "order", "text", "question_type", "choices"]
+        fields = [
+            "id",
+            "order",
+            "text",
+            "question_type",
+            "choices",
+            "is_demographic",
+            "config",
+            "content",
+        ]
+
+    def get_content(self, obj):
+        if obj.question_type != SurveyQuestion.QuestionType.CONTENT:
+            return None
+        from api.content_media import normalize_content_config
+
+        return normalize_content_config(obj.config)
+
+
+class SurveyQuestionAdminSerializer(SurveyQuestionSerializer):
+    """Dashboard view of a question: includes reporting tags."""
+
+    tags = serializers.SerializerMethodField()
+    tag_ids = serializers.SerializerMethodField()
+
+    class Meta(SurveyQuestionSerializer.Meta):
+        fields = SurveyQuestionSerializer.Meta.fields + ["tags", "tag_ids"]
+
+    def _tags(self, obj):
+        if obj.question_type == SurveyQuestion.QuestionType.CONTENT:
+            return []
+        cache = self.context.setdefault("_sq_tags", {})
+        if obj.id not in cache:
+            from api.question_tags import tags_for_survey_question
+
+            cache[obj.id] = tags_for_survey_question(obj)
+        return cache[obj.id]
+
+    def get_tags(self, obj):
+        from api.question_tags import serialize_tag
+
+        return [serialize_tag(t) for t in self._tags(obj)]
+
+    def get_tag_ids(self, obj):
+        return [t.id for t in self._tags(obj)]
+
+
 class SurveyDetailSerializer(serializers.ModelSerializer):
-    questions = SurveyQuestionSerializer(many=True, read_only=True)
+    questions = serializers.SerializerMethodField()
     organization_name = serializers.CharField(source="organization.name", read_only=True)
+    disclosure = serializers.SerializerMethodField()
+
     class Meta:
         model = Survey
         fields = [
@@ -46,8 +102,21 @@ class SurveyDetailSerializer(serializers.ModelSerializer):
             "description",
             "organization_name",
             "is_anonymous",
+            "aggregate_sharing_notice",
+            "disclosure",
             "questions",
         ]
+
+    def get_disclosure(self, obj):
+        from api.content_media import survey_disclosure_payload
+
+        return survey_disclosure_payload(obj)
+
+    def get_questions(self, obj):
+        from api.content_media import ordered_survey_questions
+
+        qs = list(obj.questions.all())
+        return SurveyQuestionSerializer(ordered_survey_questions(qs), many=True).data
 class SurveyAnswerInputSerializer(serializers.Serializer):
     question_id = serializers.IntegerField()
     value = serializers.CharField()
@@ -66,6 +135,9 @@ class OrganizationHubSerializer(serializers.ModelSerializer):
     surveys = serializers.SerializerMethodField()
     meetings = serializers.SerializerMethodField()
     has_board = serializers.SerializerMethodField()
+    board = serializers.SerializerMethodField()
+    relationships = serializers.SerializerMethodField()
+
     class Meta:
         model = Organization
         fields = [
@@ -76,10 +148,19 @@ class OrganizationHubSerializer(serializers.ModelSerializer):
             "surveys",
             "meetings",
             "has_board",
+            "board",
+            "relationships",
         ]
+
     def get_surveys(self, obj):
         qs = obj.surveys.filter(is_active=True)
         return OrganizationHubSurveySerializer(qs, many=True).data
+
+    def get_relationships(self, obj):
+        from api.relationship_service import public_relationships_payload
+
+        return public_relationships_payload(obj)
+
     def get_meetings(self, obj):
         qs = Meeting.objects.filter(
             organization=obj, status__in=["scheduled", "live", "paused"]
@@ -96,8 +177,47 @@ class OrganizationHubSerializer(serializers.ModelSerializer):
             }
             for m in qs
         ]
+
     def get_has_board(self, obj):
         return hasattr(obj, "board")
+
+    def get_board(self, obj):
+        from api.board_service import can_view_org_board, get_org_board
+
+        if not hasattr(obj, "board"):
+            return None
+        board = get_org_board(obj)
+        request = self.context.get("request")
+        user = request.user if request else None
+        if not can_view_org_board(board, user):
+            return {
+                "title": board.title or obj.name,
+                "hub_preview_count": board.hub_preview_count,
+                "can_view": False,
+                "posts": [],
+            }
+        limit = max(0, min(int(board.hub_preview_count or 0), 25))
+        posts_qs = (
+            board.posts.select_related("author__profile", "meeting__organization")
+            .prefetch_related(
+                "replies__author__profile",
+                "poll_options",
+                "poll_votes",
+                "meeting__summaries",
+                "meeting__expected_attendances",
+            )
+            .all()[:limit]
+            if limit
+            else board.posts.none()
+        )
+        return {
+            "title": (board.title or "").strip() or obj.name,
+            "hub_preview_count": board.hub_preview_count,
+            "can_view": True,
+            "posts": BoardPostSerializer(
+                posts_qs, many=True, context=self.context
+            ).data,
+        }
 
 
 class MyOrganizationSerializer(serializers.ModelSerializer):
@@ -194,8 +314,9 @@ class DashboardSurveySerializer(serializers.ModelSerializer):
 
 
 class DashboardSurveyDetailSerializer(serializers.ModelSerializer):
-    questions = SurveyQuestionSerializer(many=True, read_only=True)
+    questions = serializers.SerializerMethodField()
     access_codes = DashboardAccessCodeSerializer(many=True, read_only=True)
+    disclosure = serializers.SerializerMethodField()
 
     class Meta:
         model = Survey
@@ -205,14 +326,34 @@ class DashboardSurveyDetailSerializer(serializers.ModelSerializer):
             "description",
             "is_active",
             "is_anonymous",
+            "aggregate_sharing_notice",
+            "disclosure",
             "created_at",
             "questions",
             "access_codes",
         ]
 
+    def get_disclosure(self, obj):
+        from api.content_media import survey_disclosure_payload
+
+        return survey_disclosure_payload(obj)
+
+    def get_questions(self, obj):
+        from api.content_media import ordered_survey_questions
+
+        qs = list(obj.questions.all())
+        return SurveyQuestionAdminSerializer(
+            ordered_survey_questions(qs), many=True, context=self.context
+        ).data
+
 
 class MeetingSlideSerializer(serializers.ModelSerializer):
     participant_fields = serializers.SerializerMethodField()
+    disclosure = serializers.SerializerMethodField()
+    content = serializers.SerializerMethodField()
+    tags = serializers.SerializerMethodField()
+    tag_ids = serializers.SerializerMethodField()
+    added_live = serializers.SerializerMethodField()
 
     class Meta:
         model = MeetingSlide
@@ -226,6 +367,11 @@ class MeetingSlideSerializer(serializers.ModelSerializer):
             "choices",
             "config",
             "participant_fields",
+            "disclosure",
+            "content",
+            "tags",
+            "tag_ids",
+            "added_live",
             "is_active",
         ]
 
@@ -234,12 +380,51 @@ class MeetingSlideSerializer(serializers.ModelSerializer):
             return obj.config.get("fields", [])
         return []
 
+    def get_disclosure(self, obj):
+        if obj.slide_type != MeetingSlide.SlideType.PARTICIPANT_INFO:
+            return None
+        from api.meeting_sharing import disclosure_payload
+
+        return disclosure_payload(obj.meeting)
+
+    def get_content(self, obj):
+        if obj.slide_type != MeetingSlide.SlideType.CONTENT:
+            return None
+        from api.content_media import normalize_content_config
+
+        return normalize_content_config(obj.config)
+
+    def _tags(self, obj):
+        if not obj.is_question:
+            return []
+        cache = self.context.setdefault("_slide_tags", {})
+        if obj.id not in cache:
+            from api.question_tags import tags_for_slide
+
+            cache[obj.id] = tags_for_slide(obj)
+        return cache[obj.id]
+
+    def get_tags(self, obj):
+        from api.question_tags import serialize_tag
+
+        return [serialize_tag(t) for t in self._tags(obj)]
+
+    def get_tag_ids(self, obj):
+        return [t.id for t in self._tags(obj)]
+
+    def get_added_live(self, obj):
+        return bool((obj.config or {}).get("added_live"))
+
 
 class MeetingDetailSerializer(serializers.ModelSerializer):
     slides = MeetingSlideSerializer(many=True, read_only=True)
     organization_name = serializers.CharField(source="organization.name", read_only=True)
     organization_slug = serializers.CharField(source="organization.slug", read_only=True)
     community_code = serializers.SerializerMethodField()
+    wall = serializers.SerializerMethodField()
+    published_summary = serializers.SerializerMethodField()
+    can_create_summary = serializers.SerializerMethodField()
+    can_view_results = serializers.SerializerMethodField()
 
     class Meta:
         model = Meeting
@@ -247,16 +432,28 @@ class MeetingDetailSerializer(serializers.ModelSerializer):
             "id",
             "title",
             "description",
+            "location",
             "organization_name",
             "organization_slug",
             "access_mode",
             "status",
             "scheduled_start_at",
+            "scheduled_end_at",
             "allow_start_early",
             "is_anonymous",
+            "allow_self_paced",
             "ai_mode",
+            "results_visible_to_community",
+            "minutes_creator",
+            "aggregate_sharing_notice",
             "community_code",
             "slides",
+            "wall",
+            "published_summary",
+            "can_create_summary",
+            "can_view_results",
+            "started_at",
+            "ended_at",
         ]
 
     def get_community_code(self, obj):
@@ -264,6 +461,40 @@ class MeetingDetailSerializer(serializers.ModelSerializer):
         if not code:
             code = obj.access_codes.filter(is_active=True).first()
         return code.code if code else None
+
+    def _user(self):
+        request = self.context.get("request")
+        return request.user if request else None
+
+    def get_wall(self, obj):
+        from api.meeting_wall import serialize_meeting_wall_card
+
+        return serialize_meeting_wall_card(obj, self._user())
+
+    def get_published_summary(self, obj):
+        from api.meeting_wall import published_summary
+
+        row = published_summary(obj)
+        if not row:
+            return None
+        return {
+            "id": row.id,
+            "body": row.body,
+            "published_at": row.published_at,
+            "updated_at": row.updated_at,
+        }
+
+    def get_can_create_summary(self, obj):
+        from api.meeting_wall import can_create_meeting_minutes, published_summary
+
+        if published_summary(obj):
+            return False
+        return can_create_meeting_minutes(obj, self._user())
+
+    def get_can_view_results(self, obj):
+        from api.meeting_wall import can_view_meeting_results
+
+        return can_view_meeting_results(obj, self._user())
 
 
 class DashboardMeetingSerializer(serializers.ModelSerializer):
@@ -275,12 +506,16 @@ class DashboardMeetingSerializer(serializers.ModelSerializer):
             "id",
             "title",
             "description",
+            "location",
             "access_mode",
             "status",
             "scheduled_start_at",
+            "scheduled_end_at",
             "allow_start_early",
             "is_anonymous",
             "ai_mode",
+            "results_visible_to_community",
+            "minutes_creator",
             "created_at",
             "access_codes",
         ]
@@ -291,6 +526,7 @@ class OrganizationDashboardSerializer(serializers.ModelSerializer):
     meetings = DashboardMeetingSerializer(many=True, read_only=True)
     board = serializers.SerializerMethodField()
     capabilities = serializers.SerializerMethodField()
+    usage = serializers.SerializerMethodField()
     lifecycle = serializers.SerializerMethodField()
     community_code = serializers.SerializerMethodField()
     directory_placement = serializers.SerializerMethodField()
@@ -308,6 +544,7 @@ class OrganizationDashboardSerializer(serializers.ModelSerializer):
             "meetings",
             "board",
             "capabilities",
+            "usage",
             "lifecycle",
             "community_code",
             "directory_placement",
@@ -322,6 +559,11 @@ class OrganizationDashboardSerializer(serializers.ModelSerializer):
         from .feature_entitlements import get_organization_capabilities
 
         return get_organization_capabilities(obj)
+
+    def get_usage(self, obj):
+        from .usage_service import serialize_usage
+
+        return serialize_usage(obj)
 
     def get_lifecycle(self, obj):
         from .organization_lifecycle import serialize_lifecycle
@@ -422,12 +664,29 @@ class UserProfileUpdateSerializer(serializers.Serializer):
 
 
 class BoardPostCreateSerializer(serializers.Serializer):
-    title = serializers.CharField(max_length=200)
-    body = serializers.CharField()
+    post_type = serializers.ChoiceField(
+        choices=WallPostType.choices, required=False, default=WallPostType.POST
+    )
+    title = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    body = serializers.CharField(required=False, allow_blank=True)
+    poll_options = serializers.ListField(
+        child=serializers.CharField(max_length=200, allow_blank=True),
+        required=False,
+        allow_empty=True,
+    )
+    event_starts_at = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    event_ends_at = serializers.CharField(required=False, allow_blank=True, allow_null=True)
+    event_location = serializers.CharField(
+        max_length=255, required=False, allow_blank=True
+    )
 
 
 class BoardPostReplyCreateSerializer(serializers.Serializer):
     body = serializers.CharField()
+
+
+class BoardPollVoteSerializer(serializers.Serializer):
+    option_id = serializers.IntegerField()
 
 
 class BoardPostReplySerializer(serializers.ModelSerializer):
@@ -451,13 +710,23 @@ class BoardPostSerializer(serializers.ModelSerializer):
     author = serializers.SerializerMethodField()
     replies = BoardPostReplySerializer(many=True, read_only=True)
     can_delete = serializers.SerializerMethodField()
+    poll = serializers.SerializerMethodField()
+    type_label = serializers.SerializerMethodField()
+    meeting = serializers.SerializerMethodField()
 
     class Meta:
         model = BoardPost
         fields = [
             "id",
+            "post_type",
+            "type_label",
             "title",
             "body",
+            "event_starts_at",
+            "event_ends_at",
+            "event_location",
+            "poll",
+            "meeting",
             "author",
             "can_delete",
             "created_at",
@@ -473,11 +742,78 @@ class BoardPostSerializer(serializers.ModelSerializer):
         user = request.user if request else None
         return can_delete_org_post(obj, user)
 
+    def get_poll(self, obj):
+        from api.wall_service import serialize_org_poll
+
+        request = self.context.get("request")
+        user = request.user if request else None
+        return serialize_org_poll(obj, user)
+
+    def get_meeting(self, obj):
+        if obj.post_type != WallPostType.MEETING or not obj.meeting_id:
+            return None
+        from api.meeting_wall import serialize_meeting_wall_card
+
+        request = self.context.get("request")
+        user = request.user if request else None
+        return serialize_meeting_wall_card(obj.meeting, user)
+
+    def get_type_label(self, obj):
+        return {
+            WallPostType.POST: "",
+            WallPostType.QUESTION: "QUESTION",
+            WallPostType.POLL: "POLL",
+            WallPostType.EVENT: "EVENT",
+            WallPostType.MEETING: "",
+        }.get(obj.post_type, "")
+
 
 class PersonalBoardPostSerializer(serializers.ModelSerializer):
+    author = serializers.SerializerMethodField()
+    can_delete = serializers.SerializerMethodField()
+    poll = serializers.SerializerMethodField()
+    type_label = serializers.SerializerMethodField()
+
     class Meta:
         model = PersonalBoardPost
-        fields = ["id", "title", "body", "created_at", "updated_at"]
+        fields = [
+            "id",
+            "post_type",
+            "type_label",
+            "title",
+            "body",
+            "event_starts_at",
+            "event_ends_at",
+            "event_location",
+            "poll",
+            "author",
+            "can_delete",
+            "created_at",
+            "updated_at",
+        ]
+
+    def get_author(self, obj):
+        return serialize_post_author(obj.board.user, self.context.get("request"))
+
+    def get_can_delete(self, obj):
+        request = self.context.get("request")
+        user = request.user if request else None
+        return can_delete_personal_post(obj, user)
+
+    def get_poll(self, obj):
+        from api.wall_service import serialize_personal_poll
+
+        request = self.context.get("request")
+        user = request.user if request else None
+        return serialize_personal_poll(obj, user)
+
+    def get_type_label(self, obj):
+        return {
+            WallPostType.POST: "",
+            WallPostType.QUESTION: "QUESTION",
+            WallPostType.POLL: "POLL",
+            WallPostType.EVENT: "EVENT",
+        }.get(obj.post_type, "")
 
 
 class OrganizationBoardPublicSerializer(serializers.ModelSerializer):
@@ -487,13 +823,30 @@ class OrganizationBoardPublicSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = OrganizationBoard
-        fields = ["id", "title", "posting_mode", "posting_mode_label"]
+        fields = [
+            "id",
+            "title",
+            "posting_mode",
+            "posting_mode_label",
+            "hub_preview_count",
+        ]
 
 
 class OrganizationBoardSettingsSerializer(serializers.Serializer):
-    title = serializers.CharField(max_length=200, required=False)
+    title = serializers.CharField(
+        max_length=200, required=False, allow_blank=True
+    )
     posting_mode = serializers.ChoiceField(
         choices=OrganizationBoard.PostingMode.choices, required=False
+    )
+    hub_preview_count = serializers.IntegerField(
+        required=False, min_value=0, max_value=25
+    )
+
+
+class PersonalBoardSettingsSerializer(serializers.Serializer):
+    title = serializers.CharField(
+        max_length=200, required=False, allow_blank=True
     )
 
 
@@ -544,7 +897,7 @@ class InboxDraftSaveSerializer(serializers.Serializer):
 
 class SurveyQuestionCreateSerializer(serializers.Serializer):
     order = serializers.IntegerField(min_value=0, default=0)
-    text = serializers.CharField()
+    text = serializers.CharField(required=False, allow_blank=True, default="")
     question_type = serializers.ChoiceField(
         choices=SurveyQuestion.QuestionType.choices,
         default=SurveyQuestion.QuestionType.TEXT,
@@ -552,12 +905,39 @@ class SurveyQuestionCreateSerializer(serializers.Serializer):
     choices = serializers.ListField(
         child=serializers.CharField(), required=False, default=list
     )
+    is_demographic = serializers.BooleanField(required=False, default=False)
+    body = serializers.CharField(required=False, allow_blank=True, default="")
+    banner_url = serializers.CharField(required=False, allow_blank=True, default="", max_length=2000)
+    video_url = serializers.CharField(required=False, allow_blank=True, default="", max_length=2000)
+    tag_ids = serializers.ListField(child=serializers.IntegerField(), required=False)
+    tag_scope = serializers.ChoiceField(choices=["all", "this"], required=False, default="all")
+
+    def validate(self, attrs):
+        qtype = attrs.get("question_type") or SurveyQuestion.QuestionType.TEXT
+        if qtype == SurveyQuestion.QuestionType.CONTENT:
+            body = (attrs.get("body") or "").strip()
+            banner = (attrs.get("banner_url") or "").strip()
+            video = (attrs.get("video_url") or "").strip()
+            title = (attrs.get("text") or "").strip()
+            if not any([body, banner, video, title]):
+                raise serializers.ValidationError(
+                    {"body": "Content blocks need text, a banner, or a video."}
+                )
+            attrs["is_demographic"] = False
+        elif not (attrs.get("text") or "").strip():
+            raise serializers.ValidationError({"text": "Question text is required."})
+        if qtype == SurveyQuestion.QuestionType.CHOICE and len(attrs.get("choices") or []) < 2:
+            raise serializers.ValidationError(
+                {"choices": "Choice questions need at least two options."}
+            )
+        return attrs
 
 
 class DashboardSurveyCreateSerializer(serializers.Serializer):
     title = serializers.CharField(max_length=200)
     description = serializers.CharField(required=False, allow_blank=True, default="")
     is_anonymous = serializers.BooleanField(default=True)
+    aggregate_sharing_notice = serializers.BooleanField(required=False, default=True)
     access_code = serializers.CharField(
         required=False, allow_blank=True, max_length=32
     )
@@ -573,6 +953,7 @@ class DashboardSurveyUpdateSerializer(serializers.Serializer):
     description = serializers.CharField(required=False, allow_blank=True)
     is_anonymous = serializers.BooleanField(required=False)
     is_active = serializers.BooleanField(required=False)
+    aggregate_sharing_notice = serializers.BooleanField(required=False)
 
 
 class SurveyAppendQuestionsSerializer(serializers.Serializer):
@@ -580,18 +961,33 @@ class SurveyAppendQuestionsSerializer(serializers.Serializer):
 
 
 class ParticipantInfoFieldCreateSerializer(serializers.Serializer):
-    key = serializers.CharField(max_length=100)
+    key = serializers.CharField(max_length=100, required=False, allow_blank=True, default="")
     label = serializers.CharField(max_length=200)
     required = serializers.BooleanField(default=False)
     field_type = serializers.ChoiceField(
-        choices=["text", "single_select", "multi_select"]
+        choices=["text", "textarea", "single_select", "multi_select"]
     )
     options = serializers.ListField(
         child=serializers.CharField(), required=False, default=list
     )
 
+    def validate(self, attrs):
+        label = (attrs.get("label") or "").strip()
+        key = (attrs.get("key") or "").strip()
+        if not key:
+            base = "".join(
+                ch if ch.isalnum() else "_" for ch in label.lower()
+            ).strip("_")
+            while "__" in base:
+                base = base.replace("__", "_")
+            key = (base[:50] if base else "field")
+        attrs["key"] = key
+        attrs["label"] = label
+        return attrs
+
 
 class MeetingSlideCreateSerializer(serializers.Serializer):
+    id = serializers.IntegerField(required=False)
     order = serializers.IntegerField(min_value=0, default=0)
     slide_type = serializers.ChoiceField(choices=MeetingSlide.SlideType.choices)
     title = serializers.CharField(required=False, allow_blank=True, max_length=300)
@@ -605,6 +1001,11 @@ class MeetingSlideCreateSerializer(serializers.Serializer):
         child=serializers.CharField(), required=False, default=list
     )
     fields = ParticipantInfoFieldCreateSerializer(many=True, required=False, default=list)
+    body = serializers.CharField(required=False, allow_blank=True, default="")
+    banner_url = serializers.CharField(required=False, allow_blank=True, default="", max_length=2000)
+    video_url = serializers.CharField(required=False, allow_blank=True, default="", max_length=2000)
+    tag_ids = serializers.ListField(child=serializers.IntegerField(), required=False)
+    tag_scope = serializers.ChoiceField(choices=["all", "this"], required=False, default="all")
 
     def validate(self, attrs):
         slide_type = attrs["slide_type"]
@@ -615,20 +1016,32 @@ class MeetingSlideCreateSerializer(serializers.Serializer):
         fields = attrs.get("fields") or []
 
         if slide_type == MeetingSlide.SlideType.PARTICIPANT_INFO:
-            if not fields:
-                raise serializers.ValidationError(
-                    {"fields": "Participant info slides need at least one field."}
-                )
+            # A disclosure-only screen (no fields) is allowed; every meeting has one.
             keys = [f["key"] for f in fields]
             if len(keys) != len(set(keys)):
                 raise serializers.ValidationError(
                     {"fields": "Field keys must be unique within the slide."}
                 )
             for field in fields:
-                if field["field_type"] in ("single_select", "multi_select") and not field.get("options"):
-                    raise serializers.ValidationError(
-                        {"fields": f"Select field '{field['key']}' needs options."}
-                    )
+                if field["field_type"] in ("single_select", "multi_select"):
+                    opts = field.get("options") or []
+                    if len(opts) < 2:
+                        raise serializers.ValidationError(
+                            {
+                                "fields": (
+                                    f"Choice question '{field.get('label') or field['key']}' "
+                                    "needs at least two options."
+                                )
+                            }
+                        )
+        elif slide_type == MeetingSlide.SlideType.CONTENT:
+            body = (attrs.get("body") or "").strip()
+            banner = (attrs.get("banner_url") or "").strip()
+            video = (attrs.get("video_url") or "").strip()
+            if not any([body, banner, video, title, prompt]):
+                raise serializers.ValidationError(
+                    {"body": "Content slides need text, a banner image, or a video link."}
+                )
         elif slide_type == MeetingSlide.SlideType.STANDARD:
             if not prompt and not title:
                 raise serializers.ValidationError(
@@ -659,16 +1072,29 @@ class MeetingSlideCreateSerializer(serializers.Serializer):
 class DashboardMeetingCreateSerializer(serializers.Serializer):
     title = serializers.CharField(max_length=200)
     description = serializers.CharField(required=False, allow_blank=True, default="")
+    location = serializers.CharField(required=False, allow_blank=True, default="", max_length=255)
     access_mode = serializers.ChoiceField(
         choices=Meeting.AccessMode.choices,
         default=Meeting.AccessMode.PUBLIC,
     )
     scheduled_start_at = serializers.DateTimeField(required=False, allow_null=True)
+    scheduled_end_at = serializers.DateTimeField(required=False, allow_null=True)
     allow_start_early = serializers.BooleanField(default=False)
     is_anonymous = serializers.BooleanField(default=False)
+    allow_self_paced = serializers.BooleanField(required=False, default=False)
     ai_mode = serializers.ChoiceField(
         choices=Meeting.AIMode.choices,
         default=Meeting.AIMode.NONE,
+    )
+    results_visible_to_community = serializers.BooleanField(required=False, default=False)
+    minutes_creator = serializers.ChoiceField(
+        choices=Meeting.MinutesCreator.choices,
+        required=False,
+        default=Meeting.MinutesCreator.ORGANIZER_ONLY,
+    )
+    aggregate_sharing_notice = serializers.BooleanField(required=False, default=True)
+    share_with = serializers.ListField(
+        child=serializers.CharField(max_length=120), required=False, default=list
     )
     access_code = serializers.CharField(
         required=False, allow_blank=True, max_length=32
@@ -683,11 +1109,34 @@ class DashboardMeetingCreateSerializer(serializers.Serializer):
 class DashboardMeetingUpdateSerializer(serializers.Serializer):
     title = serializers.CharField(max_length=200, required=False)
     description = serializers.CharField(required=False, allow_blank=True)
+    location = serializers.CharField(required=False, allow_blank=True, max_length=255)
     scheduled_start_at = serializers.DateTimeField(required=False, allow_null=True)
+    scheduled_end_at = serializers.DateTimeField(required=False, allow_null=True)
     allow_start_early = serializers.BooleanField(required=False)
     is_anonymous = serializers.BooleanField(required=False)
+    allow_self_paced = serializers.BooleanField(required=False)
     ai_mode = serializers.ChoiceField(choices=Meeting.AIMode.choices, required=False)
+    results_visible_to_community = serializers.BooleanField(required=False)
+    minutes_creator = serializers.ChoiceField(
+        choices=Meeting.MinutesCreator.choices, required=False
+    )
+    aggregate_sharing_notice = serializers.BooleanField(required=False)
     slides = MeetingSlideCreateSerializer(many=True, required=False)
+
+
+class MeetingExpectedAttendanceSerializer(serializers.Serializer):
+    status = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True, max_length=20
+    )
+
+
+class MeetingSummaryWriteSerializer(serializers.Serializer):
+    body = serializers.CharField()
+    status = serializers.ChoiceField(
+        choices=MeetingSummary.Status.choices,
+        required=False,
+        default=MeetingSummary.Status.DRAFT,
+    )
 
 
 class MeetingSessionPublicSerializer(serializers.ModelSerializer):

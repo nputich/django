@@ -11,7 +11,9 @@ from api.billing_plans import (
     SERVICE_LEVEL_COMMUNITY_PLUS,
     SERVICE_LEVEL_ENTERPRISE,
     SERVICE_LEVEL_FREE,
+    SERVICE_LEVEL_STARTER,
     PlanResolutionError,
+    list_available_plans,
     resolve_paypal_checkout_plan,
 )
 from api.models import Organization, OrganizationMembership
@@ -20,11 +22,26 @@ from api.models import Organization, OrganizationMembership
 class PlanResolutionUnitTests(TestCase):
     @override_settings(PAYPAL_MODE="live")
     def test_basic_community_community_plus_map_correctly(self):
+        starter = resolve_paypal_checkout_plan("STARTER")
+        self.assertEqual(starter["price"], "19.99")
+        self.assertEqual(
+            starter["paypal_plan_id"],
+            COMMUNIB_PAYPAL_PLANS[SERVICE_LEVEL_STARTER]["plan_id"],
+        )
+        self.assertEqual(
+            starter["paypal_plan_id"],
+            "P-06R10598CK101215ANKXXMFI",
+        )
+
         basic = resolve_paypal_checkout_plan("BASIC")
         self.assertEqual(basic["price"], "49.99")
         self.assertEqual(
             basic["paypal_plan_id"],
             COMMUNIB_PAYPAL_PLANS[SERVICE_LEVEL_BASIC]["plan_id"],
+        )
+        self.assertEqual(
+            basic["paypal_plan_id"],
+            "P-8VM62345PE9955234NJ4SHHA",
         )
 
         community = resolve_paypal_checkout_plan("community")
@@ -41,8 +58,20 @@ class PlanResolutionUnitTests(TestCase):
             COMMUNIB_PAYPAL_PLANS[SERVICE_LEVEL_COMMUNITY_PLUS]["plan_id"],
         )
 
+    def test_available_plans_include_starter_and_basic(self):
+        names = [p["name"] for p in list_available_plans()]
+        self.assertEqual(
+            names,
+            ["Starter", "Basic", "Community", "Community Plus", "Enterprise"],
+        )
+
     @override_settings(PAYPAL_MODE="sandbox")
     def test_sandbox_mode_uses_sandbox_plan_ids(self):
+        starter = resolve_paypal_checkout_plan("STARTER")
+        self.assertEqual(
+            starter["paypal_plan_id"],
+            COMMUNIB_PAYPAL_PLANS_SANDBOX[SERVICE_LEVEL_STARTER]["plan_id"],
+        )
         basic = resolve_paypal_checkout_plan("BASIC")
         self.assertEqual(
             basic["paypal_plan_id"],

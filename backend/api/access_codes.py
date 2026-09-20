@@ -21,7 +21,7 @@ from .billing_service import (
     next_billing_reference,
 )
 from .models import AccessCodeRedemption, Organization, OrganizationService
-from .organization_lifecycle import default_period_end
+from .plan_limits import BASIC_ACCESS_CODE_DURATION_MONTHS, add_calendar_months
 
 
 class AccessCodeError(CheckoutError):
@@ -38,6 +38,12 @@ def basic_access_code_configured() -> bool:
 
 def _configured_basic_access_code() -> str:
     return normalize_access_code(getattr(settings, "COMMUNIB_BASIC_ACCESS_CODE", ""))
+
+
+def access_code_period_end(*, started_at=None):
+    """When complimentary Basic from an access code expires."""
+    base = started_at or timezone.now()
+    return add_calendar_months(base, BASIC_ACCESS_CODE_DURATION_MONTHS)
 
 
 def validate_temporary_basic_access_code(code: str) -> str:
@@ -73,6 +79,7 @@ def redeem_basic_access_code(
     - billing_source=ACCESS_CODE
     - paypal_subscription_id left empty
     - records AccessCodeRedemption (one redemption per org+code)
+    - Basic lasts BASIC_ACCESS_CODE_DURATION_MONTHS, then expires
     """
     normalized = validate_temporary_basic_access_code(code)
 
@@ -114,10 +121,10 @@ def redeem_basic_access_code(
     )
     service = activate_organization_service(service)
     service.paypal_subscription_id = ""
-    service.cancel_at_period_end = False
     service.cancelled_at = None
-    if not service.current_period_end:
-        service.current_period_end = default_period_end(started_at=service.started_at)
+    service.current_period_end = access_code_period_end(started_at=service.started_at)
+    # Expire automatically when the complimentary window ends (no PayPal renewal).
+    service.cancel_at_period_end = True
     service.save(
         update_fields=[
             "paypal_subscription_id",
@@ -135,7 +142,10 @@ def redeem_basic_access_code(
             redeemed_by=user if getattr(user, "is_authenticated", False) else None,
             organization_service=service,
             service_level=SERVICE_LEVEL_BASIC,
-            notes="Temporary env-based Basic access code",
+            notes=(
+                f"Temporary env-based Basic access code "
+                f"({BASIC_ACCESS_CODE_DURATION_MONTHS} months)"
+            ),
         )
     except IntegrityError as exc:
         raise AccessCodeError(
@@ -160,5 +170,6 @@ def serialize_access_code_activation(
         "paypal_subscription_id": service.paypal_subscription_id or None,
         "started_at": service.started_at,
         "current_period_end": service.current_period_end,
+        "cancel_at_period_end": service.cancel_at_period_end,
         "redemption_id": redemption.id if redemption else None,
     }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../api";
 import "../styles/Inbox.css";
+import "../styles/Relationships.css";
 import "../styles/PublicProfile.css";
 
 function formatDate(iso) {
@@ -267,6 +268,33 @@ export default function MessageInbox({
     setActiveId(id);
     const res = await api.get(`${apiBase}/conversations/${id}/`);
     setThread(res.data);
+  };
+
+  const handleRelationshipAction = async (action) => {
+    const rel = thread?.relationship;
+    if (!rel?.viewer_organization_slug) return;
+    if (
+      action === "decline" &&
+      !window.confirm("Decline this relationship request?")
+    ) {
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      await api.post(
+        `/api/organizations/${rel.viewer_organization_slug}/relationships/${rel.id}/${action}/`
+      );
+      const res = await api.get(`${apiBase}/conversations/${thread.id}/`);
+      setThread(res.data);
+      await loadFolder({ quiet: true });
+    } catch (err) {
+      setError(
+        err.response?.data?.detail || "Could not update the relationship request."
+      );
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleDecline = async (id) => {
@@ -578,6 +606,41 @@ export default function MessageInbox({
                   </button>
                 </div>
               </div>
+              {thread.relationship && (
+                <div className="inbox-relationship-card">
+                  <p className="inbox-relationship-title">
+                    Relationship request · {thread.relationship.kind_label}
+                  </p>
+                  <p>{thread.relationship.summary}.</p>
+                  {thread.relationship.can_respond ? (
+                    <div className="inbox-actions">
+                      <button
+                        type="button"
+                        className="dashboard-btn dashboard-btn--primary"
+                        disabled={busy}
+                        onClick={() => handleRelationshipAction("accept")}
+                      >
+                        Accept relationship
+                      </button>
+                      <button
+                        type="button"
+                        className="dashboard-btn"
+                        disabled={busy}
+                        onClick={() => handleRelationshipAction("decline")}
+                      >
+                        Decline
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="dashboard-meta">
+                      Status: {thread.relationship.status}
+                      {thread.relationship.status === "pending" &&
+                        !thread.relationship.viewer_organization_slug &&
+                        ` · Only ${thread.relationship.recipient_organization?.name} can respond.`}
+                    </p>
+                  )}
+                </div>
+              )}
               <ul className="inbox-messages">
                 {(thread.messages || []).map((msg) => (
                   <li key={msg.id} className="inbox-message">

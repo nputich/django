@@ -242,7 +242,7 @@ export default function OrgOwnershipSettings() {
           <section className="dashboard-card dashboard-danger-zone">
             <h2>Organization Status</h2>
             <p>
-              Closing removes the organization from the CommuniB directory and
+              Closing removes the organization from the communiBetter directory and
               prevents new activity. Existing records may be retained for
               account integrity, billing, reporting, restoration, and abuse
               prevention.
@@ -259,7 +259,7 @@ export default function OrgOwnershipSettings() {
               <div>
                 <h3>Close this organization?</h3>
                 <p>
-                  Closing this organization will remove it from the CommuniB
+                  Closing this organization will remove it from the communiBetter
                   directory and prevent new activity. Existing records may be
                   retained for account integrity, billing, reporting,
                   restoration, and abuse prevention.
@@ -324,7 +324,7 @@ export default function OrgOwnershipSettings() {
           <div className="dashboard-card">
             <h2>Organization closed</h2>
             <p>
-              This organization is archived. To restore it, contact CommuniB or
+              This organization is archived. To restore it, contact communiBetter or
               use Claim Access.
             </p>
             <Link

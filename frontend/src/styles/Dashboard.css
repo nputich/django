@@ -46,6 +46,38 @@
   flex-wrap: wrap;
   gap: 0.75rem;
   margin-bottom: 2rem;
+  align-items: center;
+}
+
+.dashboard-action-menu {
+  position: relative;
+}
+
+.dashboard-action-menu-panel {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  right: 0;
+  z-index: 20;
+  min-width: 12.5rem;
+  padding: 0.35rem;
+  border: 1px solid var(--cb-border);
+  border-radius: 10px;
+  background: var(--cb-bg);
+  box-shadow: 0 8px 24px rgba(20, 30, 20, 0.12);
+}
+
+.dashboard-action-menu-panel a {
+  display: block;
+  padding: 0.55rem 0.75rem;
+  border-radius: 8px;
+  color: var(--cb-text);
+  text-decoration: none;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.dashboard-action-menu-panel a:hover {
+  background: var(--cb-bg-subtle);
 }
 
 .dashboard-btn {
@@ -353,6 +385,21 @@
   gap: 0.5rem;
 }
 
+.dashboard-usage {
+  margin-top: 1.25rem;
+}
+
+.dashboard-usage-list {
+  margin: 0.35rem 0 0;
+  padding-left: 1.15rem;
+  color: var(--cb-text-secondary);
+  font-size: 0.9rem;
+}
+
+.dashboard-usage-list li + li {
+  margin-top: 0.2rem;
+}
+
 .dashboard-card-header {
   display: flex;
   align-items: center;
@@ -622,3 +669,87 @@
     border-top: 1px solid var(--cb-border);
   }
 }
+
+.dashboard-fieldset {
+  border: 1px solid var(--cb-border);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  margin: 0;
+}
+
+.dashboard-fieldset legend {
+  font-weight: 650;
+  padding: 0 0.25rem;
+}
+
+.dashboard-radio-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0.35rem 0;
+}
+
+.dashboard-switch-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.dashboard-switch-row span {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--cb-text-muted, #5a6358);
+}
+
+.dashboard-switch {
+  position: relative;
+  display: inline-flex;
+  width: 3.25rem;
+  height: 1.85rem;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.dashboard-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.dashboard-switch-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: #c5cdc2;
+  transition: background 0.15s ease;
+}
+
+.dashboard-switch-track::after {
+  content: "";
+  position: absolute;
+  top: 0.2rem;
+  left: 0.2rem;
+  width: 1.45rem;
+  height: 1.45rem;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s ease;
+}
+
+.dashboard-switch input:checked + .dashboard-switch-track {
+  background: var(--cb-orange, #276690);
+}
+
+.dashboard-switch input:checked + .dashboard-switch-track::after {
+  transform: translateX(1.4rem);
+}
+
+.dashboard-switch input:focus-visible + .dashboard-switch-track {
+  outline: 2px solid var(--cb-orange, #276690);
+  outline-offset: 2px;
+}
+

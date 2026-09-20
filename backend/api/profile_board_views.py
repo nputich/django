@@ -34,12 +34,21 @@ from api.serializers import (
     BoardPostReplyCreateSerializer,
     BoardPostReplySerializer,
     BoardPostSerializer,
+    BoardPollVoteSerializer,
     OrganizationBoardSettingsSerializer,
     OrganizationBoardPublicSerializer,
     PersonalBoardPostSerializer,
+    PersonalBoardSettingsSerializer,
     UserProfileUpdateSerializer,
     build_me_payload,
     serialize_post_author,
+)
+from api.usage_service import CapacityDenied, capacity_denied_response
+from api.wall_service import (
+    create_org_wall_post,
+    create_personal_wall_post,
+    vote_org_poll,
+    vote_personal_poll,
 )
 
 
@@ -132,7 +141,7 @@ class PersonalBoardView(APIView):
 
     def get(self, request):
         board = get_personal_board(request.user)
-        posts = board.posts.select_related("board__user__profile").all()
+        posts = board.posts.prefetch_related("poll_options", "poll_votes").all()
         return Response(
             {
                 "board_id": board.id,
@@ -150,15 +159,31 @@ class PersonalBoardView(APIView):
         board = get_personal_board(request.user)
         serializer = BoardPostCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        post = PersonalBoardPost.objects.create(
-            board=board,
-            title=serializer.validated_data["title"],
-            body=serializer.validated_data["body"],
+        post = create_personal_wall_post(board=board, data=serializer.validated_data)
+        post = (
+            PersonalBoardPost.objects.prefetch_related("poll_options", "poll_votes")
+            .get(pk=post.pk)
         )
         return Response(
             PersonalBoardPostSerializer(post, context={"request": request}).data,
             status=status.HTTP_201_CREATED,
         )
+
+
+class PersonalBoardSettingsView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        board = get_personal_board(request.user)
+        serializer = PersonalBoardSettingsSerializer(data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        if "title" in data:
+            data["title"] = (data["title"] or "").strip()
+        for field, value in data.items():
+            setattr(board, field, value)
+        board.save()
+        return Response({"id": board.id, "title": board.title})
 
 
 class PersonalBoardPostDeleteView(APIView):
@@ -191,8 +216,14 @@ class OrganizationBoardView(APIView):
             )
 
         posts = (
-            board.posts.select_related("author__profile")
-            .prefetch_related("replies__author__profile")
+            board.posts.select_related("author__profile", "meeting__organization")
+            .prefetch_related(
+                "replies__author__profile",
+                "poll_options",
+                "poll_votes",
+                "meeting__summaries",
+                "meeting__expected_attendances",
+            )
             .all()
         )
         return Response(
@@ -227,11 +258,16 @@ class OrganizationBoardView(APIView):
             )
         serializer = BoardPostCreateSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        post = BoardPost.objects.create(
-            board=board,
-            author=request.user,
-            title=serializer.validated_data["title"],
-            body=serializer.validated_data["body"],
+        try:
+            post = create_org_wall_post(
+                board=board, author=request.user, data=serializer.validated_data
+            )
+        except CapacityDenied as exc:
+            return capacity_denied_response(exc)
+        post = (
+            BoardPost.objects.select_related("author__profile")
+            .prefetch_related("replies", "poll_options", "poll_votes")
+            .get(pk=post.pk)
         )
         return Response(
             BoardPostSerializer(post, context={"request": request}).data,
@@ -253,7 +289,10 @@ class OrganizationBoardSettingsView(APIView):
         board = get_org_board(organization)
         serializer = OrganizationBoardSettingsSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
-        for field, value in serializer.validated_data.items():
+        data = serializer.validated_data
+        if "title" in data:
+            data["title"] = (data["title"] or "").strip()
+        for field, value in data.items():
             setattr(board, field, value)
         board.save()
         return Response(OrganizationBoardPublicSerializer(board).data)
@@ -309,3 +348,51 @@ class OrganizationBoardReplyDeleteView(APIView):
             return Response({"detail": "Not allowed."}, status=status.HTTP_403_FORBIDDEN)
         reply.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+
+class OrganizationBoardPollVoteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, slug, pk):
+        organization = get_object_or_404(Organization, slug=slug, is_active=True)
+        board = get_org_board(organization)
+        if not can_view_org_board(board, request.user):
+            return Response({"detail": "Not allowed."}, status=status.HTTP_403_FORBIDDEN)
+        post = get_object_or_404(BoardPost, pk=pk, board=board)
+        serializer = BoardPollVoteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        vote_org_poll(
+            post=post,
+            user=request.user,
+            option_id=serializer.validated_data["option_id"],
+        )
+        post = (
+            BoardPost.objects.select_related("author__profile")
+            .prefetch_related("replies__author__profile", "poll_options", "poll_votes")
+            .get(pk=post.pk)
+        )
+        return Response(BoardPostSerializer(post, context={"request": request}).data)
+
+
+class PersonalBoardPollVoteView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        post = get_object_or_404(
+            PersonalBoardPost.objects.select_related("board"),
+            pk=pk,
+            board__user=request.user,
+        )
+        serializer = BoardPollVoteSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        vote_personal_poll(
+            post=post,
+            user=request.user,
+            option_id=serializer.validated_data["option_id"],
+        )
+        post = PersonalBoardPost.objects.prefetch_related(
+            "poll_options", "poll_votes"
+        ).get(pk=post.pk)
+        return Response(
+            PersonalBoardPostSerializer(post, context={"request": request}).data
+        )

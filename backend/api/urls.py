@@ -6,6 +6,12 @@ from . import directory_placement_views
 from . import billing_views
 from . import inbox_views
 from . import organization_lifecycle_views
+from . import meeting_wall_views
+from . import relationship_views
+from . import umbrella_views
+from . import question_tag_views
+from . import meeting_sharing_views
+from . import reporting_views
 
 urlpatterns = [
     path("me/", profile_board_views.MeView.as_view(), name="me"),
@@ -17,9 +23,19 @@ urlpatterns = [
     ),
     path("me/board/", profile_board_views.PersonalBoardView.as_view(), name="me-board"),
     path(
+        "me/board/settings/",
+        profile_board_views.PersonalBoardSettingsView.as_view(),
+        name="me-board-settings",
+    ),
+    path(
         "me/board/posts/<int:pk>/",
         profile_board_views.PersonalBoardPostDeleteView.as_view(),
         name="me-board-post-delete",
+    ),
+    path(
+        "me/board/posts/<int:pk>/vote/",
+        profile_board_views.PersonalBoardPollVoteView.as_view(),
+        name="me-board-poll-vote",
     ),
     path("me/inbox/", inbox_views.InboxConversationListView.as_view(), name="me-inbox"),
     path(
@@ -120,6 +136,36 @@ urlpatterns = [
         name="org-billing-access-code",
     ),
     path(
+        "organizations/<slug:slug>/billing/umbrella/",
+        umbrella_views.UmbrellaPortalView.as_view(),
+        name="org-umbrella",
+    ),
+    path(
+        "organizations/<slug:slug>/billing/umbrella/rotate/",
+        umbrella_views.UmbrellaRotateCodeView.as_view(),
+        name="org-umbrella-rotate",
+    ),
+    path(
+        "organizations/<slug:slug>/billing/umbrella/active/",
+        umbrella_views.UmbrellaSetActiveView.as_view(),
+        name="org-umbrella-active",
+    ),
+    path(
+        "organizations/<slug:slug>/billing/umbrella/members/<int:pk>/remove/",
+        umbrella_views.UmbrellaRemoveMemberView.as_view(),
+        name="org-umbrella-remove-member",
+    ),
+    path(
+        "organizations/<slug:slug>/billing/umbrella/redeem/",
+        umbrella_views.UmbrellaRedeemView.as_view(),
+        name="org-umbrella-redeem",
+    ),
+    path(
+        "organizations/<slug:slug>/billing/umbrella/leave/",
+        umbrella_views.UmbrellaLeaveView.as_view(),
+        name="org-umbrella-leave",
+    ),
+    path(
         "organizations/<slug:slug>/billing/paypal/confirm/",
         billing_views.OrganizationBillingPayPalConfirmView.as_view(),
         name="org-billing-paypal-confirm",
@@ -133,6 +179,41 @@ urlpatterns = [
         "organizations/<slug:slug>/billing/cancel/",
         organization_lifecycle_views.OrganizationSubscriptionCancelView.as_view(),
         name="org-billing-cancel",
+    ),
+    path(
+        "organizations/lookup/",
+        relationship_views.OrganizationLookupView.as_view(),
+        name="org-lookup",
+    ),
+    path(
+        "organizations/<slug:slug>/relationships/",
+        relationship_views.OrganizationRelationshipListView.as_view(),
+        name="org-relationships",
+    ),
+    path(
+        "organizations/<slug:slug>/relationships/<int:pk>/",
+        relationship_views.OrganizationRelationshipDetailView.as_view(),
+        name="org-relationship-detail",
+    ),
+    path(
+        "organizations/<slug:slug>/relationships/<int:pk>/accept/",
+        relationship_views.OrganizationRelationshipAcceptView.as_view(),
+        name="org-relationship-accept",
+    ),
+    path(
+        "organizations/<slug:slug>/relationships/<int:pk>/decline/",
+        relationship_views.OrganizationRelationshipDeclineView.as_view(),
+        name="org-relationship-decline",
+    ),
+    path(
+        "organizations/<slug:slug>/relationships/<int:pk>/withdraw/",
+        relationship_views.OrganizationRelationshipWithdrawView.as_view(),
+        name="org-relationship-withdraw",
+    ),
+    path(
+        "organizations/<slug:slug>/relationships/<int:pk>/end/",
+        relationship_views.OrganizationRelationshipEndView.as_view(),
+        name="org-relationship-end",
     ),
     path(
         "organizations/<slug:slug>/ownership/",
@@ -195,6 +276,26 @@ urlpatterns = [
         name="org-meeting-detail",
     ),
     path("meetings/<int:pk>/", views.MeetingDetailView.as_view(), name="meeting-detail"),
+    path(
+        "meetings/<int:pk>/rsvp/",
+        meeting_wall_views.MeetingRsvpView.as_view(),
+        name="meeting-rsvp",
+    ),
+    path(
+        "meetings/<int:pk>/summary/",
+        meeting_wall_views.MeetingSummaryView.as_view(),
+        name="meeting-summary",
+    ),
+    path(
+        "meetings/<int:pk>/summaries/<int:summary_id>/publish/",
+        meeting_wall_views.MeetingSummaryPublishView.as_view(),
+        name="meeting-summary-publish",
+    ),
+    path(
+        "meetings/<int:pk>/community-results/",
+        meeting_wall_views.MeetingCommunityResultsView.as_view(),
+        name="meeting-community-results",
+    ),
     path("meetings/<int:pk>/session/", views.MeetingSessionView.as_view(), name="meeting-session"),
     path("meetings/<int:pk>/join/", views.MeetingJoinView.as_view(), name="meeting-join"),
     path("meetings/<int:pk>/profile/", views.MeetingProfileSubmitView.as_view(), name="meeting-profile"),
@@ -266,6 +367,64 @@ urlpatterns = [
         name="org-meeting-export",
     ),
     path(
+        "organizations/<slug:slug>/meetings/<int:pk>/reusable-slides/",
+        views.OrganizationMeetingReusableSlidesView.as_view(),
+        name="org-meeting-reusable-slides",
+    ),
+    # --- question tags ---------------------------------------------------
+    path(
+        "organizations/<slug:slug>/question-tags/",
+        question_tag_views.QuestionTagCatalogView.as_view(),
+        name="org-question-tags",
+    ),
+    path(
+        "organizations/<slug:slug>/question-tags/<int:pk>/",
+        question_tag_views.QuestionTagDetailView.as_view(),
+        name="org-question-tag-detail",
+    ),
+    path(
+        "organizations/<slug:slug>/question-uses/",
+        question_tag_views.QuestionUsesPreviewView.as_view(),
+        name="org-question-uses",
+    ),
+    path(
+        "organizations/<slug:slug>/meetings/<int:pk>/slides/<int:slide_pk>/tags/",
+        question_tag_views.MeetingSlideTagsView.as_view(),
+        name="org-meeting-slide-tags",
+    ),
+    path(
+        "organizations/<slug:slug>/surveys/<int:pk>/questions/<int:question_pk>/tags/",
+        question_tag_views.SurveyQuestionTagsView.as_view(),
+        name="org-survey-question-tags",
+    ),
+    # --- result sharing ----------------------------------------------------
+    path(
+        "organizations/<slug:slug>/meetings/<int:pk>/shares/",
+        meeting_sharing_views.MeetingSharesView.as_view(),
+        name="org-meeting-shares",
+    ),
+    path(
+        "organizations/<slug:slug>/meetings/<int:pk>/shares/<int:share_pk>/revoke/",
+        meeting_sharing_views.MeetingShareRevokeView.as_view(),
+        name="org-meeting-share-revoke",
+    ),
+    path(
+        "organizations/<slug:slug>/shared-meetings/",
+        meeting_sharing_views.SharedMeetingsListView.as_view(),
+        name="org-shared-meetings",
+    ),
+    path(
+        "organizations/<slug:slug>/shared-meetings/<int:meeting_pk>/",
+        meeting_sharing_views.SharedMeetingResultsView.as_view(),
+        name="org-shared-meeting-results",
+    ),
+    # --- reporting ---------------------------------------------------------
+    path(
+        "organizations/<slug:slug>/reports/",
+        reporting_views.OrganizationReportView.as_view(),
+        name="org-reports",
+    ),
+    path(
         "organizations/<slug:slug>/meetings/<int:pk>/ai/process/",
         views.OrganizationMeetingProcessAIView.as_view(),
         name="org-meeting-ai-process",
@@ -289,6 +448,11 @@ urlpatterns = [
         "organizations/<slug:slug>/board/posts/<int:pk>/",
         profile_board_views.OrganizationBoardPostDeleteView.as_view(),
         name="org-board-post-delete",
+    ),
+    path(
+        "organizations/<slug:slug>/board/posts/<int:pk>/vote/",
+        profile_board_views.OrganizationBoardPollVoteView.as_view(),
+        name="org-board-poll-vote",
     ),
     path(
         "organizations/<slug:slug>/board/posts/<int:pk>/replies/",

@@ -117,5 +117,6 @@ if ($frontendCode -ne 0) {
 Write-Host ($frontendOut | Out-String)
 
 Write-Host "`nDone. Test:" -ForegroundColor Green
+Write-Host "  https://communibetter.com"
 Write-Host "  https://communib.com"
 Write-Host "  https://django-backend-460809694305.us-central1.run.app"

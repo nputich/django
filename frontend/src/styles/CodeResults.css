@@ -143,6 +143,14 @@
   margin-top: 2rem;
 }
 
+.hub-board-preview .wall {
+  margin-top: 0.5rem;
+}
+
+.hub-board-more {
+  margin-top: 1rem;
+}
+
 .hub-list {
   list-style: none;
   padding: 0;

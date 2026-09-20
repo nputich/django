@@ -1,25 +1,39 @@
 import { Link } from "react-router-dom";
-import logo from "../assets/logo-communib.png";
+import wordmarkSvg from "../assets/logo-communibetter.svg?raw";
 
-/** communiB mark — same hero size on all marketing pages. */
-export default function SiteLogo({ className = "", linkHome = true }) {
+/** Same wordmark on every page so alignment stays consistent. */
+export default function SiteLogo({
+  className = "",
+  linkHome = true,
+  withTagline = false,
+}) {
+  const label = withTagline
+    ? "communiBetter — Build better communities."
+    : "communiBetter";
+
   const image = (
-    <img
-      src={logo}
-      alt="communiB — Better communities start here"
+    <span
       className={`landing-logo ${className}`.trim()}
+      role="img"
+      aria-label={label}
+      dangerouslySetInnerHTML={{ __html: wordmarkSvg }}
     />
+  );
+
+  const mark = linkHome ? (
+    <Link to="/" className="site-logo-link" aria-label="communiBetter home">
+      {image}
+    </Link>
+  ) : (
+    image
   );
 
   return (
     <div className="landing-logo-wrap">
-      {linkHome ? (
-        <Link to="/" className="site-logo-link" aria-label="communiB home">
-          {image}
-        </Link>
-      ) : (
-        image
-      )}
+      {mark}
+      {withTagline ? (
+        <p className="landing-logo-tagline">Build better communities.</p>
+      ) : null}
     </div>
   );
 }

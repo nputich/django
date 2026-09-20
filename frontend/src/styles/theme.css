@@ -13,9 +13,13 @@ body {
 }
 
 :root {
-  --cb-orange: #f5a623;
-  --cb-orange-hover: #e09410;
-  --cb-orange-light: #fff8eb;
+  --cb-blue: #276690;
+  --cb-blue-hover: #1e5475;
+  --cb-blue-light: #e8f2f7;
+  /* Accent tokens: civic blue (names kept so existing CSS picks it up) */
+  --cb-orange: var(--cb-blue);
+  --cb-orange-hover: var(--cb-blue-hover);
+  --cb-orange-light: var(--cb-blue-light);
   --cb-text: #1a1a1a;
   --cb-text-secondary: #6b7280;
   --cb-text-muted: #9ca3af;

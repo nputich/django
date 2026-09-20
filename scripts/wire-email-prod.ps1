@@ -65,7 +65,7 @@ $updateOut = & gcloud run services update $BackendService `
     --region $Region `
     --project $Project `
     --update-secrets="EMAIL_HOST_PASSWORD=${SecretName}:latest" `
-    --update-env-vars="EMAIL_HOST=smtp.gmail.com,EMAIL_PORT=587,EMAIL_USE_TLS=true,EMAIL_HOST_USER=contactcommunib@gmail.com,CONTACT_INBOX_EMAIL=contactcommunib@gmail.com,DEFAULT_FROM_EMAIL=contactcommunib@gmail.com" `
+    --update-env-vars="EMAIL_HOST=smtp.gmail.com,EMAIL_PORT=587,EMAIL_USE_TLS=true,EMAIL_HOST_USER=contactcommunib@gmail.com,CONTACT_INBOX_EMAIL=contactcommunibetter@gmail.com,DEFAULT_FROM_EMAIL=contactcommunib@gmail.com" `
     --quiet 2>&1
 $updateCode = $LASTEXITCODE
 $ErrorActionPreference = $prevEap
@@ -75,5 +75,5 @@ if ($updateCode -ne 0) {
 }
 Write-Host ($updateOut | Out-String)
 
-Write-Host "`nDone. Test: https://communib.com/contact" -ForegroundColor Green
-Write-Host "Messages should arrive at contactcommunib@gmail.com (check spam)."
+Write-Host "`nDone. Test: https://communibetter.com/contact" -ForegroundColor Green
+Write-Host "Messages should arrive at contactcommunibetter@gmail.com (check spam)."

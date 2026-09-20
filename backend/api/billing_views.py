@@ -24,6 +24,9 @@ from .billing_plans import (
     public_plan_payload,
     resolve_paypal_checkout_plan,
 )
+from .plan_limits import public_limits_payload
+from .umbrella_service import can_offer_umbrella, get_license, member_coverage_payload
+from .usage_service import serialize_usage
 from .billing_service import (
     CheckoutError,
     confirm_paypal_subscription_return,
@@ -98,12 +101,30 @@ class OrganizationBillingView(APIView):
                     get_pending_checkout(organization)
                 ),
                 "can_manage_billing": True,
-                "plans": [public_plan_payload(p) for p in list_available_plans()],
+                "plans": [
+                    {
+                        **public_plan_payload(p),
+                        "limits": public_limits_payload(p["service_level"]),
+                    }
+                    for p in list_available_plans()
+                ],
+                "usage": serialize_usage(organization),
+                "limits": public_limits_payload(
+                    (get_current_service_summary(organization) or {}).get(
+                        "service_level"
+                    )
+                    or "FREE"
+                ),
                 "checkout_mode": _checkout_mode(),
                 "paypal_mode": paypal_mode(),
                 "paypal_sandbox": paypal_mode() == "sandbox",
                 # Never include the actual code value in API responses.
                 "basic_access_code_enabled": basic_access_code_configured(),
+                "umbrella": {
+                    "coverage": member_coverage_payload(organization),
+                    "can_offer": can_offer_umbrella(organization),
+                    "has_license": get_license(organization) is not None,
+                },
             }
         )
 
@@ -265,7 +286,7 @@ class OrganizationBillingAccessCodeRedeemView(APIView):
             {
                 "detail": (
                     "Access code accepted. Basic service is now active for this "
-                    "organization. No PayPal subscription was created."
+                    "organization for 4 months. No PayPal subscription was created."
                 ),
                 "organization": {
                     "id": organization.id,

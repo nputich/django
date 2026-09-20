@@ -21,6 +21,7 @@ class PlanResolutionError(ValueError):
 
 
 SERVICE_LEVEL_FREE = "FREE"
+SERVICE_LEVEL_STARTER = "STARTER"
 SERVICE_LEVEL_BASIC = "BASIC"
 SERVICE_LEVEL_COMMUNITY = "COMMUNITY"
 SERVICE_LEVEL_COMMUNITY_PLUS = "COMMUNITY_PLUS"
@@ -31,6 +32,7 @@ DEFAULT_SERVICE_LEVEL = SERVICE_LEVEL_FREE
 
 SERVICE_LEVEL_LABELS = {
     SERVICE_LEVEL_FREE: "Organization",
+    SERVICE_LEVEL_STARTER: "Starter",
     SERVICE_LEVEL_BASIC: "Basic",
     SERVICE_LEVEL_COMMUNITY: "Community",
     SERVICE_LEVEL_COMMUNITY_PLUS: "Community Plus",
@@ -41,6 +43,10 @@ ALL_SERVICE_LEVELS = frozenset(SERVICE_LEVEL_LABELS.keys())
 
 # Shared display/price metadata (identical across PayPal environments).
 _PAYPAL_PLAN_META = {
+    SERVICE_LEVEL_STARTER: {
+        "price": "19.99",
+        "name": "CommuniBetter Starter",
+    },
     SERVICE_LEVEL_BASIC: {
         "price": "49.99",
         "name": "CommuniB Basic",
@@ -57,13 +63,16 @@ _PAYPAL_PLAN_META = {
 
 # Live PayPal plan IDs (production).
 COMMUNIB_PAYPAL_PLAN_IDS_LIVE = {
+    SERVICE_LEVEL_STARTER: "P-06R10598CK101215ANKXXMFI",
     SERVICE_LEVEL_BASIC: "P-8VM62345PE9955234NJ4SHHA",
     SERVICE_LEVEL_COMMUNITY: "P-6DH4658999088414HNJ4SI2Q",
     SERVICE_LEVEL_COMMUNITY_PLUS: "P-0HL011378K8966320NJ4SJWI",
 }
 
 # Sandbox PayPal plan IDs (local / QA).
+# Starter sandbox: replace when a dedicated sandbox plan is created in PayPal.
 COMMUNIB_PAYPAL_PLAN_IDS_SANDBOX = {
+    SERVICE_LEVEL_STARTER: "P-06R10598CK101215ANKXXMFI",
     SERVICE_LEVEL_BASIC: "P-5KU44863YK174172XNJ5L3AY",
     SERVICE_LEVEL_COMMUNITY: "P-51W57967WF047201WNJ5L3UY",
     SERVICE_LEVEL_COMMUNITY_PLUS: "P-29M27945AN769032ANJ5L4LI",
@@ -86,7 +95,7 @@ COMMUNIB_PAYPAL_PLANS_SANDBOX = _plans_for_ids(COMMUNIB_PAYPAL_PLAN_IDS_SANDBOX)
 
 
 def paypal_plans_for_current_mode() -> dict:
-    """Return Basic/Community/Community Plus maps for the active PayPal mode."""
+    """Return paid PayPal plan maps for the active PayPal mode."""
     mode = (getattr(settings, "PAYPAL_MODE", "disabled") or "disabled").strip().lower()
     if mode == "sandbox":
         return COMMUNIB_PAYPAL_PLANS_SANDBOX
@@ -95,6 +104,19 @@ def paypal_plans_for_current_mode() -> dict:
 
 # Display + checkout metadata for the Billing & Service UI.
 COMMUNIB_SERVICE_PLANS = {
+    SERVICE_LEVEL_STARTER: {
+        "service_level": SERVICE_LEVEL_STARTER,
+        "name": "Starter",
+        "price": _PAYPAL_PLAN_META[SERVICE_LEVEL_STARTER]["price"],
+        "price_display": "$19.99/month",
+        "description": (
+            "Starter plan for organizations to explore community management "
+            "tools and surveys."
+        ),
+        "paypal_plan_id": COMMUNIB_PAYPAL_PLANS[SERVICE_LEVEL_STARTER]["plan_id"],
+        "checkout_mode": "paypal",
+        "button_label": "Choose Starter",
+    },
     SERVICE_LEVEL_BASIC: {
         "service_level": SERVICE_LEVEL_BASIC,
         "name": "Basic",
@@ -154,6 +176,7 @@ PAID_CHECKOUT_LEVELS = frozenset(_PAYPAL_PLAN_META.keys())
 def list_available_plans():
     """Plans shown on the Billing & Service page (paid + Enterprise)."""
     order = (
+        SERVICE_LEVEL_STARTER,
         SERVICE_LEVEL_BASIC,
         SERVICE_LEVEL_COMMUNITY,
         SERVICE_LEVEL_COMMUNITY_PLUS,

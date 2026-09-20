@@ -27,6 +27,13 @@
   line-height: 1.5;
 }
 
+.org-pricing-paypal-notice {
+  margin: 0.85rem 0 0;
+  color: var(--cb-text);
+  font-size: 0.9375rem;
+  line-height: 1.45;
+}
+
 .org-pricing-list {
   list-style: none;
   margin: 0;
@@ -73,10 +80,21 @@
 }
 
 .org-pricing-desc {
-  margin: 0;
+  margin: 0 0 0.75rem;
   font-size: 0.9375rem;
   line-height: 1.5;
   color: var(--cb-text-secondary);
+}
+
+.org-pricing-features {
+  margin: 0;
+  padding-left: 1.15rem;
+  color: var(--cb-text-secondary);
+  font-size: 0.9rem;
+}
+
+.org-pricing-features li + li {
+  margin-top: 0.2rem;
 }
 
 .org-pricing-btn {

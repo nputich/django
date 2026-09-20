@@ -18,6 +18,14 @@ from .feature_entitlements import (
     entitlement_denied_response,
     require_capability,
 )
+from .usage_service import (
+    CapacityDenied,
+    assert_session_has_capacity,
+    capacity_denied_response,
+    consume_meeting_start,
+    consume_survey_submission,
+    reserve_ai_meeting_run,
+)
 from .models import AccessCode, ContactSubmission, Meeting, MeetingAttendance, MeetingSession, MeetingSlide, Organization, Survey, SurveyAnswer, SurveyQuestion
 
 logger = logging.getLogger(__name__)
@@ -62,7 +70,7 @@ from .meeting_service import (
 )
 from .survey_service import append_survey_questions
 from .meeting_analytics import get_slide_analytics, get_slide_analytics_compare
-from .meeting_ai import process_meeting_ai, schedule_response_ai_processing
+from .meeting_ai import process_meeting_ai
 from .political_issue_classifier import classify_political_slide_responses
 from .org_access import (
     get_admin_organization,
@@ -204,6 +212,8 @@ class SurveyDetailView(APIView):
         return Response(SurveyDetailSerializer(survey).data)
 class SurveySubmitView(APIView):
     permission_classes = [AllowAny]
+
+    @transaction.atomic
     def post(self, request, pk):
         survey = get_object_or_404(Survey, pk=pk, is_active=True)
         serializer = SurveySubmitSerializer(data=request.data)
@@ -218,13 +228,25 @@ class SurveySubmitView(APIView):
                 {"detail": "One or more questions are invalid for this survey."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        for answer in answers:
-            SurveyAnswer.objects.create(
-                survey=survey,
-                question=valid_map[answer["question_id"]],
-                response_session=response_session,
-                value=answer["value"],
+        if any(q.question_type == SurveyQuestion.QuestionType.CONTENT for q in valid_map.values()):
+            return Response(
+                {"detail": "Content blocks are not answerable."},
+                status=status.HTTP_400_BAD_REQUEST,
             )
+        try:
+            _submission, created = consume_survey_submission(
+                survey=survey, response_session=response_session
+            )
+        except CapacityDenied as exc:
+            return capacity_denied_response(exc)
+        if created:
+            for answer in answers:
+                SurveyAnswer.objects.create(
+                    survey=survey,
+                    question=valid_map[answer["question_id"]],
+                    response_session=response_session,
+                    value=answer["value"],
+                )
         return Response({"detail": "Survey submitted. Thank you!"}, status=status.HTTP_201_CREATED)
 class OrganizationHubView(APIView):
     permission_classes = [AllowAny]
@@ -235,7 +257,7 @@ class OrganizationHubView(APIView):
             is_active=True,
             status=Organization.Status.ACTIVE,
         )
-        return Response(OrganizationHubSerializer(organization).data)
+        return Response(OrganizationHubSerializer(organization, context={"request": request}).data)
 
 
 class MyOrganizationsView(APIView):
@@ -253,6 +275,33 @@ class OrganizationCreateView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
+        # Surface closed-name conflicts before other field validation so the
+        # claim/restore message is not masked by missing directory fields.
+        early_name = (request.data.get("name") or "").strip()
+        if early_name:
+            from api.organization_lifecycle import find_closed_name_conflicts
+
+            conflicts = find_closed_name_conflicts(early_name)
+            if conflicts:
+                closed = conflicts[0]
+                return Response(
+                    {
+                        "code": "closed_organization_exists",
+                        "detail": (
+                            "This organization previously existed on CommuniB. "
+                            "If you represent this organization, you can request "
+                            "access or restoration."
+                        ),
+                        "organization": {
+                            "id": closed.id,
+                            "name": closed.name,
+                            "slug": closed.slug,
+                            "status": closed.status,
+                        },
+                    },
+                    status=status.HTTP_409_CONFLICT,
+                )
+
         serializer = CreateOrganizationSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
@@ -400,18 +449,12 @@ class OrganizationSurveyCreateView(APIView):
             title=data["title"],
             description=data.get("description", ""),
             is_anonymous=data.get("is_anonymous", True),
+            aggregate_sharing_notice=data.get("aggregate_sharing_notice", True),
             is_active=True,
         )
-        for question in data["questions"]:
-            SurveyQuestion.objects.create(
-                survey=survey,
-                order=question.get("order", 0),
-                text=question["text"],
-                question_type=question.get(
-                    "question_type", SurveyQuestion.QuestionType.TEXT
-                ),
-                choices=question.get("choices", []),
-            )
+        from api.survey_service import create_survey_questions
+
+        create_survey_questions(survey, data["questions"], user=request.user)
         access_code = AccessCode.objects.create(
             code=code,
             organization=organization,
@@ -473,7 +516,7 @@ class OrganizationSurveyDetailView(APIView):
         serializer = DashboardSurveyUpdateSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        for field in ("title", "description", "is_anonymous", "is_active"):
+        for field in ("title", "description", "is_anonymous", "is_active", "aggregate_sharing_notice"):
             if field in data:
                 setattr(survey, field, data[field])
         survey.save()
@@ -496,7 +539,7 @@ class OrganizationSurveyAppendQuestionsView(APIView):
         survey = get_object_or_404(Survey, pk=pk, organization=organization)
         serializer = SurveyAppendQuestionsSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        append_survey_questions(survey, serializer.validated_data["questions"])
+        append_survey_questions(survey, serializer.validated_data["questions"], user=request.user)
         survey = Survey.objects.prefetch_related("questions", "access_codes").get(pk=survey.pk)
         return Response(
             {
@@ -535,15 +578,39 @@ class OrganizationMeetingCreateView(APIView):
             organization=organization,
             title=data["title"],
             description=data.get("description", ""),
+            location=data.get("location", ""),
             access_mode=data.get("access_mode", Meeting.AccessMode.PUBLIC),
             scheduled_start_at=data.get("scheduled_start_at"),
+            scheduled_end_at=data.get("scheduled_end_at"),
             allow_start_early=data.get("allow_start_early", False),
             is_anonymous=data.get("is_anonymous", False),
+            allow_self_paced=data.get("allow_self_paced", False),
             ai_mode=data.get("ai_mode", Meeting.AIMode.NONE),
+            results_visible_to_community=data.get(
+                "results_visible_to_community", False
+            ),
+            minutes_creator=data.get(
+                "minutes_creator", Meeting.MinutesCreator.ORGANIZER_ONLY
+            ),
+            aggregate_sharing_notice=data.get("aggregate_sharing_notice", True),
             status="scheduled",
         )
-        create_meeting_slides(meeting, data["slides"])
+        create_meeting_slides(meeting, data["slides"], user=request.user)
+        if data.get("share_with"):
+            from api.meeting_sharing import SharingError, grant_share
+
+            for target_slug in data["share_with"]:
+                target = Organization.objects.filter(slug=target_slug).first()
+                if not target:
+                    continue
+                try:
+                    grant_share(meeting=meeting, organization=target, user=request.user)
+                except SharingError:
+                    continue
         create_initial_session(meeting)
+        from api.meeting_wall import create_meeting_wall_post
+
+        create_meeting_wall_post(meeting=meeting, author=request.user)
         access_code = AccessCode.objects.create(
             code=code,
             organization=organization,
@@ -581,16 +648,17 @@ class OrganizationMeetingCreateView(APIView):
 
 class MeetingDetailView(APIView):
     permission_classes = [AllowAny]
-    authentication_classes = []
 
     def get(self, request, pk):
         meeting = get_object_or_404(
             Meeting.objects.select_related("organization").prefetch_related(
-                "slides", "access_codes"
+                "slides", "access_codes", "summaries"
             ),
             pk=pk,
         )
-        return Response(MeetingDetailSerializer(meeting).data)
+        return Response(
+            MeetingDetailSerializer(meeting, context={"request": request}).data
+        )
 
 
 class OrganizationMeetingDetailView(APIView):
@@ -605,11 +673,13 @@ class OrganizationMeetingDetailView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
         meeting = get_object_or_404(
-            Meeting.objects.prefetch_related("slides", "access_codes"),
+            Meeting.objects.prefetch_related("slides", "access_codes", "summaries"),
             pk=pk,
             organization=organization,
         )
-        return Response(MeetingDetailSerializer(meeting).data)
+        return Response(
+            MeetingDetailSerializer(meeting, context={"request": request}).data
+        )
 
     @transaction.atomic
     def patch(self, request, slug, pk):
@@ -633,17 +703,27 @@ class OrganizationMeetingDetailView(APIView):
         for field in (
             "title",
             "description",
+            "location",
             "scheduled_start_at",
+            "scheduled_end_at",
             "allow_start_early",
             "is_anonymous",
+            "allow_self_paced",
             "ai_mode",
+            "results_visible_to_community",
+            "minutes_creator",
+            "aggregate_sharing_notice",
         ):
             if field in data:
                 setattr(meeting, field, data[field])
         meeting.save()
 
+        from api.meeting_wall import sync_meeting_wall_post_fields
+
+        sync_meeting_wall_post_fields(meeting)
+
         if "slides" in data:
-            replace_meeting_slides(meeting, data["slides"])
+            replace_meeting_slides(meeting, data["slides"], user=request.user)
             session = meeting.sessions.order_by("-session_number").first()
             if session and session.status == MeetingSession.Status.SCHEDULED:
                 first_slide = meeting.slides.filter(is_active=True).order_by("order", "id").first()
@@ -651,8 +731,12 @@ class OrganizationMeetingDetailView(APIView):
                 session.started_from_slide = first_slide
                 session.save(update_fields=["current_slide", "started_from_slide"])
 
-        meeting = Meeting.objects.prefetch_related("slides", "access_codes").get(pk=meeting.pk)
-        return Response(MeetingDetailSerializer(meeting).data)
+        meeting = Meeting.objects.prefetch_related(
+            "slides", "access_codes", "summaries"
+        ).get(pk=meeting.pk)
+        return Response(
+            MeetingDetailSerializer(meeting, context={"request": request}).data
+        )
 
 
 def _serialize_session(session: MeetingSession) -> dict:
@@ -748,6 +832,33 @@ class MeetingJoinView(APIView):
                     payload["display_name"] = attendance.user.get_username()
                 return Response(payload)
 
+        if user:
+            existing_user = MeetingAttendance.objects.filter(
+                session=session,
+                user=user,
+                status=MeetingAttendance.Status.JOINED,
+            ).first()
+            if existing_user:
+                completed_slide_ids = participant_completed_slide_ids(
+                    session, existing_user.participant_id
+                )
+                payload = {
+                    "attendance_id": str(existing_user.attendance_id),
+                    "participant_id": str(existing_user.participant_id),
+                    "is_anonymous": meeting.is_anonymous,
+                    "session": _serialize_session(session),
+                    "completed_slide_ids": completed_slide_ids,
+                    "rejoined": True,
+                }
+                if not meeting.is_anonymous and existing_user.user:
+                    payload["display_name"] = existing_user.user.get_username()
+                return Response(payload)
+
+        try:
+            assert_session_has_capacity(session)
+        except CapacityDenied as exc:
+            return capacity_denied_response(exc)
+
         attendance = join_session(meeting, session, user=user)
         completed_slide_ids = participant_completed_slide_ids(session, attendance.participant_id)
 
@@ -824,15 +935,14 @@ class MeetingRespondView(APIView):
                     slide,
                     issues,
                 )
-                for response in responses:
-                    schedule_response_ai_processing(response)
+                # AI runs only when the host clicks Run / Refresh — never on submit.
                 return Response(
                     {
                         "detail": "Issues saved.",
                         "slide_id": slide.id,
                         "response_ids": [r.id for r in responses],
                         "issue_count": len(responses),
-                        "ai_processing": meeting.ai_mode != Meeting.AIMode.NONE,
+                        "ai_processing": False,
                     },
                     status=status.HTTP_201_CREATED,
                 )
@@ -848,14 +958,12 @@ class MeetingRespondView(APIView):
         except DjangoValidationError as exc:
             return Response({"detail": exc.messages[0]}, status=400)
 
-        schedule_response_ai_processing(response)
-
         return Response(
             {
                 "detail": "Response saved.",
                 "slide_id": slide.id,
                 "response_id": response.id,
-                "ai_processing": meeting.ai_mode != Meeting.AIMode.NONE,
+                "ai_processing": False,
             },
             status=status.HTTP_201_CREATED,
         )
@@ -911,7 +1019,10 @@ class OrganizationMeetingStartView(APIView):
                 return Response({"detail": "Invalid slide_id."}, status=400)
 
         try:
+            consume_meeting_start(meeting)
             session = start_meeting_session(meeting, session, from_slide=from_slide)
+        except CapacityDenied as exc:
+            return capacity_denied_response(exc)
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=400)
 
@@ -1007,8 +1118,11 @@ class OrganizationMeetingPoliticalClassifyView(APIView):
             return err
         try:
             require_capability(meeting.organization, "run_new_ai_analysis")
+            reserve_ai_meeting_run(meeting)
         except EntitlementDenied as exc:
             return entitlement_denied_response(exc)
+        except CapacityDenied as exc:
+            return capacity_denied_response(exc)
 
         slide_id = request.query_params.get("slide_id") or request.data.get("slide_id")
         if not slide_id:
@@ -1085,11 +1199,8 @@ class OrganizationMeetingEndView(APIView):
             session = end_meeting_session(meeting, session)
         except ValueError as exc:
             return Response({"detail": str(exc)}, status=400)
-        if meeting.ai_mode != Meeting.AIMode.NONE:
-            session_id = session.id
-            transaction.on_commit(
-                lambda: process_meeting_ai(meeting, str(session_id))
-            )
+        # Do not auto-run AI on end — organizers trigger AI from results / Run AI
+        # when they want it (keeps API and plan usage costs predictable).
         return _control_session_response(meeting, session, "Meeting ended.")
 
 
@@ -1197,7 +1308,11 @@ class OrganizationMeetingAddSlidesView(APIView):
         serializer = MeetingAddSlidesSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         slide_payloads = serializer.validated_data["slides"]
-        append_meeting_slides(meeting, slide_payloads)
+        is_running = bool(
+            session
+            and session.status in (MeetingSession.Status.LIVE, MeetingSession.Status.PAUSED)
+        )
+        append_meeting_slides(meeting, slide_payloads, added_live=is_running, user=request.user)
 
         if session and session.status in (
             MeetingSession.Status.LIVE,
@@ -1221,6 +1336,20 @@ class OrganizationMeetingAddSlidesView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+class OrganizationMeetingReusableSlidesView(APIView):
+    """Questions from a past meeting, split into planned vs live-added, for reuse."""
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, slug, pk):
+        meeting, err = _get_org_meeting_admin(request, slug, pk)
+        if err:
+            return err
+        from api.meeting_service import reusable_slides_payload
+
+        return Response(reusable_slides_payload(meeting))
 
 
 class OrganizationMeetingExportView(APIView):
@@ -1284,7 +1413,16 @@ class OrganizationMeetingProcessAIView(APIView):
             )
 
         session_id = request.data.get("session_id") or request.query_params.get("session_id", "all")
+        # Usage is reserved inside process_meeting_ai (once per meeting/period).
         outcome = process_meeting_ai(meeting, str(session_id))
+        if outcome.get("reason") == "ai_quota_reached":
+            return Response(
+                {
+                    "detail": "AI usage limit reached for this billing period.",
+                    "code": "ai_quota_reached",
+                },
+                status=status.HTTP_429_TOO_MANY_REQUESTS,
+            )
         return Response(
             {
                 "detail": "AI processing complete.",

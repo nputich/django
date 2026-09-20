@@ -20,8 +20,8 @@ export default function OrgInboxPage() {
         <div className="dashboard-header">
           <h1>Organization messages</h1>
           <p>
-            Same inbox system as personal accounts — primary inbox, unknown
-            senders, and drafts.
+            Messages sent to this organization appear here — not in your personal
+            inbox. Open <strong>Inbox</strong> for community contact.
           </p>
         </div>
         <div className="dashboard-card">

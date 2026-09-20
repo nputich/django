@@ -64,6 +64,18 @@ export default function OrgBoardPage() {
     await loadBoard();
   };
 
+  const handleVotePoll = async (postId, optionId) => {
+    await api.post(`/api/organizations/${slug}/board/posts/${postId}/vote/`, {
+      option_id: optionId,
+    });
+    await loadBoard();
+  };
+
+  const handleMeetingRsvp = async (meetingId, status) => {
+    await api.post(`/api/meetings/${meetingId}/rsvp/`, { status: status || "" });
+    await loadBoard();
+  };
+
   return (
     <div className="dashboard">
       <AppHeader />
@@ -78,7 +90,11 @@ export default function OrgBoardPage() {
         {boardData && (
           <div className="dashboard-card">
             <PostingBoard
-              title={boardData.board?.title || `${boardData.organization_name} board`}
+              title={
+                (boardData.board?.title || "").trim() ||
+                boardData.organization_name ||
+                "Community wall"
+              }
               postingMode={boardData.board?.posting_mode}
               postingModeLabel={boardData.board?.posting_mode_label}
               posts={boardData.posts}
@@ -93,6 +109,13 @@ export default function OrgBoardPage() {
               onCreateReply={boardData.can_reply ? handleCreateReply : undefined}
               onDeletePost={handleDeletePost}
               onDeleteReply={handleDeleteReply}
+              onVotePoll={
+                boardData.can_reply || boardData.can_post
+                  ? handleVotePoll
+                  : undefined
+              }
+              onMeetingRsvp={handleMeetingRsvp}
+              emptyMessage="This organization board is empty. Share an update with your community."
             />
           </div>
         )}

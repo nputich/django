@@ -2,9 +2,15 @@
 
 /* Centered content pages (enter code, register, under construction) */
 .enter-code-page {
-  max-width: 640px;
+  max-width: 1100px;
   text-align: center;
-  padding-top: 1rem;
+}
+
+.enter-code-page > *:not(.landing-logo-wrap) {
+  max-width: 640px;
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .enter-code-title {
@@ -83,7 +89,7 @@
 .enter-code-input:focus {
   outline: none;
   border-color: var(--cb-orange);
-  box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.2);
+  box-shadow: 0 0 0 3px rgba(39, 102, 144, 0.2);
 }
 
 .enter-code-button {

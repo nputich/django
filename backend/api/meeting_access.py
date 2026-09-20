@@ -79,15 +79,18 @@ def start_meeting_session(
     session.current_slide = start_slide
     session.started_from_slide = start_slide
     session.ended_at = None
-    session.save(
-        update_fields=[
-            "status",
-            "started_at",
-            "current_slide",
-            "started_from_slide",
-            "ended_at",
-        ]
-    )
+    update_fields = [
+        "status",
+        "started_at",
+        "current_slide",
+        "started_from_slide",
+        "ended_at",
+    ]
+    if session.attendee_limit is None:
+        from api.usage_service import snapshot_attendee_limit
+
+        snapshot_attendee_limit(session)
+    session.save(update_fields=update_fields)
     meeting.status = "live"
     meeting.started_at = now
     meeting.ended_at = None
@@ -215,6 +218,8 @@ def restart_meeting_session(
         raise ValueError("Invalid start slide for restart.")
 
     now = timezone.now()
+    from api.usage_service import snapshot_attendee_limit
+
     new_session = MeetingSession.objects.create(
         meeting=meeting,
         session_number=next_number,
@@ -223,6 +228,7 @@ def restart_meeting_session(
         started_from_slide=start_slide,
         started_at=now,
     )
+    snapshot_attendee_limit(new_session)
     meeting.status = "live"
     meeting.started_at = now
     meeting.ended_at = None

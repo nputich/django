@@ -189,7 +189,7 @@
 
 .host-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #f5a623, #e09410);
+  background: linear-gradient(90deg, var(--cb-blue), var(--cb-blue-hover));
   border-radius: 999px;
   min-width: 2px;
   transition: width 0.35s ease;

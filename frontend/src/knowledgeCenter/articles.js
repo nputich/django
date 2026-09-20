@@ -307,9 +307,9 @@ The goal is not simply to get more people into a meeting room.
 
 The goal is to make it possible for more people to participate in the decisions that affect their communities.
 
-## How CommuniB Can Help
+## How communiBetter Can Help
 
-CommuniB is designed to give organizations additional ways to hear from their communities, including digital meetings, surveys, issue collection, prioritization, and feedback tools that can complement traditional meetings.
+communiBetter is designed to give organizations additional ways to hear from their communities, including digital meetings, surveys, issue collection, prioritization, and feedback tools that can complement traditional meetings.
 
 Instead of requiring every participant to be available at the same place and time, organizations can create more opportunities for people to contribute when they are able.
 
@@ -710,9 +710,9 @@ Problem solving works best as a cycle:
 
 Then repeat the process.
 
-## How CommuniB Can Help
+## How communiBetter Can Help
 
-CommuniB is designed to help organizations collect community feedback, organize issues, identify priorities, and better understand what participants are asking for.
+communiBetter is designed to help organizations collect community feedback, organize issues, identify priorities, and better understand what participants are asking for.
 
 When many people submit ideas or concerns, organizations need more than a long list of comments. They need ways to identify patterns, compare priorities, and determine where their limited resources can have the greatest impact.
 

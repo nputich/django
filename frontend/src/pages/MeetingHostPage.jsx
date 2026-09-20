@@ -110,7 +110,7 @@ export default function MeetingHostPage() {
               : "Upgrade required",
           body:
             err.response.data.detail ||
-            "This action requires a paid CommuniB service.",
+            "This action requires a paid communiBetter service.",
         });
       } else {
         setActionError(err.response?.data?.detail || "Action failed.");
@@ -304,17 +304,17 @@ export default function MeetingHostPage() {
                   <button
                     type="button"
                     className="dashboard-btn dashboard-btn--locked"
-                    aria-label="Start meeting requires Basic or higher"
+                    aria-label="Start meeting requires Starter or higher"
                     onClick={() =>
                       setUpgradeModal({
                         title: "Start Meeting",
-                        body: "Starting meetings requires CommuniB Basic or higher. You can still view previous meeting results.",
+                        body: "Starting meetings requires communiBetter Starter or higher. You can still view previous meeting results.",
                       })
                     }
                   >
                     🔒 Start meeting
                   </button>
-                  <p className="dashboard-lock-hint">Requires Basic or higher</p>
+                  <p className="dashboard-lock-hint">Requires Starter or higher</p>
                 </div>
               )}
             </div>
@@ -464,17 +464,17 @@ export default function MeetingHostPage() {
                   <button
                     type="button"
                     className="dashboard-btn dashboard-btn--locked"
-                    aria-label="Restart meeting requires Basic or higher"
+                    aria-label="Restart meeting requires Starter or higher"
                     onClick={() =>
                       setUpgradeModal({
                         title: "Restart Meeting",
-                        body: "Starting meetings requires CommuniB Basic or higher. Prior session data remains available for viewing and export.",
+                        body: "Starting meetings requires communiBetter Starter or higher. Prior session data remains available for viewing and export.",
                       })
                     }
                   >
                     🔒 Restart meeting
                   </button>
-                  <p className="dashboard-lock-hint">Requires Basic or higher</p>
+                  <p className="dashboard-lock-hint">Requires Starter or higher</p>
                 </div>
               )}
               <p className="dashboard-meta">
@@ -683,8 +683,8 @@ export default function MeetingHostPage() {
               )}
             </p>
             <p className="dashboard-meta">
-              Responses are analyzed automatically after submit. Use this to re-run on all
-              responses in the selected session (rule-based demo if no API key is configured).
+              AI does not run when participants answer. Use Run AI here or Run / Refresh AI on
+              live results when you want analysis (rule-based demo if no API key is configured).
             </p>
             <div className="host-control-row">
               {canRunAi ? (
@@ -707,7 +707,7 @@ export default function MeetingHostPage() {
                           title: "Run New AI Analysis",
                           body:
                             err.response.data.detail ||
-                            "Running new AI analysis requires a paid CommuniB service.",
+                            "Running new AI analysis requires a paid communiBetter service.",
                         });
                       } else {
                         setActionError(
@@ -730,7 +730,7 @@ export default function MeetingHostPage() {
                     onClick={() =>
                       setUpgradeModal({
                         title: "Run New AI Analysis",
-                        body: "Running new AI analysis requires a paid CommuniB service. Previously generated AI summaries remain available.",
+                        body: "Running new AI analysis requires a paid communiBetter service. Previously generated AI summaries remain available.",
                       })
                     }
                   >

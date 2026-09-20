@@ -74,16 +74,20 @@ export default function BillingEntry() {
         )}
         {organizations && organizations.length > 0 && (
           <ul className="billing-org-picker">
-            {organizations.map((org) => (
-              <li key={org.slug}>
-                <Link
-                  to={`/dashboard/${org.slug}/billing`}
-                  className="dashboard-btn dashboard-btn--primary"
-                >
-                  {org.name}
-                </Link>
-              </li>
-            ))}
+            {organizations.map((org) => {
+              const qs = searchParams.toString();
+              const suffix = qs ? `?${qs}` : "";
+              return (
+                <li key={org.slug}>
+                  <Link
+                    to={`/dashboard/${org.slug}/billing${suffix}`}
+                    className="dashboard-btn dashboard-btn--primary"
+                  >
+                    {org.name}
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         )}
       </main>

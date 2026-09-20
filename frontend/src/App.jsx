@@ -1,5 +1,5 @@
 import React from "react";
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import Root from "./components/Root";
 import Register from "./pages/Register";
 import NotFound from "./pages/NotFound";
@@ -15,12 +15,21 @@ import OrgHubPage from "./pages/OrgHubPage";
 import OrgPricingPage from "./pages/OrgPricingPage";
 import CreateOrganization from "./pages/CreateOrganization";
 import MeetingPage from "./pages/MeetingPage";
+import MeetingDetailsPage from "./pages/MeetingDetailsPage";
+import MeetingResultsPage from "./pages/MeetingResultsPage";
+import MeetingSummaryPage from "./pages/MeetingSummaryPage";
 import MeetingHostPage from "./pages/MeetingHostPage";
 import DashboardHome from "./pages/DashboardHome";
 import OrgDashboard from "./pages/OrgDashboard";
 import OrgBilling from "./pages/OrgBilling";
 import BillingEntry from "./pages/BillingEntry";
 import OrgOwnershipSettings from "./pages/OrgOwnershipSettings";
+import OrgBoardSettings from "./pages/OrgBoardSettings";
+import OrgRelationshipsSettings from "./pages/OrgRelationshipsSettings";
+import OrgUmbrellaPortal from "./pages/OrgUmbrellaPortal";
+import OrgReportsPage from "./pages/OrgReportsPage";
+import OrgSharedMeetingsPage from "./pages/OrgSharedMeetingsPage";
+import PersonalBoardSettings from "./pages/PersonalBoardSettings";
 import OrgDirectoryPlacement from "./pages/OrgDirectoryPlacement";
 import CreateSurvey from "./pages/CreateSurvey";
 import CreateMeeting from "./pages/CreateMeeting";
@@ -39,6 +48,12 @@ import { UNDER_CONSTRUCTION_ROUTES } from "./constants/siteLinks";
 function Logout() {
   clearAuth();
   return <Navigate to="/" replace />;
+}
+
+/** Preserve ?paypal=cancelled (and other query) when aliasing /pricing → /org. */
+function PricingRedirect() {
+  const { search } = useLocation();
+  return <Navigate to={`/org${search}`} replace />;
 }
 
 function App() {
@@ -62,12 +77,15 @@ function App() {
           element={<KnowledgeCenterArticle />}
         />
         <Route path="/org" element={<OrgPricingPage />} />
-        <Route path="/pricing" element={<Navigate to="/org" replace />} />
+        <Route path="/pricing" element={<PricingRedirect />} />
         {UNDER_CONSTRUCTION_ROUTES.map((path) => (
           <Route key={path} path={path} element={<UnderConstruction />} />
         ))}
         <Route path="/s/:id" element={<SurveyPage />} />
         <Route path="/m/:id" element={<MeetingPage />} />
+        <Route path="/m/:id/details" element={<MeetingDetailsPage />} />
+        <Route path="/m/:id/results" element={<MeetingResultsPage />} />
+        <Route path="/m/:id/summary" element={<MeetingSummaryPage />} />
         <Route path="/org/create" element={<CreateOrganization />} />
         <Route path="/org/:slug/hub" element={<OrgHubPage />} />
         <Route path="/org/:slug/board" element={<OrgBoardPage />} />
@@ -101,6 +119,14 @@ function App() {
           element={
             <ProtectedRoute>
               <PersonalInboxPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/board-settings"
+          element={
+            <ProtectedRoute>
+              <PersonalBoardSettings />
             </ProtectedRoute>
           }
         />
@@ -141,6 +167,46 @@ function App() {
           element={
             <ProtectedRoute>
               <OrgOwnershipSettings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/:slug/board-settings"
+          element={
+            <ProtectedRoute>
+              <OrgBoardSettings />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/:slug/umbrella"
+          element={
+            <ProtectedRoute>
+              <OrgUmbrellaPortal />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/:slug/reports"
+          element={
+            <ProtectedRoute>
+              <OrgReportsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/:slug/shared-with-us"
+          element={
+            <ProtectedRoute>
+              <OrgSharedMeetingsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/:slug/relationships"
+          element={
+            <ProtectedRoute>
+              <OrgRelationshipsSettings />
             </ProtectedRoute>
           }
         />

@@ -55,13 +55,13 @@ export default function AboutPage() {
           <strong>Better Communities Start Here</strong>
         </p>
         <p className="about-intro">
-          CommuniB was created with a simple belief: every community makes better
+          communiBetter was created with a simple belief: every community makes better
           decisions when more people can participate, understand one another, and
           work toward common goals.
         </p>
         <p className="about-intro">
           Whether you&apos;re part of a neighborhood, nonprofit, business, school,
-          government agency, club, or advocacy organization, CommuniB provides the
+          government agency, club, or advocacy organization, communiBetter provides the
           tools to bring people together, gather meaningful feedback, and transform
           ideas into action.
         </p>
@@ -80,7 +80,7 @@ export default function AboutPage() {
         <p>
           Too often, valuable ideas are lost in long meetings, scattered emails,
           social media discussions, or surveys that fail to capture what matters
-          most. CommuniB helps organize those conversations into information that
+          most. communiBetter helps organize those conversations into information that
           leaders and community members can actually use.
         </p>
         <p>
@@ -103,8 +103,8 @@ export default function AboutPage() {
       </section>
 
       <section className="about-section">
-        <h2>What CommuniB Does</h2>
-        <p>CommuniB provides organizations with tools to:</p>
+        <h2>What communiBetter Does</h2>
+        <p>communiBetter provides organizations with tools to:</p>
         <ul className="about-list">
           {CAPABILITIES.map((item) => (
             <li key={item}>{item}</li>
@@ -112,7 +112,7 @@ export default function AboutPage() {
         </ul>
         <p>
           Whether you&apos;re planning a town hall, managing a nonprofit, gathering
-          employee feedback, or engaging members of a local organization, CommuniB
+          employee feedback, or engaging members of a local organization, communiBetter
           helps turn participation into actionable insights.
         </p>
       </section>
@@ -120,7 +120,7 @@ export default function AboutPage() {
       <section className="about-section">
         <h2>Designed for Every Community</h2>
         <p>
-          CommuniB is built to support organizations of every size, including:
+          communiBetter is built to support organizations of every size, including:
         </p>
         <ul className="about-list about-list--columns">
           {COMMUNITIES.map((item) => (
@@ -140,7 +140,7 @@ export default function AboutPage() {
           and summarize discussions. People remain at the center of every decision.
         </p>
         <p>
-          CommuniB uses AI to reduce administrative work and help participants and
+          communiBetter uses AI to reduce administrative work and help participants and
           leaders better understand community conversations. This allows more time
           to focus on solving problems together.
         </p>
@@ -165,7 +165,7 @@ export default function AboutPage() {
         <h2>Join Us</h2>
         <p>
           Whether you&apos;re leading an organization or looking for a better way to
-          participate in your community, CommuniB is here to help.
+          participate in your community, communiBetter is here to help.
         </p>
         <p>
           Together, we can build communities that are more informed, more engaged,

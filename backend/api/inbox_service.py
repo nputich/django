@@ -102,13 +102,9 @@ def _have_prior_accepted_contact(a: Mailbox, b: Mailbox) -> bool:
 def _recipient_folder_for(sender: Mailbox, recipient: Mailbox) -> str:
     if _have_prior_accepted_contact(sender, recipient):
         return ConversationParticipant.Folder.PRIMARY
-    # Org members messaging their own org land in primary.
-    if (
-        recipient.kind == Mailbox.Kind.ORGANIZATION
-        and sender.kind == Mailbox.Kind.PERSONAL
-        and sender.user_id
-        and is_org_member(recipient.organization, sender.user)
-    ):
+    # Organization mailboxes are public contact points — first messages belong
+    # in the main inbox, not the personal-style "unknown sender" filter.
+    if recipient.kind == Mailbox.Kind.ORGANIZATION:
         return ConversationParticipant.Folder.PRIMARY
     if (
         sender.kind == Mailbox.Kind.ORGANIZATION
@@ -155,7 +151,24 @@ def blocked_mailbox_ids_for(mailbox: Mailbox) -> set[int]:
     return ids
 
 
+def promote_organization_unknown_to_primary(mailbox: Mailbox) -> int:
+    """
+    Move legacy first-contact threads on org mailboxes into the main inbox.
+
+    Older builds stored community messages in UNKNOWN; org inboxes should
+    surface them as normal Inbox conversations.
+    """
+    if mailbox.kind != Mailbox.Kind.ORGANIZATION:
+        return 0
+    return ConversationParticipant.objects.filter(
+        mailbox=mailbox,
+        folder=ConversationParticipant.Folder.UNKNOWN,
+    ).update(folder=ConversationParticipant.Folder.PRIMARY)
+
+
 def list_conversations_for_mailbox(mailbox: Mailbox, *, folder: str):
+    if mailbox.kind == Mailbox.Kind.ORGANIZATION:
+        promote_organization_unknown_to_primary(mailbox)
     folder = (folder or ConversationParticipant.Folder.PRIMARY).strip().lower()
     if folder not in {
         ConversationParticipant.Folder.PRIMARY,
@@ -236,6 +249,8 @@ def serialize_conversation_list_item(link: ConversationParticipant, mailbox: Mai
 
 
 def inbox_summary(mailbox: Mailbox) -> dict:
+    if mailbox.kind == Mailbox.Kind.ORGANIZATION:
+        promote_organization_unknown_to_primary(mailbox)
     primary_unread = 0
     unknown_unread = 0
     for link in ConversationParticipant.objects.filter(mailbox=mailbox).exclude(

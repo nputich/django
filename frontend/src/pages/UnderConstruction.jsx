@@ -23,7 +23,7 @@ const MESSAGES = {
   },
   "/blog": {
     title: "Blog",
-    body: "News and updates from communiB will appear here soon.",
+    body: "News and updates from communiBetter will appear here soon.",
     back: { to: "/", label: "← Back to home" },
   },
   "/privacy": {

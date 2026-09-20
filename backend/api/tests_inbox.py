@@ -33,6 +33,36 @@ class UnifiedInboxTests(APITestCase):
         self.org_inbox = reverse("org-inbox", kwargs={"slug": self.org.slug})
         self.org_drafts = reverse("org-inbox-drafts", kwargs={"slug": self.org.slug})
 
+    def test_org_owner_can_open_organization_inbox(self):
+        owner = User.objects.create_user("owneruser", password="Pass1234!")
+        OrganizationMembership.objects.filter(
+            organization=self.org, user=self.alice
+        ).delete()
+        OrganizationMembership.objects.create(
+            organization=self.org,
+            user=owner,
+            role=OrganizationMembership.Role.OWNER,
+        )
+        # Community member messages the org.
+        self.client.force_authenticate(self.bob)
+        res = self.client.post(
+            self.me_inbox,
+            {
+                "subject": "Hello owner",
+                "body": "Please see this.",
+                "to_organization_slug": self.org.slug,
+            },
+            format="json",
+        )
+        self.assertEqual(res.status_code, status.HTTP_201_CREATED)
+
+        self.client.force_authenticate(owner)
+        inbox = self.client.get(self.org_inbox, {"folder": "primary"})
+        self.assertEqual(inbox.status_code, status.HTTP_200_OK)
+        self.assertGreaterEqual(len(inbox.data.get("conversations") or []), 1)
+        subjects = [c.get("subject") for c in inbox.data["conversations"]]
+        self.assertIn("Hello owner", subjects)
+
     def test_personal_and_org_share_same_message_tables(self):
         self.client.force_authenticate(self.bob)
         res = self.client.post(
@@ -55,14 +85,14 @@ class UnifiedInboxTests(APITestCase):
         )
         self.assertEqual(len(bob_primary), 1)
 
-        # Org sees first contact in unknown inbox.
+        # Org sees community contact in the main organization inbox.
         org_box = get_organization_mailbox(self.org)
-        org_unknown = list(
+        org_primary = list(
             list_conversations_for_mailbox(
-                org_box, folder=ConversationParticipant.Folder.UNKNOWN
+                org_box, folder=ConversationParticipant.Folder.PRIMARY
             )
         )
-        self.assertEqual(len(org_unknown), 1)
+        self.assertEqual(len(org_primary), 1)
         self.assertEqual(InboxMessage.objects.filter(status="sent").count(), 1)
 
     def test_draft_save_and_send(self):

@@ -3,7 +3,7 @@ Feature capabilities by organization service level.
 
 Principle:
   FREE  → maintain org + view historical data
-  BASIC+ → create and conduct new paid engagement
+  STARTER+ → create and conduct new paid engagement
 
 Never deny READ of existing meetings/surveys/reports because of FREE.
 """
@@ -19,6 +19,7 @@ from .billing_plans import (
     SERVICE_LEVEL_COMMUNITY_PLUS,
     SERVICE_LEVEL_ENTERPRISE,
     SERVICE_LEVEL_FREE,
+    SERVICE_LEVEL_STARTER,
     SERVICE_LEVEL_LABELS,
 )
 from .billing_service import get_current_service_level
@@ -31,14 +32,16 @@ from .organization_lifecycle import (
 # Ordered from free → highest.
 SERVICE_LEVEL_RANK = {
     SERVICE_LEVEL_FREE: 0,
-    SERVICE_LEVEL_BASIC: 1,
-    SERVICE_LEVEL_COMMUNITY: 2,
-    SERVICE_LEVEL_COMMUNITY_PLUS: 3,
-    SERVICE_LEVEL_ENTERPRISE: 4,
+    SERVICE_LEVEL_STARTER: 1,
+    SERVICE_LEVEL_BASIC: 2,
+    SERVICE_LEVEL_COMMUNITY: 3,
+    SERVICE_LEVEL_COMMUNITY_PLUS: 4,
+    SERVICE_LEVEL_ENTERPRISE: 5,
 }
 
 PAID_CREATE_LEVELS = frozenset(
     {
+        SERVICE_LEVEL_STARTER,
         SERVICE_LEVEL_BASIC,
         SERVICE_LEVEL_COMMUNITY,
         SERVICE_LEVEL_COMMUNITY_PLUS,
@@ -93,8 +96,8 @@ def get_organization_capabilities(organization: Organization) -> dict:
         "start_meetings": paid and operational,
         "create_surveys": paid and operational,
         "run_new_ai_analysis": paid and operational,
-        "required_plan_for_create": SERVICE_LEVEL_BASIC,
-        "required_plan_label": SERVICE_LEVEL_LABELS[SERVICE_LEVEL_BASIC],
+        "required_plan_for_create": SERVICE_LEVEL_STARTER,
+        "required_plan_label": SERVICE_LEVEL_LABELS[SERVICE_LEVEL_STARTER],
     }
 
 
@@ -139,7 +142,7 @@ def entitlement_denied_response(exc: EntitlementDenied) -> Response:
             "detail": exc.message,
             "code": exc.code,
             "upgrade_required": True,
-            "required_plan": SERVICE_LEVEL_BASIC,
+            "required_plan": SERVICE_LEVEL_STARTER,
         },
         status=status.HTTP_403_FORBIDDEN,
     )

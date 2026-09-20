@@ -2,11 +2,22 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import api from "../api";
 import AppHeader from "../components/AppHeader";
+import TagPicker from "../components/TagPicker";
 import { normalizeAccessCode } from "../accessCode";
 import "../styles/Dashboard.css";
 
 function emptyQuestion(order) {
-  return { order, text: "", question_type: "text", choices: [] };
+  return {
+    order,
+    text: "",
+    question_type: "text",
+    choices: [],
+    tag_ids: [],
+    is_demographic: false,
+    body: "",
+    banner_url: "",
+    video_url: "",
+  };
 }
 
 export default function CreateSurvey() {
@@ -17,6 +28,7 @@ export default function CreateSurvey() {
   const [accessCode, setAccessCode] = useState("");
   const [codeStatus, setCodeStatus] = useState(null);
   const [isAnonymous, setIsAnonymous] = useState(true);
+  const [aggregateNotice, setAggregateNotice] = useState(true);
   const [questions, setQuestions] = useState([emptyQuestion(1)]);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(null);
@@ -79,12 +91,19 @@ export default function CreateSurvey() {
       title: title.trim(),
       description: description.trim(),
       is_anonymous: isAnonymous,
+      aggregate_sharing_notice: aggregateNotice,
       access_code: accessCode.trim(),
       questions: questions.map((q, i) => ({
         order: i + 1,
         text: q.text.trim(),
         question_type: q.question_type,
         choices: q.question_type === "choice" ? q.choices : [],
+        is_demographic: !!q.is_demographic && q.question_type !== "content",
+        body: q.body || "",
+        banner_url: q.banner_url || "",
+        video_url: q.video_url || "",
+        tag_ids: q.tag_ids || [],
+        tag_scope: "all",
       })),
     };
 
@@ -122,7 +141,7 @@ export default function CreateSurvey() {
           <div className="dashboard-card">
             <h2>Create a New Survey</h2>
             <p>
-              New surveys require CommuniB Basic or higher. You can continue
+              New surveys require communiBetter Starter or higher. You can continue
               viewing your previous surveys and results.
             </p>
             <div className="dashboard-actions">
@@ -211,12 +230,35 @@ export default function CreateSurvey() {
             <label htmlFor="survey-anonymous">Anonymous responses</label>
           </div>
 
+          <div className="dashboard-field dashboard-field--inline">
+            <input
+              id="survey-agg"
+              type="checkbox"
+              checked={aggregateNotice}
+              onChange={(e) => setAggregateNotice(e.target.checked)}
+            />
+            <label htmlFor="survey-agg">
+              Tell respondents anonymous combined results may be shared with policymakers
+            </label>
+          </div>
+
           <div className="dashboard-card">
             <h2>Questions</h2>
+            <p className="dashboard-meta">
+              Respondents see a short disclosure first, then these questions. Mark demographic
+              questions so they appear at the end (optional to answer). Use Content blocks for
+              banners, text, or YouTube/Vimeo before a question.
+            </p>
             {questions.map((q, index) => (
               <div key={index} className="dashboard-question-block">
                 <div className="dashboard-question-header">
-                  <strong>Question {index + 1}</strong>
+                  <strong>
+                    {q.question_type === "content"
+                      ? `Content ${index + 1}`
+                      : q.is_demographic
+                        ? `Demographic ${index + 1}`
+                        : `Question ${index + 1}`}
+                  </strong>
                   {questions.length > 1 && (
                     <button
                       type="button"
@@ -228,14 +270,6 @@ export default function CreateSurvey() {
                   )}
                 </div>
                 <div className="dashboard-field">
-                  <label>Question text</label>
-                  <textarea
-                    value={q.text}
-                    onChange={(e) => updateQuestion(index, "text", e.target.value)}
-                    required
-                  />
-                </div>
-                <div className="dashboard-field">
                   <label>Type</label>
                   <select
                     value={q.question_type}
@@ -245,26 +279,89 @@ export default function CreateSurvey() {
                   >
                     <option value="text">Text</option>
                     <option value="choice">Multiple choice</option>
+                    <option value="content">Content (banner / video / text)</option>
                   </select>
                 </div>
-                {q.question_type === "choice" && (
-                  <div className="dashboard-field">
-                    <label>Choices (comma-separated)</label>
-                    <input
-                      value={(q.choices || []).join(", ")}
-                      onChange={(e) =>
-                        updateQuestion(
-                          index,
-                          "choices",
-                          e.target.value
-                            .split(",")
-                            .map((s) => s.trim())
-                            .filter(Boolean)
-                        )
-                      }
-                      placeholder="Option A, Option B, Option C"
-                    />
-                  </div>
+                {q.question_type === "content" ? (
+                  <>
+                    <div className="dashboard-field">
+                      <label>Heading (optional)</label>
+                      <input
+                        value={q.text}
+                        onChange={(e) => updateQuestion(index, "text", e.target.value)}
+                      />
+                    </div>
+                    <div className="dashboard-field">
+                      <label>Text</label>
+                      <textarea
+                        value={q.body || ""}
+                        onChange={(e) => updateQuestion(index, "body", e.target.value)}
+                      />
+                    </div>
+                    <div className="dashboard-field">
+                      <label>Banner image URL</label>
+                      <input
+                        value={q.banner_url || ""}
+                        onChange={(e) => updateQuestion(index, "banner_url", e.target.value)}
+                      />
+                    </div>
+                    <div className="dashboard-field">
+                      <label>Video URL (YouTube / Vimeo)</label>
+                      <input
+                        value={q.video_url || ""}
+                        onChange={(e) => updateQuestion(index, "video_url", e.target.value)}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="dashboard-field">
+                      <label>Question text</label>
+                      <textarea
+                        value={q.text}
+                        onChange={(e) => updateQuestion(index, "text", e.target.value)}
+                        required
+                      />
+                    </div>
+                    {q.question_type === "choice" && (
+                      <div className="dashboard-field">
+                        <label>Choices (comma-separated)</label>
+                        <input
+                          value={(q.choices || []).join(", ")}
+                          onChange={(e) =>
+                            updateQuestion(
+                              index,
+                              "choices",
+                              e.target.value
+                                .split(",")
+                                .map((s) => s.trim())
+                                .filter(Boolean)
+                            )
+                          }
+                          placeholder="Option A, Option B, Option C"
+                        />
+                      </div>
+                    )}
+                    <label className="dashboard-radio-row">
+                      <input
+                        type="checkbox"
+                        checked={!!q.is_demographic}
+                        onChange={(e) =>
+                          updateQuestion(index, "is_demographic", e.target.checked)
+                        }
+                      />{" "}
+                      Demographic (shown at the end, optional)
+                    </label>
+                    <div className="dashboard-field">
+                      <label>Report tags</label>
+                      <TagPicker
+                        orgSlug={slug}
+                        value={q.tag_ids || []}
+                        questionText={q.text}
+                        onChange={(ids) => updateQuestion(index, "tag_ids", ids)}
+                      />
+                    </div>
+                  </>
                 )}
               </div>
             ))}

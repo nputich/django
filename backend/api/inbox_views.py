@@ -30,6 +30,7 @@ from api.inbox_service import (
 )
 from api.models import ConversationParticipant, InboxMessage, Organization
 from api.org_access import get_admin_organization
+from api.relationship_service import conversation_relationship_payload
 from api.serializers import (
     InboxComposeSerializer,
     InboxDraftSaveSerializer,
@@ -175,6 +176,9 @@ class InboxConversationDetailView(APIView):
             {
                 **serialize_conversation_list_item(link, mailbox),
                 "messages": [serialize_message(m) for m in messages],
+                "relationship": conversation_relationship_payload(
+                    link.conversation, viewer_org=mailbox.organization
+                ),
             }
         )
 

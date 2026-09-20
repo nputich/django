@@ -12,6 +12,7 @@ import "../styles/Dashboard.css";
 import "../styles/CreateOrganization.css";
 
 const PLAN_LABELS = {
+  [PAID_PLAN_LEVELS.STARTER]: "Starter",
   [PAID_PLAN_LEVELS.BASIC]: "Basic",
   [PAID_PLAN_LEVELS.COMMUNITY]: "Community",
   [PAID_PLAN_LEVELS.COMMUNITY_PLUS]: "Community Plus",
@@ -76,7 +77,7 @@ export default function CreateOrganization() {
       const data = err.response?.data;
       if (data?.code === "closed_organization_exists" && data.organization) {
         setClosedConflict(data);
-        setError(data.detail || "This organization previously existed on CommuniB.");
+        setError(data.detail || "This organization previously existed on communiBetter.");
       } else if (err.response?.status === 401) {
         setError("Sign in to create an organization.");
       } else {
@@ -107,7 +108,7 @@ export default function CreateOrganization() {
         <main className="create-org-page create-org-page--gate">
           <h1>Create an Organization</h1>
           <p>
-            You need a CommuniB account to create and manage an organization
+            You need a communiBetter account to create and manage an organization
             {intendedPlan
               ? ` (then you can upgrade to ${PLAN_LABELS[intendedPlan]})`
               : ""}
@@ -190,7 +191,7 @@ export default function CreateOrganization() {
               placeholder="e.g. FORSYTHDEMS"
             />
             <p className="create-org-help">
-              Enter a Community Code or leave this blank and CommuniB will
+              Enter a Community Code or leave this blank and communiBetter will
               generate one for you.
             </p>
           </div>
@@ -204,7 +205,7 @@ export default function CreateOrganization() {
           {closedConflict?.organization && (
             <div className="dashboard-card">
               <p>
-                <strong>This organization previously existed on CommuniB.</strong>
+                <strong>This organization previously existed on communiBetter.</strong>
               </p>
               <p>
                 If you represent this organization, you can request access or

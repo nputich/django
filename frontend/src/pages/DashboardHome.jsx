@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import api from "../api";
 import AppHeader from "../components/AppHeader";
 import CreateOrganizationLink from "../components/CreateOrganizationLink";
+import PersonalDashboardSettingsMenu from "../components/PersonalDashboardSettingsMenu";
 import PostingBoard from "../components/PostingBoard";
 import "../styles/Dashboard.css";
 import "../styles/Board.css";
@@ -50,6 +51,13 @@ export default function DashboardHome() {
     await loadBoard();
   };
 
+  const handleVotePoll = async (postId, optionId) => {
+    await api.post(`/api/me/board/posts/${postId}/vote/`, {
+      option_id: optionId,
+    });
+    await loadBoard();
+  };
+
   return (
     <div className="dashboard">
       <AppHeader />
@@ -62,9 +70,6 @@ export default function DashboardHome() {
           </h1>
           <p>
             Your personal posting board, messages, and organizations you manage.
-            <Link to="/account" style={{ marginLeft: "0.5rem" }}>
-              Account settings
-            </Link>
           </p>
         </div>
 
@@ -72,22 +77,32 @@ export default function DashboardHome() {
         {error && <p className="dashboard-error">{error}</p>}
 
         {!loading && !error && (
-          <div className="dashboard-actions" style={{ marginBottom: "1.25rem" }}>
+          <div className="dashboard-actions">
             <Link to="/dashboard/inbox" className="dashboard-btn dashboard-btn--primary">
               Messages
             </Link>
+            <Link to="/account" className="dashboard-btn">
+              Account settings
+            </Link>
+            <PersonalDashboardSettingsMenu />
           </div>
         )}
 
         {boardData && (
           <div className="dashboard-card">
             <PostingBoard
-              title={boardData.title || "My board"}
+              title={
+                (boardData.title || "").trim() ||
+                profile?.display_name ||
+                profile?.username ||
+                "My board"
+              }
               postingModeLabel="Private (restricted)"
               posts={boardData.posts}
               canPost={boardData.can_post}
               onCreatePost={handleCreatePost}
               onDeletePost={handleDeletePost}
+              onVotePoll={handleVotePoll}
               emptyMessage="Your personal board is empty. Add a note for yourself."
             />
           </div>

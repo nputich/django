@@ -25,7 +25,7 @@ $ErrorActionPreference = "Stop"
 $Project = "communib"
 $Region = "us-central1"
 $BackendService = "django-backend"
-$FrontendBaseUrl = "https://communib.com"
+$FrontendBaseUrl = "https://communibetter.com"
 
 if ($Mode -eq "live") {
     $ClientSecretName = "PAYPAL_LIVE_CLIENT_ID"
@@ -116,6 +116,6 @@ Write-Host ($updateOut | Out-String)
 
 Write-Host "`nDone. PayPal checkout mode: $Mode" -ForegroundColor Green
 Write-Host "Cloud Run now has PAYPAL_WEBHOOK_ID from $WebhookSecretName"
-Write-Host "Test: https://communib.com -> org Billing and Service -> Choose a paid plan."
+Write-Host "Test: https://communibetter.com -> org Billing and Service -> Choose a paid plan."
 Write-Host "Note: webhook handler must still be implemented before activation works."
 Write-Host "Plan IDs must match PayPal dashboard ($Mode) - see api/billing_plans.py"

@@ -74,6 +74,15 @@ class PayPalCheckoutApiTests(TestCase):
             COMMUNIB_PAYPAL_PLANS_SANDBOX[SERVICE_LEVEL_COMMUNITY]["plan_id"],
         )
         self.assertEqual(kwargs["custom_id"], pending["billing_reference"])
+        self.assertEqual(
+            kwargs["return_url"],
+            "http://localhost:10001/dashboard/billing"
+            "?paypal=success&org=paypal-checkout-org",
+        )
+        self.assertEqual(
+            kwargs["cancel_url"],
+            "http://localhost:10001/pricing?paypal=cancelled",
+        )
 
     @patch("api.billing_service.create_subscription")
     @patch("api.billing_service.get_subscription")

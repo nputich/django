@@ -2,10 +2,43 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import api from "../api";
 import AppHeader from "../components/AppHeader";
+import TagPicker from "../components/TagPicker";
 import "../styles/Dashboard.css";
 
+/** Tags on an existing survey question — saves immediately, applies to all uses of the text. */
+function ExistingQuestionTags({ slug, surveyId, question }) {
+  const [ids, setIds] = useState(question.tag_ids || []);
+  const [saving, setSaving] = useState(false);
+  const [note, setNote] = useState("");
+
+  const save = async (nextIds) => {
+    setIds(nextIds);
+    setSaving(true);
+    try {
+      const res = await api.put(
+        `/api/organizations/${slug}/surveys/${surveyId}/questions/${question.id}/tags/`,
+        { tag_ids: nextIds, scope: "all" }
+      );
+      const uses = res.data.other_uses;
+      const total = uses.meetings + uses.surveys;
+      setNote(total ? `Saved · also applied to ${total} other use${total === 1 ? "" : "s"}.` : "Saved.");
+    } catch {
+      setNote("Could not save tags.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="dashboard-field" style={{ marginTop: "0.4rem" }}>
+      <TagPicker orgSlug={slug} value={ids} onChange={save} compact />
+      {(saving || note) && <p className="dashboard-meta">{saving ? "Saving…" : note}</p>}
+    </div>
+  );
+}
+
 function emptyQuestion() {
-  return { text: "", question_type: "text", choices: [] };
+  return { text: "", question_type: "text", choices: [], tag_ids: [], is_demographic: false, body: "", banner_url: "", video_url: "" };
 }
 
 export default function EditSurvey() {
@@ -73,8 +106,14 @@ export default function EditSurvey() {
         text: q.text.trim(),
         question_type: q.question_type,
         choices: q.question_type === "choice" ? q.choices : [],
+        is_demographic: !!q.is_demographic && q.question_type !== "content",
+        body: q.body || "",
+        banner_url: q.banner_url || "",
+        video_url: q.video_url || "",
+        tag_ids: q.tag_ids || [],
+        tag_scope: "all",
       }))
-      .filter((q) => q.text);
+      .filter((q) => q.text || q.question_type === "content");
 
     try {
       await api.patch(`/api/organizations/${slug}/surveys/${id}/`, {
@@ -204,9 +243,10 @@ export default function EditSurvey() {
               <ol className="dashboard-list">
                 {survey.questions.map((q) => (
                   <li key={q.id} className="dashboard-list-item">
-                    <div>
+                    <div style={{ flex: 1 }}>
                       <strong>#{q.order}</strong> {q.text}
                       <p className="dashboard-meta">{q.question_type}</p>
+                      <ExistingQuestionTags slug={slug} surveyId={id} question={q} />
                     </div>
                   </li>
                 ))}
@@ -270,6 +310,15 @@ export default function EditSurvey() {
                     />
                   </div>
                 )}
+                <div className="dashboard-field">
+                  <label>Report tags</label>
+                  <TagPicker
+                    orgSlug={slug}
+                    value={q.tag_ids || []}
+                    questionText={q.text}
+                    onChange={(ids) => updateNewQuestion(index, "tag_ids", ids)}
+                  />
+                </div>
               </div>
             ))}
             <button type="button" className="dashboard-btn" onClick={addNewQuestion}>

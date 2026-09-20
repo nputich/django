@@ -15,7 +15,7 @@ export default function SiteFooter() {
                 href={item.to}
                 target="_blank"
                 rel="noopener noreferrer"
-                aria-label="communiB on YouTube"
+                aria-label="communiBetter on YouTube"
                 title="YouTube"
               >
                 <YouTubeIcon />
@@ -41,7 +41,7 @@ export default function SiteFooter() {
           );
         })}
       </nav>
-      <p>© {new Date().getFullYear()} communiB</p>
+      <p>© {new Date().getFullYear()} communiBetter</p>
     </footer>
   );
 }

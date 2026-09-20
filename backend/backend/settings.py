@@ -163,7 +163,7 @@ MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOWS_CREDENTIALS = True
+CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:8000",
@@ -171,9 +171,11 @@ CSRF_TRUSTED_ORIGINS = [
     "https://django-backend-460809694305.us-central1.run.app",
     "https://communib.com",
     "https://www.communib.com",
+    "https://communibetter.com",
+    "https://www.communibetter.com",
 ]
 
-CONTACT_INBOX_EMAIL = os.getenv("CONTACT_INBOX_EMAIL", "contactcommunib@gmail.com")
+CONTACT_INBOX_EMAIL = os.getenv("CONTACT_INBOX_EMAIL", "contactcommunibetter@gmail.com")
 
 
 def _env_or_file(name: str, default: str = "") -> str:
@@ -246,4 +248,5 @@ FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:10001").rst
 
 # Temporary Basic complimentary access code (server-side only; never expose to clients).
 # Empty disables access-code redemption. Local Docker sets SUPERBASIC via compose.
+# Redeeming grants Basic for 4 months, then the entitlement expires.
 COMMUNIB_BASIC_ACCESS_CODE = _env_or_file("COMMUNIB_BASIC_ACCESS_CODE").strip()

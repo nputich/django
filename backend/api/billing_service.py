@@ -66,7 +66,7 @@ def get_active_organization_service(organization: Organization):
             service.cancelled_at = now
         service.save(update_fields=["status", "cancelled_at", "updated_at"])
 
-    return (
+    service = (
         OrganizationService.objects.filter(
             organization=organization,
             status=OrganizationService.Status.ACTIVE,
@@ -75,6 +75,14 @@ def get_active_organization_service(organization: Organization):
         .order_by("-started_at", "-id")
         .first()
     )
+    if (
+        service
+        and service.billing_source == OrganizationService.BillingSource.UMBRELLA_LICENSE
+    ):
+        from .umbrella_service import reconcile_member_service  # noqa: PLC0415
+
+        return reconcile_member_service(organization, service)
+    return service
 
 
 def get_pending_checkout(organization: Organization):
@@ -235,14 +243,13 @@ def start_pending_checkout(
         return pending, resolved, paypal_meta
 
     frontend = getattr(settings, "FRONTEND_BASE_URL", "http://localhost:10001").rstrip("/")
+    # Match PayPal plan auto-return / cancel-return URLs; include org on success
+    # so BillingEntry can route multi-org admins without a picker step.
     ret = return_url or (
-        f"{frontend}/dashboard/{organization.slug}/billing"
+        f"{frontend}/dashboard/billing"
         f"?paypal=success&org={organization.slug}"
     )
-    can = cancel_url or (
-        f"{frontend}/dashboard/{organization.slug}/billing"
-        f"?paypal=cancelled&org={organization.slug}"
-    )
+    can = cancel_url or f"{frontend}/pricing?paypal=cancelled"
 
     try:
         created = create_subscription(

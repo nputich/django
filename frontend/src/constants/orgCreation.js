@@ -5,6 +5,7 @@ export const CREATE_ORGANIZATION_PATH = "/org/create";
 export const ORG_PRICING_PATH = "/org";
 
 export const PAID_PLAN_LEVELS = {
+  STARTER: "STARTER",
   BASIC: "BASIC",
   COMMUNITY: "COMMUNITY",
   COMMUNITY_PLUS: "COMMUNITY_PLUS",

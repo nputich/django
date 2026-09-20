@@ -112,7 +112,6 @@ export default function HostResultsPanel({
   const [classifyState, setClassifyState] = useState("idle");
   const [classifyMessage, setClassifyMessage] = useState("");
   const classifyInFlightRef = useRef(false);
-  const pendingClassifyTimerRef = useRef(null);
 
   const selectedSlide = analyzableSlides.find((slide) => slide.id === slideId);
 
@@ -195,20 +194,32 @@ export default function HostResultsPanel({
   }, [loadAnalytics]);
 
   useEffect(() => {
+    // Never auto-run AI/classification — organizer must click Run / Refresh.
     if (!slideId || !isPoliticalSlide(selectedSlide)) {
       setClassifyState("idle");
       setClassifyMessage("");
-      return undefined;
+      return;
     }
-
-    runClassification();
-
-    return () => {
-      if (pendingClassifyTimerRef.current) {
-        clearTimeout(pendingClassifyTimerRef.current);
-      }
-    };
-  }, [slideId, selectedSlide?.slide_type, runClassification]);
+    const pending = analytics?.classification?.pending;
+    const classified = analytics?.classification?.classified;
+    if (pending == null && classified == null) {
+      setClassifyState("idle");
+      setClassifyMessage("");
+      return;
+    }
+    if ((classified || 0) === 0 && (pending || 0) > 0) {
+      setClassifyState("idle");
+      setClassifyMessage("AI has not been run yet.");
+    } else if ((pending || 0) > 0) {
+      setClassifyState("idle");
+      setClassifyMessage(
+        `${pending} new response${pending === 1 ? "" : "s"} since last run.`
+      );
+    } else if ((classified || 0) > 0) {
+      setClassifyState("success");
+      setClassifyMessage("Classification is up to date.");
+    }
+  }, [slideId, selectedSlide, analytics?.classification?.pending, analytics?.classification?.classified]);
 
   useEffect(() => {
     if (!slideId) return undefined;
@@ -218,26 +229,7 @@ export default function HostResultsPanel({
     return () => clearInterval(interval);
   }, [slideId, loadAnalytics]);
 
-  useEffect(() => {
-    if (!isPoliticalSlide(selectedSlide)) return undefined;
-    const pending = analytics?.classification?.pending || 0;
-    if (pending <= 0 || classifyInFlightRef.current) return undefined;
-
-    pendingClassifyTimerRef.current = setTimeout(() => {
-      runClassification();
-    }, 2000);
-
-    return () => {
-      if (pendingClassifyTimerRef.current) {
-        clearTimeout(pendingClassifyTimerRef.current);
-      }
-    };
-  }, [
-    analytics?.classification?.pending,
-    selectedSlide,
-    runClassification,
-  ]);
-
+  // Removed auto-classify on open and pending timer.
   const fields = analytics?.demographic_fields?.length
     ? analytics.demographic_fields
     : demographicFields || [];
@@ -316,13 +308,27 @@ export default function HostResultsPanel({
           )}
         </div>
 
-        {isPoliticalSlide(selectedSlide) && classifyState !== "idle" && (
-          <p
-            className={`host-results-classify host-results-classify--${classifyState}`}
-            role="status"
-          >
-            {classifyMessage}
-          </p>
+        {isPoliticalSlide(selectedSlide) && (
+          <div className="host-results-ai-actions">
+            <p
+              className={`host-results-classify host-results-classify--${classifyState}`}
+              role="status"
+            >
+              {classifyMessage || "AI has not been run yet."}
+            </p>
+            <button
+              type="button"
+              className="dashboard-btn dashboard-btn--primary"
+              disabled={classifyState === "loading"}
+              onClick={runClassification}
+            >
+              {classifyState === "loading"
+                ? "Running…"
+                : (analytics?.classification?.classified || 0) > 0
+                  ? "Refresh AI"
+                  : "Run AI"}
+            </button>
+          </div>
         )}
 
         {analytics && (
@@ -376,11 +382,35 @@ export default function HostResultsPanel({
         <div className="host-results-body">
           {!error && analytics && isCompare && (
             <>
-              {analytics.comparisons.length === 0 ? (
+              {analytics.split_blocked || analytics.split?.blocked ? (
+                <>
+                  <p className="dashboard-meta">
+                    Answer comparison by {splitFieldLabel.toLowerCase()} is not
+                    available — at least one group has{" "}
+                    {analytics.split?.min_cell_count ?? 5} or fewer participants.
+                    Showing all answers together. Who responded:
+                    {(analytics.group_counts || []).length > 0
+                      ? ` ${(analytics.group_counts || [])
+                          .map(
+                            (g) =>
+                              `${g.value} (${g.filtered_respondents})`
+                          )
+                          .join(", ")}.`
+                      : " no values submitted yet."}
+                  </p>
+                  <div className="host-results-compare-scroll">
+                    <div className="host-results-compare">
+                      <CompareColumn
+                        title="All"
+                        subtitle={`${analytics.overall?.filtered_respondents ?? analytics.total_respondents} participants`}
+                        bars={analytics.overall?.bars || []}
+                      />
+                    </div>
+                  </div>
+                </>
+              ) : analytics.comparisons.length === 0 ? (
                 <p className="dashboard-meta">
-                  No {splitFieldLabel.toLowerCase()} values submitted yet. Responses
-                  will appear here once participants fill in the participant info
-                  slide.
+                  {`No ${splitFieldLabel.toLowerCase()} values submitted yet. Responses will appear here once participants fill in the participant info slide.`}
                 </p>
               ) : (
                 <div className="host-results-compare-scroll">
@@ -406,11 +436,21 @@ export default function HostResultsPanel({
             </>
           )}
 
-          {!error && analytics && !isCompare && analytics.bars?.length === 0 && (
+          {!error && analytics && !isCompare && analytics.suppressed && (
+            <p className="dashboard-meta">
+              This demographic group has {analytics.filtered_respondents} participant
+              {analytics.filtered_respondents === 1 ? "" : "s"} — at or below the
+              privacy minimum of {analytics.min_cell_count ?? 5}. Answer breakdowns
+              for this group are hidden. Overall results (no demographic filter) still
+              include everyone.
+            </p>
+          )}
+
+          {!error && analytics && !isCompare && !analytics.suppressed && analytics.bars?.length === 0 && (
             <p className="dashboard-meta">No responses yet for this slide.</p>
           )}
 
-          {!error && analytics && !isCompare && analytics.bars?.length > 0 && (
+          {!error && analytics && !isCompare && !analytics.suppressed && analytics.bars?.length > 0 && (
             <BarChart bars={analytics.bars} />
           )}
 
@@ -429,7 +469,7 @@ export default function HostResultsPanel({
         <p className="dashboard-meta host-results-footnote">
           Results refresh every few seconds while this panel is open.
           {analytics?.slide_type === "political_issue_card" &&
-            " Political issue charts list normalized responses, not raw participant text. Classification runs when you open live results, not on every refresh."}
+            " Political issue charts use classified themes. Run / Refresh AI when you want analysis."}
           {isCompare && " Scroll sideways to compare groups; scroll down if needed."}
         </p>
       </div>

@@ -20,7 +20,16 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
+    const status = error.response?.status;
+    const url = String(error.config?.url || "");
+    const detail = error.response?.data?.detail;
+    const isAuthAttempt =
+      url.includes("/api/token/") || url.includes("/api/user/register/");
+    const tokenInvalid =
+      status === 401 &&
+      typeof detail === "string" &&
+      detail.toLowerCase().includes("token");
+    if ((status === 401 || tokenInvalid) && !isAuthAttempt) {
       clearAuth();
     }
     return Promise.reject(error);

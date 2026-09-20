@@ -12,25 +12,53 @@ from api.models import (
 )
 
 
-def create_meeting_slides(meeting: Meeting, slide_payloads: list[dict]) -> list[MeetingSlide]:
+def create_meeting_slides(
+    meeting: Meeting,
+    slide_payloads: list[dict],
+    *,
+    added_live: bool = False,
+    user=None,
+    ensure_disclosure: bool = True,
+) -> list[MeetingSlide]:
+    from api.content_media import normalize_content_config
+    from api.meeting_sharing import ensure_disclosure_slide
+    from api.question_tags import apply_payload_tags
+
     created = []
     for slide_data in slide_payloads:
         config = {}
         if slide_data["slide_type"] == MeetingSlide.SlideType.PARTICIPANT_INFO:
             config = {"fields": slide_data.get("fields", [])}
-
-        created.append(
-            MeetingSlide.objects.create(
-                meeting=meeting,
-                order=slide_data.get("order", 0),
-                slide_type=slide_data["slide_type"],
-                title=slide_data.get("title", ""),
-                prompt=slide_data.get("prompt", ""),
-                question_format=slide_data.get("question_format", ""),
-                choices=slide_data.get("choices", []),
-                config=config,
+        elif slide_data["slide_type"] == MeetingSlide.SlideType.CONTENT:
+            config = normalize_content_config(
+                {
+                    "body": slide_data.get("body") or (slide_data.get("config") or {}).get("body", ""),
+                    "banner_url": slide_data.get("banner_url")
+                    or (slide_data.get("config") or {}).get("banner_url", ""),
+                    "video_url": slide_data.get("video_url")
+                    or (slide_data.get("config") or {}).get("video_url", ""),
+                }
             )
+        if added_live:
+            config["added_live"] = True
+
+        slide = MeetingSlide.objects.create(
+            meeting=meeting,
+            order=slide_data.get("order", 0),
+            slide_type=slide_data["slide_type"],
+            title=slide_data.get("title", ""),
+            prompt=slide_data.get("prompt", ""),
+            question_format=slide_data.get("question_format", ""),
+            choices=slide_data.get("choices", []),
+            config=config,
         )
+        if slide.is_question:
+            apply_payload_tags(
+                organization=meeting.organization, slide=slide, payload=slide_data, user=user
+            )
+        created.append(slide)
+    if ensure_disclosure:
+        ensure_disclosure_slide(meeting)
     return created
 
 
@@ -45,9 +73,88 @@ def create_initial_session(meeting: Meeting) -> MeetingSession:
     )
 
 
-def replace_meeting_slides(meeting: Meeting, slide_payloads: list[dict]) -> list[MeetingSlide]:
-    meeting.slides.all().delete()
-    return create_meeting_slides(meeting, slide_payloads)
+def replace_meeting_slides(meeting: Meeting, slide_payloads: list[dict], *, user=None) -> list[MeetingSlide]:
+    """
+    Sync slides to the payload without wiping answered history.
+
+    Matching order: payload ``id`` → same position/type → create.
+    Slides removed from the deck are deactivated (``is_active=False``) so
+    MeetingResponse rows stay attached for reports and exports.
+    """
+    from api.content_media import normalize_content_config
+    from api.meeting_sharing import ensure_disclosure_slide
+    from api.question_tags import apply_payload_tags
+
+    existing = list(meeting.slides.order_by("order", "id"))
+    by_id = {s.id: s for s in existing}
+    used_ids: set[int] = set()
+    kept: list[MeetingSlide] = []
+
+    for index, slide_data in enumerate(slide_payloads):
+        config = {}
+        if slide_data["slide_type"] == MeetingSlide.SlideType.PARTICIPANT_INFO:
+            config = {"fields": slide_data.get("fields", [])}
+        elif slide_data["slide_type"] == MeetingSlide.SlideType.CONTENT:
+            config = normalize_content_config(
+                {
+                    "body": slide_data.get("body") or (slide_data.get("config") or {}).get("body", ""),
+                    "banner_url": slide_data.get("banner_url")
+                    or (slide_data.get("config") or {}).get("banner_url", ""),
+                    "video_url": slide_data.get("video_url")
+                    or (slide_data.get("config") or {}).get("video_url", ""),
+                }
+            )
+        if slide_data.get("added_live") or (slide_data.get("config") or {}).get("added_live"):
+            config["added_live"] = True
+
+        slide = None
+        raw_id = slide_data.get("id")
+        if raw_id is not None:
+            try:
+                slide = by_id.get(int(raw_id))
+            except (TypeError, ValueError):
+                slide = None
+        if slide is None and index < len(existing):
+            candidate = existing[index]
+            if candidate.id not in used_ids and candidate.slide_type == slide_data["slide_type"]:
+                slide = candidate
+
+        fields = {
+            "order": slide_data.get("order", index),
+            "slide_type": slide_data["slide_type"],
+            "title": slide_data.get("title", ""),
+            "prompt": slide_data.get("prompt", ""),
+            "question_format": slide_data.get("question_format", ""),
+            "choices": slide_data.get("choices", []),
+            "config": config,
+            "is_active": True,
+        }
+
+        if slide is not None:
+            # Preserve live-added flag if the organizer is only editing text.
+            if (slide.config or {}).get("added_live") and "added_live" not in config:
+                config["added_live"] = True
+                fields["config"] = config
+            for key, value in fields.items():
+                setattr(slide, key, value)
+            slide.save()
+            used_ids.add(slide.id)
+        else:
+            slide = MeetingSlide.objects.create(meeting=meeting, **fields)
+
+        if slide.is_question:
+            apply_payload_tags(
+                organization=meeting.organization, slide=slide, payload=slide_data, user=user
+            )
+        kept.append(slide)
+
+    for slide in existing:
+        if slide.id not in {s.id for s in kept} and slide.is_active:
+            slide.is_active = False
+            slide.save(update_fields=["is_active"])
+
+    ensure_disclosure_slide(meeting)
+    return kept
 
 
 def join_session(
@@ -88,6 +195,15 @@ def leave_attendance(attendance: MeetingAttendance) -> None:
     attendance.save(update_fields=["status", "left_at"])
 
 
+def _assert_slide_response_allowed(meeting: Meeting, session: MeetingSession, slide: MeetingSlide) -> None:
+    if session.status != MeetingSession.Status.LIVE:
+        raise ValidationError("The meeting is paused. Wait for the organizer to resume.")
+    if meeting.allow_self_paced:
+        return
+    if session.current_slide_id != slide.id:
+        raise ValidationError("You can only respond to the organizer's current slide.")
+
+
 def submit_participant_profile(
     attendance: MeetingAttendance,
     slide: MeetingSlide,
@@ -96,10 +212,18 @@ def submit_participant_profile(
     if slide.slide_type != MeetingSlide.SlideType.PARTICIPANT_INFO:
         raise ValidationError("This slide is not a participant information slide.")
 
-    if attendance.session.status != MeetingSession.Status.LIVE:
-        raise ValidationError("The meeting is paused. Wait for the organizer to resume.")
+    _assert_slide_response_allowed(attendance.session.meeting, attendance.session, slide)
     fields = slide.config.get("fields", [])
     field_map = {f["key"]: f for f in fields}
+
+    # Disclosure-only (no demographic fields): record acknowledgment.
+    if not field_map:
+        ParticipantProfileValue.objects.update_or_create(
+            attendance=attendance,
+            field_key="__disclosure_ack__",
+            defaults={"field_label": "Disclosure acknowledged", "value": True},
+        )
+        return
 
     for key, field_def in field_map.items():
         if field_def.get("required") and key not in field_values:
@@ -118,6 +242,10 @@ def submit_participant_profile(
             options = set(field_def.get("options", []))
             if not set(value).issubset(options):
                 raise ValidationError(f"Invalid options for {field_def.get('label', key)}.")
+        elif field_type in ("text", "textarea"):
+            if value is None:
+                raise ValidationError(f"Invalid value for {field_def.get('label', key)}.")
+            field_values[key] = str(value)
 
     for key, value in field_values.items():
         field_def = field_map[key]
@@ -131,6 +259,31 @@ def submit_participant_profile(
         )
 
 
+def acknowledge_content_slide(
+    meeting: Meeting,
+    session: MeetingSession,
+    attendance: MeetingAttendance,
+    slide: MeetingSlide,
+) -> MeetingResponse:
+    if slide.slide_type != MeetingSlide.SlideType.CONTENT:
+        raise ValidationError("This endpoint is only for content slides.")
+    _assert_slide_response_allowed(meeting, session, slide)
+    response, _ = MeetingResponse.objects.update_or_create(
+        session=session,
+        slide=slide,
+        participant_id=attendance.participant_id,
+        defaults={
+            "meeting": meeting,
+            "attendance": attendance,
+            "user": attendance.user,
+            "raw_response": "__viewed__",
+            "selected_options": [],
+            "normalization_status": "complete",
+        },
+    )
+    return response
+
+
 def submit_slide_response(
     meeting: Meeting,
     session: MeetingSession,
@@ -141,12 +294,10 @@ def submit_slide_response(
 ) -> MeetingResponse:
     if slide.slide_type == MeetingSlide.SlideType.PARTICIPANT_INFO:
         raise ValidationError("Use the profile endpoint for participant info slides.")
+    if slide.slide_type == MeetingSlide.SlideType.CONTENT:
+        return acknowledge_content_slide(meeting, session, attendance, slide)
 
-    if session.current_slide_id != slide.id:
-        raise ValidationError("You can only respond to the organizer's current slide.")
-
-    if session.status != MeetingSession.Status.LIVE:
-        raise ValidationError("The meeting is paused. Wait for the organizer to resume.")
+    _assert_slide_response_allowed(meeting, session, slide)
 
     selected_options = selected_options or []
     text = raw_response.strip()
@@ -223,11 +374,7 @@ def submit_issue_card_responses(
     ):
         raise ValidationError("This endpoint is only for issue card slides.")
 
-    if session.current_slide_id != slide.id:
-        raise ValidationError("You can only respond to the organizer's current slide.")
-
-    if session.status != MeetingSession.Status.LIVE:
-        raise ValidationError("The meeting is paused. Wait for the organizer to resume.")
+    _assert_slide_response_allowed(meeting, session, slide)
 
     cleaned: list[dict] = []
     for item in issues:
@@ -317,18 +464,19 @@ def participant_completed_slide_ids(session: MeetingSession, participant_id) -> 
 def participant_profile_complete(attendance: MeetingAttendance, slide: MeetingSlide) -> bool:
     if slide.slide_type != MeetingSlide.SlideType.PARTICIPANT_INFO:
         return True
-    required_keys = [
-        f["key"]
-        for f in slide.config.get("fields", [])
-        if f.get("required")
-    ]
+    fields = slide.config.get("fields", [])
+    if not fields:
+        return attendance.profile_values.filter(field_key="__disclosure_ack__").exists()
+    required_keys = [f["key"] for f in fields if f.get("required")]
     if not required_keys:
-        return attendance.profile_values.exists()
+        return attendance.profile_values.exclude(field_key="__disclosure_ack__").exists()
     saved_keys = set(attendance.profile_values.values_list("field_key", flat=True))
     return all(key in saved_keys for key in required_keys)
 
 
-def append_meeting_slides(meeting: Meeting, slide_payloads: list[dict]) -> list[MeetingSlide]:
+def append_meeting_slides(
+    meeting: Meeting, slide_payloads: list[dict], *, added_live: bool = False, user=None
+) -> list[MeetingSlide]:
     max_order = (
         meeting.slides.filter(is_active=True).order_by("-order").values_list("order", flat=True).first()
     )
@@ -336,7 +484,44 @@ def append_meeting_slides(meeting: Meeting, slide_payloads: list[dict]) -> list[
     normalized = []
     for index, slide_data in enumerate(slide_payloads):
         normalized.append({**slide_data, "order": slide_data.get("order", base_order + index)})
-    return create_meeting_slides(meeting, normalized)
+    # Never reorder a running deck; the disclosure slide already exists.
+    return create_meeting_slides(
+        meeting, normalized, added_live=added_live, user=user, ensure_disclosure=not added_live
+    )
+
+
+def reusable_slides_payload(meeting: Meeting) -> dict:
+    """Planned vs live-added question slides from a past meeting, for reuse."""
+    from api.question_tags import serialize_tag, tags_for_slide
+
+    planned, live_added = [], []
+    for slide in get_active_slides(meeting):
+        if not slide.is_question:
+            continue
+        item = {
+            "id": slide.id,
+            "order": slide.order,
+            "slide_type": slide.slide_type,
+            "title": slide.title,
+            "prompt": slide.prompt,
+            "question_format": slide.question_format,
+            "choices": slide.choices,
+            "response_count": slide.responses.count(),
+            "tag_ids": [t.id for t in tags_for_slide(slide)],
+            "tags": [serialize_tag(t) for t in tags_for_slide(slide)],
+        }
+        (live_added if slide.config.get("added_live") else planned).append(item)
+    return {
+        "meeting": {
+            "id": meeting.id,
+            "title": meeting.title,
+            "status": meeting.status,
+            "started_at": meeting.started_at,
+            "ended_at": meeting.ended_at,
+        },
+        "planned": planned,
+        "live_added": live_added,
+    }
 
 
 def get_organizer_live_payload(meeting: Meeting, session: MeetingSession) -> dict:
@@ -382,6 +567,7 @@ def get_organizer_live_payload(meeting: Meeting, session: MeetingSession) -> dic
                     MeetingSlide.SlideType.ISSUE_CARD,
                     MeetingSlide.SlideType.POLITICAL_ISSUE_CARD,
                 ),
+                "is_content": slide.slide_type == MeetingSlide.SlideType.CONTENT,
             }
         )
 
@@ -390,6 +576,7 @@ def get_organizer_live_payload(meeting: Meeting, session: MeetingSession) -> dic
         "meeting_title": meeting.title,
         "meeting_status": meeting.status,
         "is_anonymous": meeting.is_anonymous,
+        "allow_self_paced": meeting.allow_self_paced,
         "ai_mode": meeting.ai_mode,
         "ai_pending_count": MeetingResponse.objects.filter(
             meeting=meeting,

@@ -1,11 +1,17 @@
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.test import TestCase, override_settings
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APIClient
 
-from api.access_codes import redeem_basic_access_code
+from api.access_codes import (
+    BASIC_ACCESS_CODE_DURATION_MONTHS,
+    access_code_period_end,
+    redeem_basic_access_code,
+)
 from api.billing_service import get_current_service_level, request_cancel_paid_service
 from api.models import (
     AccessCodeRedemption,
@@ -65,6 +71,11 @@ class AccessCodeRedeemApiTests(TestCase):
             service.billing_source, OrganizationService.BillingSource.ACCESS_CODE
         )
         self.assertEqual(service.paypal_subscription_id, "")
+        self.assertTrue(service.cancel_at_period_end)
+        self.assertEqual(
+            service.current_period_end,
+            access_code_period_end(started_at=service.started_at),
+        )
 
         redemption = AccessCodeRedemption.objects.get(organization=self.org)
         self.assertEqual(redemption.code, "SUPERBASIC")
@@ -112,6 +123,21 @@ class AccessCodeRedeemApiTests(TestCase):
             updated.billing_source, OrganizationService.BillingSource.ACCESS_CODE
         )
         self.assertEqual(updated.paypal_subscription_id, "")
+
+    def test_access_code_basic_expires_after_four_months(self):
+        service, _ = redeem_basic_access_code(
+            organization=self.org,
+            user=self.admin,
+            code="SUPERBASIC",
+        )
+        self.assertEqual(get_current_service_level(self.org), "BASIC")
+        self.assertEqual(BASIC_ACCESS_CODE_DURATION_MONTHS, 4)
+
+        service.current_period_end = timezone.now() - timedelta(seconds=1)
+        service.save(update_fields=["current_period_end", "updated_at"])
+        self.assertEqual(get_current_service_level(self.org), "FREE")
+        service.refresh_from_db()
+        self.assertEqual(service.status, OrganizationService.Status.CANCELLED)
 
 
 @override_settings(COMMUNIB_BASIC_ACCESS_CODE="")

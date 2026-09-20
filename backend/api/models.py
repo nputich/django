@@ -249,6 +249,7 @@ class OrganizationService(models.Model):
 
     class ServiceLevel(models.TextChoices):
         FREE = "FREE", "Organization (Free)"
+        STARTER = "STARTER", "Starter"
         BASIC = "BASIC", "Basic"
         COMMUNITY = "COMMUNITY", "Community"
         COMMUNITY_PLUS = "COMMUNITY_PLUS", "Community Plus"
@@ -260,6 +261,7 @@ class OrganizationService(models.Model):
         ACCESS_CODE = "ACCESS_CODE", "Access code"
         ADMIN_GRANT = "ADMIN_GRANT", "Administrative grant"
         ENTERPRISE_CONTRACT = "ENTERPRISE_CONTRACT", "Enterprise contract"
+        UMBRELLA_LICENSE = "UMBRELLA_LICENSE", "Umbrella license"
 
     class Status(models.TextChoices):
         PENDING = "PENDING", "Pending"
@@ -313,6 +315,14 @@ class OrganizationService(models.Model):
         default=False,
         help_text="When True, keep ACTIVE paid access until current_period_end, then expire.",
     )
+    umbrella_license = models.ForeignKey(
+        "UmbrellaLicense",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="member_services",
+        help_text="Set when this entitlement is granted by another org's umbrella license.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -328,6 +338,111 @@ class OrganizationService(models.Model):
             f"{self.organization.slug} {self.service_level} "
             f"{self.status} ({self.billing_reference})"
         )
+
+
+class UmbrellaLicense(models.Model):
+    """
+    A paid organization's shareable code that lets other orgs run on its plan.
+
+    Members get an ``OrganizationService`` with billing_source=UMBRELLA_LICENSE
+    mirroring the licensor's level, plus an accepted ``umbrella_member``
+    relationship. All metered usage by members counts against the licensor's
+    pooled usage period.
+    """
+
+    organization = models.OneToOneField(
+        Organization, on_delete=models.CASCADE, related_name="umbrella_license"
+    )
+    code = models.CharField(max_length=32, unique=True)
+    is_active = models.BooleanField(default=True)
+    max_members = models.PositiveIntegerField(
+        null=True, blank=True, help_text="Blank = no cap on member organizations."
+    )
+    created_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    rotated_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"umbrella:{self.organization_id}:{self.code}"
+
+
+class OrganizationUsagePeriod(models.Model):
+    """
+    Append-only billing-period usage counters for an organization.
+
+    Do not wipe these rows when a period rolls; create a new row instead.
+    Attendee counts are not stored here — they are derived from MeetingAttendance.
+    """
+
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="usage_periods",
+    )
+    period_start = models.DateTimeField(db_index=True)
+    period_end = models.DateTimeField()
+    service_level = models.CharField(max_length=32)
+    survey_submissions_used = models.PositiveIntegerField(default=0)
+    meetings_started_used = models.PositiveIntegerField(default=0)
+    ai_meeting_runs_used = models.PositiveIntegerField(default=0)
+    board_posts_used = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-period_start", "-id"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization", "period_start"],
+                name="uniq_org_usage_period_start",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["organization", "-period_start"]),
+        ]
+
+    def __str__(self):
+        return f"{self.organization_id} {self.period_start.date()} {self.service_level}"
+
+
+class AiUsageEvent(models.Model):
+    """Internal AI cost/quota event. Customer dashboards do not show tokens."""
+
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="ai_usage_events",
+    )
+    meeting = models.ForeignKey(
+        "Meeting",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="ai_usage_events",
+    )
+    usage_period = models.ForeignKey(
+        OrganizationUsagePeriod,
+        on_delete=models.CASCADE,
+        related_name="ai_usage_events",
+    )
+    provider = models.CharField(max_length=32, blank=True, default="")
+    consumed_run = models.BooleanField(default=False)
+    success = models.BooleanField(default=True)
+    input_tokens = models.PositiveIntegerField(default=0)
+    output_tokens = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["usage_period", "meeting"]),
+        ]
+
+    def __str__(self):
+        return f"ai {self.organization_id} meeting={self.meeting_id} run={self.consumed_run}"
 
 
 class AccessCodeRedemption(models.Model):
@@ -396,26 +511,65 @@ class Survey(models.Model):
     description = models.TextField(blank=True)
     is_anonymous = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True)
+    aggregate_sharing_notice = models.BooleanField(
+        default=True,
+        help_text=(
+            "Tell respondents that anonymous combined results may be shared with "
+            "policymakers and decision makers not listed in the disclosure."
+        ),
+    )
     created_at = models.DateTimeField(auto_now_add=True)
+
     def __str__(self):
         return self.title
+
+
 class SurveyQuestion(models.Model):
     class QuestionType(models.TextChoices):
         TEXT = "text", "Text"
         CHOICE = "choice", "Multiple choice"
+        CONTENT = "content", "Content (text / media)"
+
     survey = models.ForeignKey(
         Survey, on_delete=models.CASCADE, related_name="questions"
     )
     order = models.PositiveIntegerField(default=0)
-    text = models.TextField()
+    text = models.TextField(blank=True, default="")
     question_type = models.CharField(
         max_length=20, choices=QuestionType.choices, default=QuestionType.TEXT
     )
     choices = models.JSONField(default=list, blank=True)
+    is_demographic = models.BooleanField(
+        default=False,
+        help_text="Demographic questions are shown after the main survey questions.",
+    )
+    config = models.JSONField(
+        default=dict,
+        blank=True,
+        help_text="For content blocks: body, banner_url, video_url.",
+    )
+    question_key = models.CharField(
+        max_length=40,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Normalized hash of the question text; groups the same question across surveys/meetings.",
+    )
+
     class Meta:
         ordering = ["order", "id"]
+
+    def save(self, *args, **kwargs):
+        from api.question_identity import question_key_for
+
+        if self.question_type == self.QuestionType.CONTENT:
+            self.question_key = ""
+        else:
+            self.question_key = question_key_for(self.text)
+        super().save(*args, **kwargs)
+
     def __str__(self):
-        return self.text[:50]
+        return (self.text or self.question_type)[:50]
 class SurveyAnswer(models.Model):
     survey = models.ForeignKey(
         Survey, on_delete=models.CASCADE, related_name="answers"
@@ -424,6 +578,42 @@ class SurveyAnswer(models.Model):
     response_session = models.CharField(max_length=64, db_index=True)
     value = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
+
+
+class SurveySubmission(models.Model):
+    """One completed survey response (not per-question)."""
+
+    survey = models.ForeignKey(
+        Survey, on_delete=models.CASCADE, related_name="submissions"
+    )
+    organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="survey_submissions",
+    )
+    usage_period = models.ForeignKey(
+        OrganizationUsagePeriod,
+        on_delete=models.CASCADE,
+        related_name="survey_submissions",
+    )
+    response_session = models.CharField(max_length=64, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["survey", "response_session"],
+                name="uniq_survey_response_session",
+            )
+        ]
+        indexes = [
+            models.Index(fields=["organization", "usage_period"]),
+        ]
+
+    def __str__(self):
+        return f"survey {self.survey_id} session {self.response_session}"
+
+
 class Meeting(models.Model):
     class AccessMode(models.TextChoices):
         PUBLIC = "public", "Public"
@@ -435,20 +625,49 @@ class Meeting(models.Model):
         SELF_HOSTED = "self_hosted", "Self-Hosted AI"
         PAID = "paid", "Paid AI Model"
 
+    class MinutesCreator(models.TextChoices):
+        ORGANIZER_ONLY = "organizer_only", "Organizer only"
+        ORGANIZER_OR_ATTENDEES = "organizer_or_attendees", "Organizer or attendees"
+
     organization = models.ForeignKey(
         Organization, on_delete=models.CASCADE, related_name="meetings"
     )
     title = models.CharField(max_length=200)
     description = models.TextField(blank=True)
+    location = models.CharField(max_length=255, blank=True, default="")
     access_mode = models.CharField(
         max_length=20, choices=AccessMode.choices, default=AccessMode.PUBLIC
     )
     private_code_hash = models.CharField(max_length=128, blank=True)
     scheduled_start_at = models.DateTimeField(null=True, blank=True)
+    scheduled_end_at = models.DateTimeField(null=True, blank=True)
     allow_start_early = models.BooleanField(default=False)
     is_anonymous = models.BooleanField(default=False)
+    allow_self_paced = models.BooleanField(
+        default=False,
+        help_text=(
+            "When True, participants may answer any slide without waiting for the "
+            "organizer to advance. Default is organizer-paced."
+        ),
+    )
     ai_mode = models.CharField(
         max_length=20, choices=AIMode.choices, default=AIMode.NONE
+    )
+    results_visible_to_community = models.BooleanField(
+        default=False,
+        help_text="When True, eligible users may view meeting results after the meeting ends.",
+    )
+    minutes_creator = models.CharField(
+        max_length=32,
+        choices=MinutesCreator.choices,
+        default=MinutesCreator.ORGANIZER_ONLY,
+    )
+    aggregate_sharing_notice = models.BooleanField(
+        default=True,
+        help_text=(
+            "Show participants that anonymous combined results may be shared with "
+            "policymakers and decision makers not listed on the disclosure screen."
+        ),
     )
     status = models.CharField(max_length=20, default="scheduled")
     started_at = models.DateTimeField(null=True, blank=True)
@@ -459,11 +678,124 @@ class Meeting(models.Model):
         return self.title
 
 
+class MeetingShare(models.Model):
+    """
+    Grant another organization access to a meeting's results.
+
+    Access level is derived, never chosen:
+      * declared before the meeting first started and still active → FULL
+        (every stored row, keyed by the random per-meeting participant UUID)
+      * granted after the meeting started, or later revoked → AGGREGATE
+        (buckets and totals only)
+    """
+
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Active"
+        REVOKED = "revoked", "Revoked"
+
+    class Access(models.TextChoices):
+        FULL = "full", "Full data"
+        AGGREGATE = "aggregate", "Buckets and totals"
+
+    meeting = models.ForeignKey(Meeting, on_delete=models.CASCADE, related_name="shares")
+    organization = models.ForeignKey(
+        Organization, on_delete=models.CASCADE, related_name="meetings_shared_with_us"
+    )
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
+    declared_before_start = models.BooleanField(default=False)
+    created_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    revoked_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["meeting", "organization"], name="uniq_meeting_share_per_org"
+            )
+        ]
+        indexes = [models.Index(fields=["organization", "status"])]
+
+    @property
+    def effective_access(self) -> str:
+        if self.status == self.Status.ACTIVE and self.declared_before_start:
+            return self.Access.FULL
+        return self.Access.AGGREGATE
+
+    def __str__(self):
+        return f"meeting {self.meeting_id} → org {self.organization_id} [{self.status}]"
+
+
+class MeetingExpectedAttendance(models.Model):
+    """RSVP / expected attendance — separate from actual MeetingAttendance."""
+
+    class Status(models.TextChoices):
+        GOING = "going", "Going"
+        PENDING = "pending", "Pending"
+
+    meeting = models.ForeignKey(
+        Meeting, on_delete=models.CASCADE, related_name="expected_attendances"
+    )
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="meeting_expected_attendances"
+    )
+    status = models.CharField(max_length=20, choices=Status.choices)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["meeting", "user"],
+                name="unique_meeting_expected_attendance_per_user",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.meeting_id}:{self.user_id}:{self.status}"
+
+
+class MeetingSummary(models.Model):
+    """Meeting minutes / narrative summary with draft → publish lifecycle."""
+
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        SUBMITTED = "submitted", "Submitted"
+        PUBLISHED = "published", "Published"
+
+    meeting = models.ForeignKey(
+        Meeting, on_delete=models.CASCADE, related_name="summaries"
+    )
+    author = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    body = models.TextField()
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.DRAFT
+    )
+    is_organizer_authored = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    published_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-updated_at", "-id"]
+        verbose_name_plural = "Meeting summaries"
+
+    def __str__(self):
+        return f"{self.meeting_id}:{self.status}:{self.pk}"
+
+
 class MeetingSlide(models.Model):
     """Ordered slide in a meeting deck (info, questions, issue cards)."""
 
     class SlideType(models.TextChoices):
         PARTICIPANT_INFO = "participant_info", "Participant information"
+        CONTENT = "content", "Content (text / media)"
         STANDARD = "standard", "Standard question"
         ISSUE_CARD = "issue_card", "Issue card"
         POLITICAL_ISSUE_CARD = "political_issue_card", "Political issue card"
@@ -488,11 +820,32 @@ class MeetingSlide(models.Model):
     )
     choices = models.JSONField(default=list, blank=True)
     config = models.JSONField(default=dict, blank=True)
+    question_key = models.CharField(
+        max_length=40,
+        blank=True,
+        default="",
+        db_index=True,
+        help_text="Normalized hash of prompt/title; groups the same question across meetings.",
+    )
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ["order", "id"]
+
+    QUESTION_TYPES = ("standard", "issue_card", "political_issue_card")
+
+    @property
+    def is_question(self) -> bool:
+        return self.slide_type in self.QUESTION_TYPES
+
+    def save(self, *args, **kwargs):
+        from api.question_identity import question_key_for
+
+        self.question_key = (
+            question_key_for(self.prompt or self.title) if self.is_question else ""
+        )
+        super().save(*args, **kwargs)
 
     def __str__(self):
         label = self.title or self.prompt or self.slide_type
@@ -531,6 +884,11 @@ class MeetingSession(models.Model):
     )
     started_at = models.DateTimeField(null=True, blank=True)
     ended_at = models.DateTimeField(null=True, blank=True)
+    attendee_limit = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Snapshot of plan interactive-attendee cap when the session went live.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -673,6 +1031,120 @@ class MeetingResponseAI(models.Model):
     processed_at = models.DateTimeField(null=True, blank=True)
 
 
+class QuestionTag(models.Model):
+    """
+    Reporting tag for questions (meeting slides and survey questions).
+
+    ``organization`` NULL = shared catalog available to everyone; otherwise a
+    custom tag owned by one organization. Distinct from AI political
+    classification — tags are organizer-assigned metadata for reporting.
+    """
+
+    class Category(models.TextChoices):
+        PURPOSE = "purpose", "Purpose"
+        AUDIENCE = "audience", "Audience / context"
+        TOPIC = "topic", "Topic"
+        CUSTOM = "custom", "Custom"
+
+    organization = models.ForeignKey(
+        Organization,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="question_tags",
+    )
+    slug = models.SlugField(max_length=80)
+    label = models.CharField(max_length=120)
+    category = models.CharField(
+        max_length=20, choices=Category.choices, default=Category.CUSTOM
+    )
+    description = models.CharField(max_length=255, blank=True, default="")
+    is_active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["category", "label"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization", "slug"], name="uniq_question_tag_per_org_slug"
+            ),
+            models.UniqueConstraint(
+                fields=["slug"],
+                condition=models.Q(organization__isnull=True),
+                name="uniq_global_question_tag_slug",
+            ),
+        ]
+
+    def __str__(self):
+        scope = "global" if self.organization_id is None else f"org {self.organization_id}"
+        return f"{self.label} ({scope})"
+
+
+class QuestionTagLink(models.Model):
+    """
+    Tag ↔ question link within an organization.
+
+    Scope is by ``question_key`` (normalized question text), so the same
+    question asked in many meetings/surveys carries the tag everywhere —
+    past and future. When ``slide`` or ``survey_question`` is set, the link
+    applies to that single use only.
+    """
+
+    organization = models.ForeignKey(
+        Organization, on_delete=models.CASCADE, related_name="question_tag_links"
+    )
+    tag = models.ForeignKey(QuestionTag, on_delete=models.CASCADE, related_name="links")
+    question_key = models.CharField(max_length=40, db_index=True)
+    slide = models.ForeignKey(
+        MeetingSlide,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="tag_links",
+    )
+    survey_question = models.ForeignKey(
+        SurveyQuestion,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="tag_links",
+    )
+    created_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["organization", "question_key"]),
+            models.Index(fields=["organization", "tag"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["organization", "tag", "question_key"],
+                condition=models.Q(slide__isnull=True, survey_question__isnull=True),
+                name="uniq_tag_link_org_wide",
+            ),
+            models.UniqueConstraint(
+                fields=["tag", "slide"],
+                condition=models.Q(slide__isnull=False),
+                name="uniq_tag_link_slide",
+            ),
+            models.UniqueConstraint(
+                fields=["tag", "survey_question"],
+                condition=models.Q(survey_question__isnull=False),
+                name="uniq_tag_link_survey_question",
+            ),
+        ]
+
+    @property
+    def is_org_wide(self) -> bool:
+        return self.slide_id is None and self.survey_question_id is None
+
+
 class PoliticalClassification(models.Model):
     """One path in a political issue taxonomy — multiple rows per response allowed."""
 
@@ -724,24 +1196,71 @@ class PersonalBoard(models.Model):
     user = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name="personal_board"
     )
-    title = models.CharField(max_length=200, default="My board")
+    title = models.CharField(max_length=200, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.user.username}'s board"
 
 
+class WallPostType(models.TextChoices):
+    """Shared wall content types for personal and organization boards."""
+
+    POST = "post", "Post"
+    QUESTION = "question", "Question"
+    POLL = "poll", "Poll"
+    EVENT = "event", "Event"
+    MEETING = "meeting", "Meeting"
+
+
 class PersonalBoardPost(models.Model):
     board = models.ForeignKey(
         PersonalBoard, on_delete=models.CASCADE, related_name="posts"
     )
-    title = models.CharField(max_length=200)
-    body = models.TextField()
+    post_type = models.CharField(
+        max_length=20,
+        choices=WallPostType.choices,
+        default=WallPostType.POST,
+    )
+    title = models.CharField(max_length=200, blank=True, default="")
+    body = models.TextField(blank=True, default="")
+    event_starts_at = models.DateTimeField(null=True, blank=True)
+    event_ends_at = models.DateTimeField(null=True, blank=True)
+    event_location = models.CharField(max_length=255, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["-created_at"]
+
+
+class PersonalBoardPollOption(models.Model):
+    post = models.ForeignKey(
+        PersonalBoardPost, on_delete=models.CASCADE, related_name="poll_options"
+    )
+    text = models.CharField(max_length=200)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ["sort_order", "id"]
+
+
+class PersonalBoardPollVote(models.Model):
+    post = models.ForeignKey(
+        PersonalBoardPost, on_delete=models.CASCADE, related_name="poll_votes"
+    )
+    option = models.ForeignKey(
+        PersonalBoardPollOption, on_delete=models.CASCADE, related_name="votes"
+    )
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["post", "user"], name="unique_personal_poll_vote_per_user"
+            )
+        ]
 
 
 class OrganizationBoard(models.Model):
@@ -753,11 +1272,15 @@ class OrganizationBoard(models.Model):
     organization = models.OneToOneField(
         Organization, on_delete=models.CASCADE, related_name="board"
     )
-    title = models.CharField(max_length=200, default="Message board")
+    title = models.CharField(max_length=200, blank=True, default="")
     posting_mode = models.CharField(
         max_length=20,
         choices=PostingMode.choices,
         default=PostingMode.PUBLIC,
+    )
+    hub_preview_count = models.PositiveSmallIntegerField(
+        default=5,
+        help_text="How many newest board posts to show on the public organization hub (0 hides the preview).",
     )
 
     def __str__(self):
@@ -769,13 +1292,57 @@ class BoardPost(models.Model):
         OrganizationBoard, on_delete=models.CASCADE, related_name="posts"
     )
     author = models.ForeignKey(User, on_delete=models.CASCADE)
-    title = models.CharField(max_length=200)
-    body = models.TextField()
+    post_type = models.CharField(
+        max_length=20,
+        choices=WallPostType.choices,
+        default=WallPostType.POST,
+    )
+    title = models.CharField(max_length=200, blank=True, default="")
+    body = models.TextField(blank=True, default="")
+    event_starts_at = models.DateTimeField(null=True, blank=True)
+    event_ends_at = models.DateTimeField(null=True, blank=True)
+    event_location = models.CharField(max_length=255, blank=True, default="")
+    meeting = models.OneToOneField(
+        "Meeting",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="wall_post",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["-created_at"]
+
+
+class BoardPollOption(models.Model):
+    post = models.ForeignKey(
+        BoardPost, on_delete=models.CASCADE, related_name="poll_options"
+    )
+    text = models.CharField(max_length=200)
+    sort_order = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        ordering = ["sort_order", "id"]
+
+
+class BoardPollVote(models.Model):
+    post = models.ForeignKey(
+        BoardPost, on_delete=models.CASCADE, related_name="poll_votes"
+    )
+    option = models.ForeignKey(
+        BoardPollOption, on_delete=models.CASCADE, related_name="votes"
+    )
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["post", "user"], name="unique_board_poll_vote_per_user"
+            )
+        ]
 
 
 class BoardPostReply(models.Model):
@@ -1040,6 +1607,114 @@ class ContactSubmission(models.Model):
 
     def __str__(self):
         return f"{self.subject} — {self.email}"
+class OrganizationRelationship(models.Model):
+    """
+    Explicit, consent-based link between two organizations.
+
+    Direction for hierarchical kinds: ``from_organization`` is the upper party
+    (parent / licensor / sponsor); ``to_organization`` is the child / member /
+    sponsored org. ``partner`` is symmetric — either order.
+
+    Relationships never grant admin rights or data access by themselves.
+    ``Organization.parent_organization`` is kept in sync from accepted
+    ``parent_child`` rows for directory display.
+    """
+
+    class Kind(models.TextChoices):
+        PARENT_CHILD = "parent_child", "Parent / child"
+        UMBRELLA_MEMBER = "umbrella_member", "Umbrella license member"
+        PARTNER = "partner", "Partner"
+        SPONSOR = "sponsor", "Sponsor"
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        ACCEPTED = "accepted", "Accepted"
+        DECLINED = "declined", "Declined"
+        ENDED = "ended", "Ended"
+        EXPIRED = "expired", "Expired"
+
+    kind = models.CharField(max_length=32, choices=Kind.choices, db_index=True)
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.PENDING, db_index=True
+    )
+    from_organization = models.ForeignKey(
+        Organization, on_delete=models.CASCADE, related_name="relationships_from"
+    )
+    to_organization = models.ForeignKey(
+        Organization, on_delete=models.CASCADE, related_name="relationships_to"
+    )
+    initiated_by_organization = models.ForeignKey(
+        Organization,
+        on_delete=models.CASCADE,
+        related_name="relationships_initiated",
+        help_text="Which side sent the request; the other side must accept.",
+    )
+    requested_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    responded_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    ended_by_organization = models.ForeignKey(
+        Organization,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    conversation = models.ForeignKey(
+        "Conversation",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="relationships",
+    )
+    note = models.CharField(max_length=500, blank=True, default="")
+    public = models.BooleanField(
+        default=True, help_text="Show this relationship on public hubs / directory."
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+    responded_at = models.DateTimeField(null=True, blank=True)
+    ended_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(
+                fields=["from_organization", "kind", "status"],
+                name="api_orgrel_from_kind_status",
+            ),
+            models.Index(
+                fields=["to_organization", "kind", "status"],
+                name="api_orgrel_to_kind_status",
+            ),
+        ]
+        constraints = [
+            models.CheckConstraint(
+                condition=~models.Q(from_organization=models.F("to_organization")),
+                name="orgrel_no_self_relationship",
+            ),
+        ]
+
+    OPEN_STATUSES = (Status.PENDING, Status.ACCEPTED)
+
+    def __str__(self):
+        return (
+            f"{self.kind}:{self.from_organization_id}->{self.to_organization_id}"
+            f" [{self.status}]"
+        )
+
+    def counterpart_of(self, organization: "Organization") -> "Organization":
+        if organization.id == self.from_organization_id:
+            return self.to_organization
+        return self.from_organization
+
+    @property
+    def recipient_organization(self) -> "Organization":
+        return self.counterpart_of(self.initiated_by_organization)
+
+
 class OrganizationAuditEvent(models.Model):
     """Append-only audit trail for ownership, billing, and closure actions."""
 

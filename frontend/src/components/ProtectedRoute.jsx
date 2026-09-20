@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import api from "../api";
 import { REFRESH_TOKEN, ACCESS_TOKEN } from "../constants";
-import { clearAuth } from "../auth";
+import { clearAuth, ensureValidSession, setAuthTokens } from "../auth";
 
 function ProtectedRoute({ children, skipProfileCheck = false }) {
   const [isAuthorized, setIsAuthorized] = useState(null);
@@ -40,13 +40,22 @@ function ProtectedRoute({ children, skipProfileCheck = false }) {
       if (res.status !== 200) {
         throw new Error("refresh failed");
       }
-      localStorage.setItem(ACCESS_TOKEN, res.data.access);
+      setAuthTokens(res.data.access, refresh);
       if (!cancelled) {
         setIsAuthorized(true);
       }
     };
 
     const auth = async () => {
+      // Drop tokens issued for a different API (e.g. production vs local).
+      if (!ensureValidSession() && !localStorage.getItem(ACCESS_TOKEN)) {
+        if (!cancelled) {
+          setIsAuthorized(false);
+          setProfileComplete(true);
+        }
+        return;
+      }
+
       const token = localStorage.getItem(ACCESS_TOKEN);
       if (!token) {
         if (!cancelled) {

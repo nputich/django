@@ -5,10 +5,14 @@ import AppHeader from "../components/AppHeader";
 import MeetingSlideEditor, {
   emptyIssueSlide,
   emptyParticipantInfoSlide,
+  emptyContentSlide,
   emptyStandardSlide,
+  validateSlidesForSave,
   slideFromApi,
   slideToPayload,
 } from "../components/MeetingSlideEditor";
+import MeetingSharingFields from "../components/MeetingSharingFields";
+import ReuseQuestionsPanel from "../components/ReuseQuestionsPanel";
 import "../styles/Dashboard.css";
 
 function toDatetimeLocal(iso) {
@@ -19,52 +23,6 @@ function toDatetimeLocal(iso) {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
-function validateSlides(slides) {
-  for (let index = 0; index < slides.length; index += 1) {
-    const slide = slides[index];
-    const label = `Slide ${index + 1}`;
-
-    if (slide.slide_type === "standard") {
-      if (!slide.prompt.trim() && !slide.title.trim()) {
-        return `${label}: add a prompt or title.`;
-      }
-      if (
-        ["single_choice", "multi_choice"].includes(slide.question_format) &&
-        slide.choices.filter(Boolean).length < 2
-      ) {
-        return `${label}: choice questions need at least two options.`;
-      }
-    }
-
-    if (
-      slide.slide_type === "issue_card" ||
-      slide.slide_type === "political_issue_card"
-    ) {
-      if (!slide.prompt.trim() && !slide.title.trim()) {
-        return `${label}: add a prompt or title.`;
-      }
-    }
-
-    if (slide.slide_type === "participant_info") {
-      if (!slide.fields.length) {
-        return `${label}: add at least one participant question.`;
-      }
-      for (const field of slide.fields) {
-        if (!field.label.trim()) {
-          return `${label}: each participant question needs a label.`;
-        }
-        if (
-          ["single_select", "multi_select"].includes(field.field_type) &&
-          (field.options || []).filter(Boolean).length < 2
-        ) {
-          return `${label}: "${field.label}" needs at least two options.`;
-        }
-      }
-    }
-  }
-  return "";
-}
-
 export default function EditMeeting() {
   const { slug, id } = useParams();
   const navigate = useNavigate();
@@ -72,15 +30,23 @@ export default function EditMeeting() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [scheduledStartAt, setScheduledStartAt] = useState("");
+  const [scheduledEndAt, setScheduledEndAt] = useState("");
+  const [location, setLocation] = useState("");
   const [allowStartEarly, setAllowStartEarly] = useState(false);
   const [isAnonymous, setIsAnonymous] = useState(false);
+  const [allowSelfPaced, setAllowSelfPaced] = useState(false);
   const [aiMode, setAiMode] = useState("none");
+  const [resultsVisible, setResultsVisible] = useState(false);
+  const [minutesCreator, setMinutesCreator] = useState("organizer_only");
+  const [aggregateNotice, setAggregateNotice] = useState(true);
   const [slides, setSlides] = useState([]);
   const [expandedIndex, setExpandedIndex] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [submitting, setSubmitting] = useState(false);
+
+  const slideValidationError = validateSlidesForSave(slides, expandedIndex);
 
   useEffect(() => {
     let cancelled = false;
@@ -93,9 +59,15 @@ export default function EditMeeting() {
         setTitle(m.title || "");
         setDescription(m.description || "");
         setScheduledStartAt(toDatetimeLocal(m.scheduled_start_at));
+        setScheduledEndAt(toDatetimeLocal(m.scheduled_end_at));
+        setLocation(m.location || "");
         setAllowStartEarly(!!m.allow_start_early);
         setIsAnonymous(!!m.is_anonymous);
+        setAllowSelfPaced(!!m.allow_self_paced);
         setAiMode(m.ai_mode || "none");
+        setResultsVisible(!!m.results_visible_to_community);
+        setMinutesCreator(m.minutes_creator || "organizer_only");
+        setAggregateNotice(m.aggregate_sharing_notice !== false);
         const loadedSlides = (m.slides || [])
           .slice()
           .sort((a, b) => a.order - b.order)
@@ -122,6 +94,8 @@ export default function EditMeeting() {
     let nextSlide = emptyStandardSlide();
     if (slideType === "participant_info") {
       nextSlide = emptyParticipantInfoSlide();
+    } else if (slideType === "content") {
+      nextSlide = emptyContentSlide();
     } else if (slideType === "issue_card") {
       nextSlide = emptyIssueSlide("issue_card");
     } else if (slideType === "political_issue_card") {
@@ -132,6 +106,11 @@ export default function EditMeeting() {
       setExpandedIndex(next.length - 1);
       return next;
     });
+  };
+
+  const addReusedSlides = (reused) => {
+    setSlides((prev) => [...prev, ...reused]);
+    setExpandedIndex(null);
   };
 
   const removeSlide = (index) => {
@@ -155,7 +134,7 @@ export default function EditMeeting() {
       return;
     }
 
-    const slideError = validateSlides(slides);
+    const slideError = validateSlidesForSave(slides, expandedIndex);
     if (slideError) {
       setError(slideError);
       return;
@@ -166,12 +145,20 @@ export default function EditMeeting() {
       const res = await api.patch(`/api/organizations/${slug}/meetings/${id}/`, {
         title: title.trim(),
         description: description.trim(),
+        location: location.trim(),
         scheduled_start_at: scheduledStartAt
           ? new Date(scheduledStartAt).toISOString()
           : null,
+        scheduled_end_at: scheduledEndAt
+          ? new Date(scheduledEndAt).toISOString()
+          : null,
         allow_start_early: allowStartEarly,
         is_anonymous: isAnonymous,
+        allow_self_paced: allowSelfPaced,
         ai_mode: aiMode,
+        results_visible_to_community: resultsVisible,
+        minutes_creator: minutesCreator,
+        aggregate_sharing_notice: aggregateNotice,
         slides: slides.map((slide, index) => slideToPayload(slide, index + 1)),
       });
 
@@ -284,6 +271,74 @@ export default function EditMeeting() {
             />
           </div>
 
+          <div className="dashboard-field">
+            <label htmlFor="edit-meeting-end">Expected end (optional)</label>
+            <input
+              id="edit-meeting-end"
+              type="datetime-local"
+              value={scheduledEndAt}
+              onChange={(e) => setScheduledEndAt(e.target.value)}
+            />
+          </div>
+
+          <div className="dashboard-field">
+            <label htmlFor="edit-meeting-location">Location</label>
+            <input
+              id="edit-meeting-location"
+              value={location}
+              onChange={(e) => setLocation(e.target.value)}
+              placeholder="Central Library, or online link notes"
+            />
+          </div>
+
+          <div className="dashboard-field">
+            <fieldset className="dashboard-fieldset">
+              <legend>Results visibility</legend>
+              <p className="dashboard-meta">
+                Allow participants/community members to view meeting results after
+                the meeting
+              </p>
+              <div className="dashboard-switch-row">
+                <span>{resultsVisible ? "ON" : "OFF"}</span>
+                <label className="dashboard-switch">
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    checked={resultsVisible}
+                    onChange={(e) => setResultsVisible(e.target.checked)}
+                    aria-label="Allow participants to view meeting results after the meeting"
+                  />
+                  <span className="dashboard-switch-track" aria-hidden />
+                </label>
+              </div>
+            </fieldset>
+          </div>
+
+          <div className="dashboard-field">
+            <fieldset className="dashboard-fieldset">
+              <legend>Meeting minutes</legend>
+              <p className="dashboard-meta">Who may create the meeting minutes?</p>
+              <label className="dashboard-radio-row">
+                <input
+                  type="radio"
+                  name="edit-minutes-creator"
+                  checked={minutesCreator === "organizer_only"}
+                  onChange={() => setMinutesCreator("organizer_only")}
+                />{" "}
+                Organizer only
+              </label>
+              <label className="dashboard-radio-row">
+                <input
+                  type="radio"
+                  name="edit-minutes-creator"
+                  checked={minutesCreator === "organizer_or_attendees"}
+                  onChange={() => setMinutesCreator("organizer_or_attendees")}
+                />{" "}
+                Organizer or attendees
+              </label>
+            </fieldset>
+          </div>
+
           <div className="dashboard-field dashboard-field--row">
             <label>
               <input
@@ -306,6 +361,26 @@ export default function EditMeeting() {
             </label>
           </div>
 
+          <div className="dashboard-field dashboard-field--row">
+            <label>
+              <input
+                type="checkbox"
+                checked={allowSelfPaced}
+                onChange={(e) => setAllowSelfPaced(e.target.checked)}
+              />{" "}
+              Allow self-paced answers (participants do not wait for the organizer to
+              advance)
+            </label>
+          </div>
+
+          <MeetingSharingFields
+            orgSlug={slug}
+            meetingId={Number(id)}
+            isAnonymous={isAnonymous}
+            aggregateNotice={aggregateNotice}
+            onAggregateNoticeChange={setAggregateNotice}
+          />
+
           <div className="dashboard-field">
             <label htmlFor="edit-meeting-ai">AI mode</label>
             <select
@@ -324,6 +399,13 @@ export default function EditMeeting() {
               <div className="dashboard-section-header">
                 <h2>Slides ({slides.length})</h2>
                 <div className="dashboard-section-actions">
+                  <button
+                    type="button"
+                    className="dashboard-btn"
+                    onClick={() => addSlide("content")}
+                  >
+                    + Content
+                  </button>
                   <button
                     type="button"
                     className="dashboard-btn"
@@ -355,12 +437,18 @@ export default function EditMeeting() {
                 </div>
               </div>
 
+              <ReuseQuestionsPanel
+                orgSlug={slug}
+                excludeMeetingId={Number(id)}
+                onAdd={addReusedSlides}
+              />
+
               {slides.length === 0 ? (
                 <p className="dashboard-empty">No slides yet. Add one above.</p>
               ) : (
                 slides.map((slide, index) => (
                   <MeetingSlideEditor
-                    key={slide.id || `new-${index}`}
+                    key={slide.id || slide.clientId || `new-${index}`}
                     slide={slide}
                     order={index + 1}
                     expanded={expandedIndex === index}
@@ -369,7 +457,9 @@ export default function EditMeeting() {
                     }
                     onChange={(nextSlide) => updateSlide(index, nextSlide)}
                     onDelete={() => removeSlide(index)}
-                    canDelete={slides.length > 1}
+                    canDelete={slides.length > 1 && !slide.is_disclosure}
+                    orgSlug={slug}
+                    meetingId={Number(id)}
                   />
                 ))
               )}
@@ -409,12 +499,17 @@ export default function EditMeeting() {
             </div>
           )}
 
+          {slideValidationError && !isLive && (
+            <p className="dashboard-error">{slideValidationError}</p>
+          )}
+
           {error && <p className="dashboard-error">{error}</p>}
 
           <button
             type="submit"
             className="dashboard-btn dashboard-btn--primary"
-            disabled={submitting || isLive}
+            disabled={submitting || isLive || !!slideValidationError}
+            title={slideValidationError || undefined}
           >
             {submitting ? "Saving..." : "Save changes"}
           </button>

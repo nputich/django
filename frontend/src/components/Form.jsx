@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import api from "../api";
-import { ACCESS_TOKEN, REFRESH_TOKEN } from "../constants";
+import { setAuthTokens } from "../auth";
 import "../styles/Form.css";
 import LoadingIndicator from "./LoadingIndicator";
 
@@ -26,8 +26,7 @@ function Form({ route, method, compact = false, header = false, hideFooter = fal
                 return "/dashboard";
             };
             if (method === "login") {
-                localStorage.setItem(ACCESS_TOKEN, res.data.access);
-                localStorage.setItem(REFRESH_TOKEN, res.data.refresh);
+                setAuthTokens(res.data.access, res.data.refresh);
                 const next = redirectTo();
                 window.location.href = next.startsWith("/") ? next : "/dashboard";
             } else {
@@ -36,13 +35,32 @@ function Form({ route, method, compact = false, header = false, hideFooter = fal
                     username,
                     password,
                 });
-                localStorage.setItem(ACCESS_TOKEN, tokenRes.data.access);
-                localStorage.setItem(REFRESH_TOKEN, tokenRes.data.refresh);
+                setAuthTokens(tokenRes.data.access, tokenRes.data.refresh);
                 const next = redirectTo();
                 window.location.href = next.startsWith("/") ? next : "/dashboard";
             }
         } catch (error) {
-            alert(error);
+            const status = error.response?.status;
+            const detail =
+                error.response?.data?.detail ||
+                error.response?.data?.non_field_errors?.[0];
+            if (status === 401) {
+                alert(
+                    typeof detail === "string"
+                        ? detail
+                        : "Invalid username or password."
+                );
+            } else if (!error.response) {
+                alert(
+                    "Could not reach the server. Is the local backend running on port 8001?"
+                );
+            } else {
+                alert(
+                    typeof detail === "string"
+                        ? detail
+                        : `Login failed (${status}). Please try again.`
+                );
+            }
         } finally {
             setLoading(false);
         }

@@ -10,7 +10,7 @@ function Login() {
   return (
     <MarketingLayout mainClassName="landing-main landing-main--home">
       <section className="landing-hero">
-        <SiteLogo />
+        <SiteLogo withTagline />
       </section>
       <CodeLookup />
     </MarketingLayout>

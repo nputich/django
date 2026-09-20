@@ -1,8 +1,11 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import api from "../api";
+import PostingBoard from "../components/PostingBoard";
 import "../styles/Landing.css";
 import "../styles/CodeResults.css";
+import "../styles/Board.css";
+import "../styles/Relationships.css";
 
 export default function OrgHubPage() {
   const { slug } = useParams();
@@ -26,6 +29,24 @@ export default function OrgHubPage() {
   }
 
   if (!org) return <div className="resource-page">Loading...</div>;
+
+  const board = org.board;
+  const showBoardPreview =
+    org.has_board !== false &&
+    board &&
+    board.can_view !== false &&
+    (board.hub_preview_count ?? 0) > 0;
+  const rel = {
+    parent: org.relationships?.parent || null,
+    chapters: org.relationships?.chapters || [],
+    partners: org.relationships?.partners || [],
+    sponsors: org.relationships?.sponsors || [],
+  };
+  const hasRelationships =
+    Boolean(rel.parent) ||
+    rel.chapters.length > 0 ||
+    rel.partners.length > 0 ||
+    rel.sponsors.length > 0;
 
   return (
     <div className="resource-page">
@@ -72,10 +93,72 @@ export default function OrgHubPage() {
         )}
       </section>
 
-      {org.has_board !== false && (
+      {showBoardPreview && (
+        <section className="hub-section hub-board-preview">
+          <PostingBoard
+            title={board.title || org.name}
+            posts={board.posts || []}
+            canPost={false}
+            canReply={false}
+            emptyMessage="No posts on this board yet."
+          />
+          <p className="hub-board-more">
+            <Link to={`/org/${org.slug}/board`}>View full board</Link>
+          </p>
+        </section>
+      )}
+
+      {org.has_board !== false && board && board.can_view === false && (
         <section className="hub-section">
-          <h2>Posting board</h2>
-          <Link to={`/org/${org.slug}/board`}>View posting board</Link>
+          <h2>{board.title || "Posting board"}</h2>
+          <p>This board is for organization members only.</p>
+        </section>
+      )}
+
+      {hasRelationships && (
+        <section className="hub-section">
+          <h2>Affiliations</h2>
+          <ul className="hub-list hub-affiliations">
+            {rel.parent && (
+              <li>
+                <span className="resource-meta">Part of</span>{" "}
+                <Link to={`/org/${rel.parent.slug}`}>{rel.parent.name}</Link>
+              </li>
+            )}
+            {rel.chapters.length > 0 && (
+              <li>
+                <span className="resource-meta">Chapters &amp; members</span>{" "}
+                {rel.chapters.map((o, i) => (
+                  <span key={o.slug}>
+                    {i > 0 && ", "}
+                    <Link to={`/org/${o.slug}`}>{o.name}</Link>
+                  </span>
+                ))}
+              </li>
+            )}
+            {rel.partners.length > 0 && (
+              <li>
+                <span className="resource-meta">Partners</span>{" "}
+                {rel.partners.map((o, i) => (
+                  <span key={o.slug}>
+                    {i > 0 && ", "}
+                    <Link to={`/org/${o.slug}`}>{o.name}</Link>
+                  </span>
+                ))}
+              </li>
+            )}
+            {rel.sponsors.length > 0 && (
+              <li>
+                <span className="resource-meta">Sponsored by</span>{" "}
+                {rel.sponsors.map((o, i) => (
+                  <span key={o.slug}>
+                    {i > 0 && ", "}
+                    <Link to={`/org/${o.slug}`}>{o.name}</Link>
+                  </span>
+                ))}
+              </li>
+            )}
+          </ul>
         </section>
       )}
 

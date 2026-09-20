@@ -432,9 +432,16 @@ def process_slide_responses_ai(
 def process_meeting_ai(meeting: Meeting, session_id: str | None = None) -> dict[str, Any]:
     from api.meeting_export import get_sessions_for_export
     from api.political_issue_classifier import classify_political_slide_responses
+    from api.usage_service import CapacityDenied, reserve_ai_meeting_run
 
     if not ai_mode_enabled(meeting):
         return {"processed": 0, "skipped": 0, "reason": "ai_disabled"}
+
+    try:
+        if not reserve_ai_meeting_run(meeting):
+            return {"processed": 0, "skipped": 0, "reason": "ai_disabled"}
+    except CapacityDenied:
+        return {"processed": 0, "skipped": 0, "reason": "ai_quota_reached"}
 
     total_processed = 0
     total_skipped = 0
@@ -482,11 +489,18 @@ def schedule_response_ai_processing(response: MeetingResponse) -> None:
     """Run after DB commit so participants are not blocked on AI latency."""
     from django.db import transaction
 
+    from api.usage_service import CapacityDenied, reserve_ai_meeting_run
+
     if not ai_mode_enabled(response.meeting):
         return
     if (
         response.slide
         and response.slide.slide_type == MeetingSlide.SlideType.POLITICAL_ISSUE_CARD
     ):
+        return
+    try:
+        if not reserve_ai_meeting_run(response.meeting):
+            return
+    except CapacityDenied:
         return
     transaction.on_commit(lambda: process_meeting_response_by_id(response.id))

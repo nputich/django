@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import api from "../api";
 import AppHeader from "../components/AppHeader";
 import DashboardCollapsibleSection from "../components/DashboardCollapsibleSection";
+import OrgDashboardSettingsMenu from "../components/OrgDashboardSettingsMenu";
 import PostingBoard from "../components/PostingBoard";
 import UpgradeRequiredModal from "../components/UpgradeRequiredModal";
 import "../styles/Dashboard.css";
@@ -26,10 +27,6 @@ export default function OrgDashboard() {
   const [loading, setLoading] = useState(true);
   const [boardLoading, setBoardLoading] = useState(true);
   const [startingId, setStartingId] = useState(null);
-  const [boardTitle, setBoardTitle] = useState("");
-  const [boardMode, setBoardMode] = useState("public");
-  const [boardSaving, setBoardSaving] = useState(false);
-  const [boardMessage, setBoardMessage] = useState("");
   const [upgradeModal, setUpgradeModal] = useState(null);
 
   const caps = org?.capabilities || {};
@@ -49,10 +46,6 @@ export default function OrgDashboard() {
       .get(`/api/organizations/${slug}/dashboard/`)
       .then((res) => {
         setOrg(res.data);
-        if (res.data.board) {
-          setBoardTitle(res.data.board.title || "");
-          setBoardMode(res.data.board.posting_mode || "public");
-        }
       })
       .catch((err) => {
         setError(
@@ -90,32 +83,13 @@ export default function OrgDashboard() {
         openUpgrade(
           "Start Meeting",
           err.response.data.detail ||
-            "Starting meetings requires CommuniB Basic or higher."
+            "Starting meetings requires communiBetter Starter or higher."
         );
       } else {
         setError(err.response?.data?.detail || "Could not start meeting.");
       }
     } finally {
       setStartingId(null);
-    }
-  };
-
-  const handleSaveBoardSettings = async (e) => {
-    e.preventDefault();
-    setBoardSaving(true);
-    setBoardMessage("");
-    try {
-      await api.patch(`/api/organizations/${slug}/board/settings/`, {
-        title: boardTitle,
-        posting_mode: boardMode,
-      });
-      setBoardMessage("Board settings saved.");
-      await loadDashboard();
-      await loadBoard();
-    } catch (err) {
-      setError(err.response?.data?.detail || "Could not save board settings.");
-    } finally {
-      setBoardSaving(false);
     }
   };
 
@@ -140,6 +114,18 @@ export default function OrgDashboard() {
     await api.delete(
       `/api/organizations/${slug}/board/posts/${postId}/replies/${replyId}/`
     );
+    await loadBoard();
+  };
+
+  const handleVotePoll = async (postId, optionId) => {
+    await api.post(`/api/organizations/${slug}/board/posts/${postId}/vote/`, {
+      option_id: optionId,
+    });
+    await loadBoard();
+  };
+
+  const handleMeetingRsvp = async (meetingId, status) => {
+    await api.post(`/api/meetings/${meetingId}/rsvp/`, { status: status || "" });
     await loadBoard();
   };
 
@@ -177,6 +163,39 @@ export default function OrgDashboard() {
                     </button>
                   </div>
                 </div>
+              )}
+              {org.usage && (
+                <section className="dashboard-usage" aria-label="Plan usage this period">
+                  <p className="org-community-code-label">Usage this billing period</p>
+                  <ul className="dashboard-usage-list">
+                    <li>
+                      Meetings started:{" "}
+                      {org.usage.meetings_started?.limit == null
+                        ? `${org.usage.meetings_started?.used ?? 0} used`
+                        : `${org.usage.meetings_started?.used ?? 0} of ${org.usage.meetings_started.limit}`}
+                    </li>
+                    <li>
+                      Survey responses:{" "}
+                      {org.usage.survey_submissions?.limit == null
+                        ? `${org.usage.survey_submissions?.used ?? 0} used`
+                        : `${org.usage.survey_submissions?.used ?? 0} of ${Number(
+                            org.usage.survey_submissions.limit
+                          ).toLocaleString()}`}
+                    </li>
+                    <li>
+                      AI meeting runs:{" "}
+                      {org.usage.ai_meeting_runs?.limit == null
+                        ? `${org.usage.ai_meeting_runs?.used ?? 0} used`
+                        : `${org.usage.ai_meeting_runs?.used ?? 0} of ${org.usage.ai_meeting_runs.limit}`}
+                    </li>
+                    <li>
+                      Interactive attendees per meeting:{" "}
+                      {org.usage.attendee_limit == null
+                        ? "Unlimited*"
+                        : org.usage.attendee_limit.toLocaleString()}
+                    </li>
+                  </ul>
+                </section>
               )}
               {org.directory_placement && (
                 <div className="org-directory-block">
@@ -222,6 +241,18 @@ export default function OrgDashboard() {
               >
                 Messages
               </Link>
+              <Link
+                to={`/dashboard/${slug}/reports`}
+                className="dashboard-btn"
+              >
+                Reports
+              </Link>
+              <Link
+                to={`/dashboard/${slug}/shared-with-us`}
+                className="dashboard-btn"
+              >
+                Shared with us
+              </Link>
               <Link to={billingPath} className="dashboard-btn">
                 Billing &amp; Service
               </Link>
@@ -239,6 +270,7 @@ export default function OrgDashboard() {
               >
                 View public hub
               </Link>
+              <OrgDashboardSettingsMenu slug={slug} />
             </div>
 
             {org.lifecycle?.status === "closure_pending" && (
@@ -275,48 +307,15 @@ export default function OrgDashboard() {
               </div>
             )}
 
-            <DashboardCollapsibleSection id="org-board" title="Posting board" defaultOpen>
-              <p className="dashboard-meta">
-                Control who can post on your organization&apos;s public board.
-              </p>
-              <form className="dashboard-form" onSubmit={handleSaveBoardSettings}>
-                <div className="dashboard-field">
-                  <label htmlFor="board-title">Board title</label>
-                  <input
-                    id="board-title"
-                    value={boardTitle}
-                    onChange={(e) => setBoardTitle(e.target.value)}
-                  />
-                </div>
-                <div className="dashboard-field">
-                  <label htmlFor="board-mode">Who can post</label>
-                  <select
-                    id="board-mode"
-                    value={boardMode}
-                    onChange={(e) => setBoardMode(e.target.value)}
-                  >
-                    <option value="public">Everyone (logged in)</option>
-                    <option value="members_only">Members only</option>
-                    <option value="restricted">Restricted (admins only)</option>
-                  </select>
-                </div>
-                {boardMessage && (
-                  <p className="dashboard-success" style={{ margin: 0 }}>
-                    {boardMessage}
-                  </p>
-                )}
-                <button
-                  type="submit"
-                  className="dashboard-btn dashboard-btn--primary"
-                  disabled={boardSaving}
-                >
-                  {boardSaving ? "Saving..." : "Save board settings"}
-                </button>
-              </form>
-              {boardLoading && <p className="dashboard-empty">Loading board...</p>}
-              {boardData && (
+            {boardLoading && <p className="dashboard-empty">Loading board...</p>}
+            {boardData && (
+              <div className="dashboard-card">
                 <PostingBoard
-                  title={boardData.board?.title || `${boardData.organization_name} board`}
+                  title={
+                    (boardData.board?.title || "").trim() ||
+                    boardData.organization_name ||
+                    "Community wall"
+                  }
                   postingMode={boardData.board?.posting_mode}
                   postingModeLabel={boardData.board?.posting_mode_label}
                   posts={boardData.posts}
@@ -325,15 +324,29 @@ export default function OrgDashboard() {
                   readOnlyMessage={
                     boardData.can_post
                       ? ""
-                      : readOnlyMessage(boardData.board?.posting_mode, boardData.is_admin)
+                      : readOnlyMessage(
+                          boardData.board?.posting_mode,
+                          boardData.is_admin
+                        )
                   }
-                  onCreatePost={boardData.can_post ? handleCreatePost : undefined}
-                  onCreateReply={boardData.can_reply ? handleCreateReply : undefined}
+                  onCreatePost={
+                    boardData.can_post ? handleCreatePost : undefined
+                  }
+                  onCreateReply={
+                    boardData.can_reply ? handleCreateReply : undefined
+                  }
                   onDeletePost={handleDeletePost}
                   onDeleteReply={handleDeleteReply}
+                  onVotePoll={
+                    boardData.can_reply || boardData.can_post
+                      ? handleVotePoll
+                      : undefined
+                  }
+                  onMeetingRsvp={handleMeetingRsvp}
+                  emptyMessage="This organization board is empty. Share an update with your community."
                 />
-              )}
-            </DashboardCollapsibleSection>
+              </div>
+            )}
 
             <DashboardCollapsibleSection id="org-surveys" title="Surveys" defaultOpen>
               {org.surveys.length === 0 ? (
@@ -376,17 +389,17 @@ export default function OrgDashboard() {
                   <button
                     type="button"
                     className="dashboard-btn dashboard-btn--locked"
-                    aria-label="Create new survey requires Basic or higher"
+                    aria-label="Create new survey requires Starter or higher"
                     onClick={() =>
                       openUpgrade(
                         "Create a New Survey",
-                        "New surveys require CommuniB Basic or higher. You can continue viewing your previous surveys and results."
+                        "New surveys require communiBetter Starter or higher. You can continue viewing your previous surveys and results."
                       )
                     }
                   >
                     🔒 Create new survey
                   </button>
-                  <p className="dashboard-lock-hint">Requires Basic or higher</p>
+                  <p className="dashboard-lock-hint">Requires Starter or higher</p>
                 </div>
               )}
             </DashboardCollapsibleSection>
@@ -431,18 +444,18 @@ export default function OrgDashboard() {
                               <button
                                 type="button"
                                 className="dashboard-btn dashboard-btn--locked"
-                                aria-label="Start meeting requires Basic or higher"
+                                aria-label="Start meeting requires Starter or higher"
                                 onClick={() =>
                                   openUpgrade(
                                     "Start Meeting",
-                                    "Starting meetings requires CommuniB Basic or higher. You can still view previous meeting results."
+                                    "Starting meetings requires communiBetter Starter or higher. You can still view previous meeting results."
                                   )
                                 }
                               >
                                 🔒 Start meeting
                               </button>
                               <p className="dashboard-lock-hint">
-                                Requires Basic or higher
+                                Requires Starter or higher
                               </p>
                             </div>
                           ))}
@@ -471,17 +484,17 @@ export default function OrgDashboard() {
                   <button
                     type="button"
                     className="dashboard-btn dashboard-btn--locked"
-                    aria-label="Create new meeting requires Basic or higher"
+                    aria-label="Create new meeting requires Starter or higher"
                     onClick={() =>
                       openUpgrade(
                         "Create a New Meeting",
-                        "New meetings require CommuniB Basic or higher. Your previous meetings, responses, and reports remain available."
+                        "New meetings require communiBetter Starter or higher. Your previous meetings, responses, and reports remain available."
                       )
                     }
                   >
                     🔒 Create new meeting
                   </button>
-                  <p className="dashboard-lock-hint">Requires Basic or higher</p>
+                  <p className="dashboard-lock-hint">Requires Starter or higher</p>
                 </div>
               )}
             </DashboardCollapsibleSection>

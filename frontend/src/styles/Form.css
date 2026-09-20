@@ -45,7 +45,7 @@
 .form-input:focus {
   outline: none;
   border-color: var(--cb-orange);
-  box-shadow: 0 0 0 3px rgba(245, 166, 35, 0.2);
+  box-shadow: 0 0 0 3px rgba(39, 102, 144, 0.2);
 }
 
 .form-button {
