@@ -4,6 +4,7 @@ import api from "../api";
 import AppHeader from "../components/AppHeader";
 import HostResultsPanel from "../components/HostResultsPanel";
 import UpgradeRequiredModal from "../components/UpgradeRequiredModal";
+import MeetingFlyerButton from "../components/MeetingFlyerButton";
 import "../styles/Dashboard.css";
 
 function emptyStandardSlide(order) {
@@ -261,9 +262,17 @@ export default function MeetingHostPage() {
             Session #{live.session.session_number} · {sessionStatus} ·{" "}
             {live.session.attendance_count} in room
           </p>
-          <Link to={`/m/${meetingId}`} target="_blank" rel="noopener noreferrer">
-            Open participant view
-          </Link>
+          <div className="dashboard-actions" style={{ marginTop: "0.75rem" }}>
+            <MeetingFlyerButton meetingId={meetingId} />
+            <Link
+              to={`/m/${meetingId}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="dashboard-btn"
+            >
+              Open participant view
+            </Link>
+          </div>
         </div>
 
         {actionError && <p className="dashboard-error">{actionError}</p>}

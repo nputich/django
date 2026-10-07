@@ -43,17 +43,34 @@ def get_organization_mailbox(organization: Organization) -> Mailbox:
 
 
 def mailbox_label(mailbox: Mailbox) -> dict:
+    from api.control_numbers import (
+        ensure_org_control_number,
+        ensure_user_control_number,
+        format_org_control_number,
+        format_user_control_number,
+    )
+
     if mailbox.kind == Mailbox.Kind.ORGANIZATION and mailbox.organization_id:
         org = mailbox.organization
+        n = ensure_org_control_number(org)
+        handle = (org.public_username or "").strip() or None
         return {
             "id": mailbox.id,
             "kind": mailbox.kind,
             "display_name": org.name,
-            "username": None,
+            "username": handle,
             "organization_slug": org.slug,
+            "public_username": handle,
+            "control_number": n,
+            "communibetter_id": format_org_control_number(n),
         }
     user = mailbox.user
     profile = getattr(user, "profile", None) if user else None
+    if user and profile is None:
+        from api.models import UserProfile
+
+        profile, _ = UserProfile.objects.get_or_create(user=user)
+    n = ensure_user_control_number(profile) if profile else None
     return {
         "id": mailbox.id,
         "kind": mailbox.kind,
@@ -61,6 +78,9 @@ def mailbox_label(mailbox: Mailbox) -> dict:
         or (user.username if user else "Unknown"),
         "username": user.username if user else None,
         "organization_slug": None,
+        "public_username": None,
+        "control_number": n,
+        "communibetter_id": format_user_control_number(n),
     }
 
 
@@ -69,19 +89,50 @@ def resolve_recipient_mailbox(
     to_username: str | None = None,
     to_organization_slug: str | None = None,
 ) -> Mailbox:
-    username = (to_username or "").strip()
-    org_slug = (to_organization_slug or "").strip()
+    from api.control_numbers import parse_control_code
+
+    username = (to_username or "").strip().lstrip("@")
+    org_slug = (to_organization_slug or "").strip().lstrip("@")
     if bool(username) == bool(org_slug):
         raise ValidationError(
             "Provide exactly one of to_username or to_organization_slug."
         )
     if username:
+        kind, number = parse_control_code(username)
+        if number is not None and kind in (None, "user"):
+            from api.models import UserProfile
+
+            profile = (
+                UserProfile.objects.select_related("user")
+                .filter(control_number=number)
+                .first()
+            )
+            if profile and profile.user_id:
+                return get_personal_mailbox(profile.user)
+            if kind == "user":
+                raise ValidationError("No user found with that CommuniBetter ID.")
+        if kind == "org":
+            org = Organization.objects.filter(control_number=number).first()
+            if not org:
+                raise ValidationError("No organization found with that CommuniBetter ID.")
+            return get_organization_mailbox(org)
         try:
             user = User.objects.get(username__iexact=username)
-        except User.DoesNotExist as exc:
-            raise ValidationError("No user found with that username.") from exc
-        return get_personal_mailbox(user)
-    org = Organization.objects.filter(slug=org_slug, is_active=True).first()
+            return get_personal_mailbox(user)
+        except User.DoesNotExist:
+            pass
+        org = Organization.objects.filter(
+            public_username__iexact=username, is_active=True
+        ).first()
+        if org:
+            return get_organization_mailbox(org)
+        raise ValidationError("No user or organization found with that shortcode.")
+    org = (
+        Organization.objects.filter(slug=org_slug, is_active=True).first()
+        or Organization.objects.filter(
+            public_username__iexact=org_slug, is_active=True
+        ).first()
+    )
     if not org:
         raise ValidationError("Organization not found.")
     return get_organization_mailbox(org)
@@ -166,7 +217,7 @@ def promote_organization_unknown_to_primary(mailbox: Mailbox) -> int:
     ).update(folder=ConversationParticipant.Folder.PRIMARY)
 
 
-def list_conversations_for_mailbox(mailbox: Mailbox, *, folder: str):
+def list_conversations_for_mailbox(mailbox: Mailbox, *, folder: str, q: str = ""):
     if mailbox.kind == Mailbox.Kind.ORGANIZATION:
         promote_organization_unknown_to_primary(mailbox)
     folder = (folder or ConversationParticipant.Folder.PRIMARY).strip().lower()
@@ -204,14 +255,41 @@ def list_conversations_for_mailbox(mailbox: Mailbox, *, folder: str):
         )
         .order_by("-conversation__updated_at")
     )
-    if not blocked_ids:
-        return qs
+    if blocked_ids:
+        # Hide threads that include a blocked counterparty.
+        hidden_conversation_ids = ConversationParticipant.objects.filter(
+            mailbox_id__in=blocked_ids
+        ).values_list("conversation_id", flat=True)
+        qs = qs.exclude(conversation_id__in=hidden_conversation_ids)
 
-    # Hide threads that include a blocked counterparty (ban = they cannot see you / you don't see them).
-    hidden_conversation_ids = ConversationParticipant.objects.filter(
-        mailbox_id__in=blocked_ids
-    ).values_list("conversation_id", flat=True)
-    return qs.exclude(conversation_id__in=hidden_conversation_ids)
+    query = (q or "").strip()
+    if query:
+        from api.control_numbers import parse_control_code
+
+        kind, number = parse_control_code(query)
+        counterparty_q = Q(
+            conversation__participants__mailbox__user__username__icontains=query
+        ) | Q(
+            conversation__participants__mailbox__user__profile__display_name__icontains=query
+        ) | Q(
+            conversation__participants__mailbox__organization__name__icontains=query
+        ) | Q(
+            conversation__participants__mailbox__organization__slug__icontains=query
+        ) | Q(
+            conversation__participants__mailbox__organization__public_username__icontains=query
+        ) | Q(conversation__subject__icontains=query)
+        if number is not None:
+            if kind in (None, "user"):
+                counterparty_q |= Q(
+                    conversation__participants__mailbox__user__profile__control_number=number
+                )
+            if kind in (None, "org"):
+                counterparty_q |= Q(
+                    conversation__participants__mailbox__organization__control_number=number
+                )
+        qs = qs.filter(counterparty_q).distinct()
+
+    return qs
 
 
 def serialize_conversation_list_item(link: ConversationParticipant, mailbox: Mailbox) -> dict:

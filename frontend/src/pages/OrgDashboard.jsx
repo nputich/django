@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import api from "../api";
 import AppHeader from "../components/AppHeader";
 import DashboardCollapsibleSection from "../components/DashboardCollapsibleSection";
+import MeetingFlyerButton from "../components/MeetingFlyerButton";
 import OrgDashboardSettingsMenu from "../components/OrgDashboardSettingsMenu";
 import PostingBoard from "../components/PostingBoard";
 import UpgradeRequiredModal from "../components/UpgradeRequiredModal";
@@ -72,6 +73,19 @@ export default function OrgDashboard() {
     loadDashboard();
     loadBoard();
   }, [loadDashboard, loadBoard]);
+
+  // Org wall composer uses organization profile only (not personal avatar).
+  const orgWallIdentity =
+    boardData?.wall_identity || org?.wall_identity || null;
+  const composerAvatar = orgWallIdentity
+    ? {
+        profile_picture_url: orgWallIdentity.profile_picture_url || null,
+        display_name: orgWallIdentity.profile_picture_url
+          ? orgWallIdentity.name || orgWallIdentity.display_name || ""
+          : "",
+        username: orgWallIdentity.public_username || "",
+      }
+    : null;
 
   const handleStartMeeting = async (meetingId) => {
     setStartingId(meetingId);
@@ -235,6 +249,14 @@ export default function OrgDashboard() {
             </div>
 
             <div className="dashboard-actions">
+              {(org?.discovery_enabled || caps.discovery_map) && (
+                <Link
+                  to={`/dashboard/${slug}/map-search`}
+                  className="dashboard-btn dashboard-btn--primary"
+                >
+                  Map Search
+                </Link>
+              )}
               <Link
                 to={`/dashboard/${slug}/inbox`}
                 className="dashboard-btn"
@@ -252,6 +274,12 @@ export default function OrgDashboard() {
                 className="dashboard-btn"
               >
                 Documents
+              </Link>
+              <Link
+                to={`/dashboard/${slug}/board-settings`}
+                className="dashboard-btn"
+              >
+                Board settings
               </Link>
               <Link
                 to={`/dashboard/${slug}/shared-with-us`}
@@ -313,6 +341,24 @@ export default function OrgDashboard() {
               </div>
             )}
 
+            {boardData?.is_admin &&
+              orgWallIdentity &&
+              !orgWallIdentity.has_wall_identity && (
+                <div className="dashboard-card dashboard-upgrade-nudge">
+                  <p>
+                    Add an organization profile picture and @username under{" "}
+                    {org?.name || "this organization"} in Account settings so
+                    the wall doesn&apos;t show a placeholder.
+                  </p>
+                  <Link
+                    to={`/account#org-account-${slug}`}
+                    className="dashboard-btn dashboard-btn--primary"
+                  >
+                    Account settings
+                  </Link>
+                </div>
+              )}
+
             {boardLoading && <p className="dashboard-empty">Loading board...</p>}
             {boardData && (
               <div className="dashboard-card">
@@ -353,6 +399,7 @@ export default function OrgDashboard() {
                       : undefined
                   }
                   onMeetingRsvp={handleMeetingRsvp}
+                  composerAvatar={composerAvatar}
                   emptyMessage="This organization board is empty. Share an update with your community."
                 />
               </div>
@@ -436,6 +483,11 @@ export default function OrgDashboard() {
                             View results / host
                           </Link>
                         </p>
+                        <MeetingFlyerButton
+                          meetingId={meeting.id}
+                          className="dashboard-btn"
+                          label="Print / share flyer"
+                        />
                         {meeting.status === "scheduled" &&
                           (canStartMeetings ? (
                             <button

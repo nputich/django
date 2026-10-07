@@ -119,6 +119,35 @@ class Organization(models.Model):
 
     name = models.CharField(max_length=200)
     slug = models.SlugField(unique=True)
+    # Stable CommuniBetter ID (O-); separate sequence from users. Never changes.
+    control_number = models.BigIntegerField(
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True,
+        editable=False,
+        help_text="Stable CommuniBetter organization ID (displayed as O-<n>).",
+    )
+    # Public wall identity (optional until admins set them).
+    public_username = models.SlugField(
+        max_length=50,
+        blank=True,
+        default="",
+        help_text="CommuniBetter org shortcode (@handle) used for search/lookup.",
+    )
+    profile_picture = models.ImageField(
+        upload_to="org_profiles/", blank=True, null=True
+    )
+    # Organization account contact (Account settings; optional until set).
+    first_name = models.CharField(max_length=100, blank=True, default="")
+    last_name = models.CharField(max_length=100, blank=True, default="")
+    city = models.CharField(max_length=100, blank=True, default="")
+    state = models.CharField(max_length=100, blank=True, default="")
+    zip_code = models.CharField(max_length=20, blank=True, default="")
+    phone = models.CharField(max_length=30, blank=True, default="")
+    contact_email = models.EmailField(blank=True, default="")
+    # Per-field visibility for org account fields.
+    field_visibility = models.JSONField(default=dict, blank=True)
     description = models.TextField(blank=True)
     is_active = models.BooleanField(
         default=True,
@@ -196,6 +225,17 @@ class Organization(models.Model):
 
     search_aliases = models.JSONField(default=list, blank=True)
 
+    # Map Search / member discovery (first-party; not a widget store).
+    discovery_enabled = models.BooleanField(
+        default=False,
+        help_text="When True, members can use Map Search for this organization.",
+    )
+    discovery_fields = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Org-defined discovery schema: [{key,label,type,required,searchable,options?}].",
+    )
+
     def __str__(self):
         return self.name
 
@@ -231,12 +271,63 @@ class OrganizationMembership(models.Model):
         User, on_delete=models.CASCADE, related_name="org_memberships"
     )
     role = models.CharField(max_length=20, choices=Role.choices, default=Role.MEMBER)
+    # Values shared with this organization (may differ from personal profile).
+    shared_profile = models.JSONField(default=dict, blank=True)
+    # Per-field visibility for values shared with this organization.
+    field_visibility = models.JSONField(default=dict, blank=True)
+    # List this membership on the member's public profile (default off).
+    show_on_profile = models.BooleanField(
+        default=False,
+        help_text="Show this membership on the member's public profile.",
+    )
+    # Map Search listing (populated after discovery profile + YouTube verify).
+    discovery_lat = models.FloatField(null=True, blank=True)
+    discovery_lng = models.FloatField(null=True, blank=True)
+    discovery_listed = models.BooleanField(
+        default=False,
+        help_text="When True, this member appears on the org Map Search map/list.",
+    )
 
     class Meta:
         unique_together = ("organization", "user")
 
     def __str__(self):
         return f"{self.user.username} @ {self.organization.name} ({self.role})"
+
+
+class YouTubeChannelLink(models.Model):
+    """Verified YouTube channel owned by a user (Google OAuth)."""
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="youtube_channels"
+    )
+    channel_id = models.CharField(max_length=64, db_index=True)
+    title = models.CharField(max_length=255, blank=True, default="")
+    custom_url = models.CharField(max_length=255, blank=True, default="")
+    thumbnail_url = models.URLField(blank=True, default="")
+    subscriber_count = models.BigIntegerField(null=True, blank=True)
+    video_count = models.BigIntegerField(null=True, blank=True)
+    # Location + tags for Map Search — set on Account settings per channel.
+    state = models.CharField(max_length=64, blank=True, default="")
+    zip_code = models.CharField(max_length=16, blank=True, default="")
+    lat = models.FloatField(null=True, blank=True)
+    lng = models.FloatField(null=True, blank=True)
+    tags = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="User-defined tags for this channel (Map Search).",
+    )
+    verified_at = models.DateTimeField(auto_now_add=True)
+    last_synced_at = models.DateTimeField(null=True, blank=True)
+    # Opaque refresh token for re-sync (store encrypted in production later).
+    refresh_token = models.TextField(blank=True, default="")
+
+    class Meta:
+        unique_together = ("user", "channel_id")
+        ordering = ["-subscriber_count", "title"]
+
+    def __str__(self):
+        return f"{self.title or self.channel_id} ({self.user.username})"
 
 
 class OrganizationService(models.Model):
@@ -1165,18 +1256,37 @@ class PoliticalClassification(models.Model):
 
 
 class UserProfile(models.Model):
-    """Extensible account profile; required fields gate dashboard access."""
+    """Extensible account profile; username gates dashboard access."""
 
     user = models.OneToOneField(
         User, on_delete=models.CASCADE, related_name="profile"
     )
+    # Stable CommuniBetter ID (U-); separate sequence from orgs. Never changes.
+    control_number = models.BigIntegerField(
+        unique=True,
+        null=True,
+        blank=True,
+        db_index=True,
+        editable=False,
+        help_text="Stable CommuniBetter member ID (displayed as U-<n>).",
+    )
     display_name = models.CharField(max_length=200, blank=True)
+    first_name = models.CharField(max_length=100, blank=True, default="")
+    last_name = models.CharField(max_length=100, blank=True, default="")
     city = models.CharField(max_length=100, blank=True)
     state = models.CharField(max_length=100, blank=True)
+    zip_code = models.CharField(max_length=20, blank=True)
     phone = models.CharField(max_length=30, blank=True)
     contact_email = models.EmailField(blank=True)
     profile_picture = models.ImageField(
         upload_to="profiles/", blank=True, null=True
+    )
+    # Per-field visibility: public | org_admins | private
+    field_visibility = models.JSONField(default=dict, blank=True)
+    # When True, memberships with show_on_profile=True appear on /u/<username>.
+    show_memberships_on_profile = models.BooleanField(
+        default=False,
+        help_text="List organization memberships on the public profile.",
     )
     extra_data = models.JSONField(default=dict, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -1187,7 +1297,7 @@ class UserProfile(models.Model):
 
     @property
     def is_complete(self) -> bool:
-        return bool(self.display_name.strip() and self.user.username.strip())
+        return bool(self.user.username.strip())
 
 
 class PersonalBoard(models.Model):

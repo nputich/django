@@ -18,6 +18,7 @@ import MeetingPage from "./pages/MeetingPage";
 import MeetingDetailsPage from "./pages/MeetingDetailsPage";
 import MeetingResultsPage from "./pages/MeetingResultsPage";
 import MeetingSummaryPage from "./pages/MeetingSummaryPage";
+import MeetingFlyerPage from "./pages/MeetingFlyerPage";
 import MeetingHostPage from "./pages/MeetingHostPage";
 import DashboardHome from "./pages/DashboardHome";
 import OrgDashboard from "./pages/OrgDashboard";
@@ -42,6 +43,7 @@ import OrgBoardPage from "./pages/OrgBoardPage";
 import PersonalInboxPage from "./pages/PersonalInboxPage";
 import OrgInboxPage from "./pages/OrgInboxPage";
 import PublicProfilePage from "./pages/PublicProfilePage";
+import MapSearchPage from "./pages/MapSearchPage";
 import ProtectedRoute from "./components/ProtectedRoute";
 import { clearAuth } from "./auth";
 import { UNDER_CONSTRUCTION_ROUTES } from "./constants/siteLinks";
@@ -87,6 +89,7 @@ function App() {
         <Route path="/m/:id/details" element={<MeetingDetailsPage />} />
         <Route path="/m/:id/results" element={<MeetingResultsPage />} />
         <Route path="/m/:id/summary" element={<MeetingSummaryPage />} />
+        <Route path="/m/:id/flyer" element={<MeetingFlyerPage />} />
         <Route path="/org/create" element={<CreateOrganization />} />
         <Route path="/org/:slug/hub" element={<OrgHubPage />} />
         <Route path="/org/:slug/board" element={<OrgBoardPage />} />
@@ -152,6 +155,14 @@ function App() {
           element={
             <ProtectedRoute>
               <OrgDashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/:slug/map-search"
+          element={
+            <ProtectedRoute>
+              <MapSearchPage />
             </ProtectedRoute>
           }
         />

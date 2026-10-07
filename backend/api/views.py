@@ -26,7 +26,7 @@ from .usage_service import (
     consume_survey_submission,
     reserve_ai_meeting_run,
 )
-from .models import AccessCode, ContactSubmission, Meeting, MeetingAttendance, MeetingSession, MeetingSlide, Organization, Survey, SurveyAnswer, SurveyQuestion
+from .models import AccessCode, ContactSubmission, Meeting, MeetingAttendance, MeetingSession, MeetingSlide, Organization, OrganizationMembership, Survey, SurveyAnswer, SurveyQuestion
 
 logger = logging.getLogger(__name__)
 from .meeting_access import (
@@ -162,7 +162,11 @@ class ResolveCodeView(APIView):
     MATCH_LIMIT = 10
 
     def get(self, request, query):
-        q = query.strip().upper()
+        from api.models import Organization
+        from api.org_access import get_primary_community_code
+
+        raw = query.strip()
+        q = raw.upper()
         if not q:
             return Response({"query": "", "match_count": 0, "results": []})
 
@@ -178,14 +182,46 @@ class ResolveCodeView(APIView):
         )
         now = timezone.now()
         results = []
+        seen_org_ids = set()
         for access_code in codes:
             if access_code.expires_at and access_code.expires_at < now:
                 continue
             item = build_access_code_result(access_code)
             if item:
                 results.append(item)
+                if access_code.organization_id:
+                    seen_org_ids.add(access_code.organization_id)
             if len(results) >= self.MATCH_LIMIT:
                 break
+
+        # Also match org shortcodes (public_username) for enter-a-code lookup.
+        if len(results) < self.MATCH_LIMIT:
+            for org in Organization.objects.filter(
+                is_active=True,
+                status=Organization.Status.ACTIVE,
+                public_username__istartswith=raw,
+            ).exclude(id__in=seen_org_ids)[: self.MATCH_LIMIT]:
+                code_row = get_primary_community_code(org)
+                code = (code_row.code if code_row else org.public_username or org.slug).upper()
+                results.append(
+                    {
+                        "target_id": f"org-short-{org.id}",
+                        "code": code,
+                        "label": org.name,
+                        "description": org.description or "Organization hub",
+                        "type": "organization",
+                        "organization_name": org.name,
+                        "requires_login": False,
+                        "requires_private_code": False,
+                        "path": f"/org/{org.slug}/hub",
+                        "sort_order": 0,
+                        "is_primary": True,
+                        "is_verified": org.is_verified,
+                    }
+                )
+                if len(results) >= self.MATCH_LIMIT:
+                    break
+
         results.sort(
             key=lambda r: (
                 not r["is_primary"],
@@ -258,6 +294,39 @@ class OrganizationHubView(APIView):
             status=Organization.Status.ACTIVE,
         )
         return Response(OrganizationHubSerializer(organization, context={"request": request}).data)
+
+
+class OrganizationJoinView(APIView):
+    """Authenticated users join as a member (open membership for discovery orgs)."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, slug):
+        organization = get_object_or_404(
+            Organization,
+            slug=slug,
+            is_active=True,
+            status=Organization.Status.ACTIVE,
+        )
+        membership, created = OrganizationMembership.objects.get_or_create(
+            organization=organization,
+            user=request.user,
+            defaults={"role": OrganizationMembership.Role.MEMBER},
+        )
+        return Response(
+            {
+                "joined": True,
+                "created": created,
+                "role": membership.role,
+                "organization": {
+                    "id": organization.id,
+                    "name": organization.name,
+                    "slug": organization.slug,
+                    "discovery_enabled": bool(organization.discovery_enabled),
+                },
+            },
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
 
 
 class MyOrganizationsView(APIView):

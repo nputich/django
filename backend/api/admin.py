@@ -40,6 +40,7 @@ from .models import (
     SurveyAnswer,
     SurveyQuestion,
     UserProfile,
+    YouTubeChannelLink,
 )
 
 
@@ -72,10 +73,11 @@ class OrganizationAdmin(admin.ModelAdmin):
         "geographic_scope",
         "service_area",
         "primary_subcategory",
+        "discovery_enabled",
         "is_active",
         "is_verified",
     )
-    list_filter = ("geographic_scope", "is_active", "is_verified")
+    list_filter = ("geographic_scope", "discovery_enabled", "is_active", "is_verified")
     search_fields = ("name", "slug")
     prepopulated_fields = {"slug": ("name",)}
     raw_id_fields = (
@@ -93,7 +95,28 @@ class ResourceTypeAdmin(admin.ModelAdmin):
 
 @admin.register(OrganizationMembership)
 class OrganizationMembershipAdmin(admin.ModelAdmin):
-    list_display = ("organization", "user", "role")
+    list_display = (
+        "organization",
+        "user",
+        "role",
+        "discovery_listed",
+    )
+
+
+@admin.register(YouTubeChannelLink)
+class YouTubeChannelLinkAdmin(admin.ModelAdmin):
+    list_display = (
+        "title",
+        "channel_id",
+        "user",
+        "state",
+        "zip_code",
+        "subscriber_count",
+        "video_count",
+        "last_synced_at",
+    )
+    search_fields = ("title", "channel_id", "user__username")
+    raw_id_fields = ("user",)
 
 
 @admin.register(OrganizationRelationship)
@@ -392,7 +415,7 @@ class DocumentShareListAdmin(admin.ModelAdmin):
 
 @admin.register(UserProfile)
 class UserProfileAdmin(admin.ModelAdmin):
-    list_display = ("user", "display_name", "city", "state", "updated_at")
+    list_display = ("user", "display_name", "city", "state", "zip_code", "updated_at")
     search_fields = ("user__username", "display_name")
 
 

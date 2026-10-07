@@ -124,31 +124,66 @@
   font-size: 1.125rem;
 }
 
+.dashboard-collapsible {
+  padding: 0;
+  overflow: hidden;
+}
+
 .dashboard-collapsible-trigger {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
   width: 100%;
-  margin: 0 0 1rem;
-  padding: 0;
+  margin: 0;
+  padding: 1rem 1.25rem;
   border: none;
-  background: none;
+  background: var(--cb-bg);
   font-family: var(--cb-font);
   font-size: 1.125rem;
   font-weight: 600;
   color: var(--cb-text);
   text-align: left;
-  cursor: default;
-  pointer-events: none;
+  cursor: pointer;
+  pointer-events: auto;
+  transition: background-color 0.15s;
+}
+
+.dashboard-collapsible-trigger:hover {
+  background: var(--cb-bg-subtle);
 }
 
 .dashboard-collapsible-chevron {
-  display: none;
+  display: block;
+  flex-shrink: 0;
+  color: var(--cb-text-secondary);
+  transition: transform 0.25s ease;
+}
+
+.dashboard-collapsible--open .dashboard-collapsible-chevron {
+  transform: rotate(180deg);
 }
 
 .dashboard-collapsible-panel {
-  display: block;
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.3s ease;
+}
+
+.dashboard-collapsible--open .dashboard-collapsible-panel {
+  grid-template-rows: 1fr;
+}
+
+.dashboard-collapsible-panel-inner {
+  overflow: hidden;
+  min-height: 0;
+  padding: 0 1.25rem;
+}
+
+.dashboard-collapsible--open .dashboard-collapsible-panel-inner {
+  overflow: visible;
+  padding: 1rem 1.25rem 1.25rem;
+  border-top: 1px solid var(--cb-border);
 }
 
 .dashboard-collapsible-panel-inner > :first-child {
@@ -615,59 +650,6 @@
 .meeting-participant-fields h3 {
   margin: 0;
   font-size: 1rem;
-}
-
-@media (max-width: 767px) {
-  .dashboard-collapsible {
-    padding: 0;
-    overflow: hidden;
-  }
-
-  .dashboard-collapsible-trigger {
-    margin: 0;
-    padding: 1rem 1.25rem;
-    background: var(--cb-bg);
-    cursor: pointer;
-    pointer-events: auto;
-    transition: background-color 0.15s;
-  }
-
-  .dashboard-collapsible-trigger:hover {
-    background: var(--cb-bg-subtle);
-  }
-
-  .dashboard-collapsible-chevron {
-    display: block;
-    flex-shrink: 0;
-    color: var(--cb-text-secondary);
-    transition: transform 0.25s ease;
-  }
-
-  .dashboard-collapsible--open .dashboard-collapsible-chevron {
-    transform: rotate(180deg);
-  }
-
-  .dashboard-collapsible-panel {
-    display: grid;
-    grid-template-rows: 0fr;
-    transition: grid-template-rows 0.3s ease;
-  }
-
-  .dashboard-collapsible--open .dashboard-collapsible-panel {
-    grid-template-rows: 1fr;
-  }
-
-  .dashboard-collapsible-panel-inner {
-    overflow: hidden;
-    min-height: 0;
-    padding: 0 1.25rem;
-  }
-
-  .dashboard-collapsible--open .dashboard-collapsible-panel-inner {
-    overflow: visible;
-    padding: 1rem 1.25rem 1.25rem;
-    border-top: 1px solid var(--cb-border);
-  }
 }
 
 .dashboard-fieldset {

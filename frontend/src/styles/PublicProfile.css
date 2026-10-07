@@ -25,6 +25,23 @@
   font-weight: 600;
 }
 
+.public-profile-cb-id {
+  margin: 0.35rem 0 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.public-profile-cb-link {
+  color: var(--cb-orange);
+  text-decoration: none;
+}
+
+.public-profile-cb-link:hover {
+  text-decoration: underline;
+  color: var(--cb-orange-hover);
+}
+
 .public-profile-avatar {
   width: 4.5rem;
   height: 4.5rem;
@@ -48,6 +65,30 @@
 .public-profile-location {
   margin: 1rem 0 0;
   color: var(--cb-text-secondary);
+}
+
+.public-profile-orgs {
+  margin-top: 1.25rem;
+}
+
+.public-profile-org-list {
+  margin: 0.5rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.public-profile-org-list li {
+  margin: 0.35rem 0;
+}
+
+.public-profile-org-list a {
+  color: var(--cb-orange);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.public-profile-org-list a:hover {
+  text-decoration: underline;
 }
 
 .public-profile-actions {

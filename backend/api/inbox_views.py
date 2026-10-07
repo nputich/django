@@ -91,7 +91,11 @@ class InboxConversationListView(APIView):
                 if slug
                 else PersonalMailboxMixin().get_mailbox(request)
             )
-            links = list_conversations_for_mailbox(mailbox, folder=folder)
+            links = list_conversations_for_mailbox(
+                mailbox,
+                folder=folder,
+                q=request.query_params.get("q") or "",
+            )
         except Organization.DoesNotExist:
             return Response(
                 {"detail": "Organization not found or you are not an admin."},

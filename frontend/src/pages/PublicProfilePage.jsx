@@ -26,6 +26,10 @@ export default function PublicProfilePage() {
   }, [username]);
 
   const showPicture = Boolean(profile?.profile_picture_url) && !pictureBroken;
+  const location = [profile?.city, profile?.state, profile?.zip_code]
+    .filter(Boolean)
+    .join(", ");
+  const orgs = profile?.organizations || [];
 
   return (
     <div className="dashboard">
@@ -59,13 +63,40 @@ export default function PublicProfilePage() {
               <div>
                 <h1>{profile.display_name || profile.username}</h1>
                 <p className="public-profile-username">@{profile.username}</p>
+                {profile.communibetter_id && (
+                  <p className="public-profile-cb-id">
+                    <Link
+                      to={`/u/${encodeURIComponent(profile.username)}`}
+                      className="public-profile-cb-link"
+                    >
+                      {profile.communibetter_id}
+                    </Link>
+                  </p>
+                )}
               </div>
             </div>
 
-            {(profile.city || profile.state) && (
+            {location && (
+              <p className="public-profile-location">{location}</p>
+            )}
+
+            {(profile.phone || profile.contact_email) && (
               <p className="public-profile-location">
-                {[profile.city, profile.state].filter(Boolean).join(", ")}
+                {[profile.phone, profile.contact_email].filter(Boolean).join(" · ")}
               </p>
+            )}
+
+            {orgs.length > 0 && (
+              <div className="public-profile-orgs">
+                <h2 className="dashboard-section-title">Organizations</h2>
+                <ul className="public-profile-org-list">
+                  {orgs.map((org) => (
+                    <li key={org.slug}>
+                      <Link to={`/org/${org.slug}/hub`}>{org.name}</Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             )}
 
             {signedIn && (

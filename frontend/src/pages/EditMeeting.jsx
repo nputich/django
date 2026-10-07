@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import api from "../api";
 import AppHeader from "../components/AppHeader";
+import MeetingFlyerButton from "../components/MeetingFlyerButton";
 import MeetingSlideEditor, {
   emptyIssueSlide,
   emptyParticipantInfoSlide,
@@ -229,6 +230,9 @@ export default function EditMeeting() {
               </>
             )}
           </p>
+          <div className="dashboard-actions" style={{ marginTop: "0.75rem" }}>
+            <MeetingFlyerButton meetingId={id} />
+          </div>
         </div>
 
         {isLive && (

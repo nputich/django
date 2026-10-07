@@ -143,12 +143,30 @@
   margin-top: 2rem;
 }
 
-.hub-board-preview .wall {
-  margin-top: 0.5rem;
+.hub-communibetter-id {
+  margin: 0.25rem 0 0.75rem;
+  color: var(--cb-text-secondary);
+  font-size: 0.95rem;
 }
 
-.hub-board-more {
-  margin-top: 1rem;
+.hub-top-actions,
+.hub-button-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+  margin: 0.75rem 0 0;
+}
+
+.hub-list--actions li {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.hub-board-preview .wall {
+  margin-top: 0.5rem;
 }
 
 .hub-list {

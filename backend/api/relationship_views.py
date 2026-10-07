@@ -171,13 +171,22 @@ class OrganizationLookupView(APIView):
             return Response({"results": []})
         qs = Organization.objects.filter(
             is_active=True, status=Organization.Status.ACTIVE
-        ).filter(Q(name__icontains=q) | Q(slug__icontains=q))
+        ).filter(
+            Q(name__icontains=q)
+            | Q(slug__icontains=q)
+            | Q(public_username__icontains=q)
+        )
         if exclude:
             qs = qs.exclude(slug=exclude)
         return Response(
             {
                 "results": [
-                    {"id": o.id, "name": o.name, "slug": o.slug}
+                    {
+                        "id": o.id,
+                        "name": o.name,
+                        "slug": o.slug,
+                        "public_username": o.public_username or "",
+                    }
                     for o in qs.order_by("name")[:10]
                 ]
             }

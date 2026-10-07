@@ -13,6 +13,7 @@ from . import question_tag_views
 from . import meeting_sharing_views
 from . import reporting_views
 from . import document_views
+from . import discovery_views
 
 urlpatterns = [
     path("me/", profile_board_views.MeView.as_view(), name="me"),
@@ -105,6 +106,11 @@ urlpatterns = [
     path("surveys/<int:pk>/", views.SurveyDetailView.as_view(), name="survey-detail"),
     path("surveys/<int:pk>/submit/", views.SurveySubmitView.as_view(), name="survey-submit"),
     path("organizations/<slug:slug>/hub/", views.OrganizationHubView.as_view(), name="org-hub"),
+    path(
+        "organizations/<slug:slug>/join/",
+        views.OrganizationJoinView.as_view(),
+        name="org-join",
+    ),
     path("me/organizations/", views.MyOrganizationsView.as_view(), name="my-organizations"),
     path(
         "organizations/",
@@ -115,6 +121,51 @@ urlpatterns = [
         "organizations/<slug:slug>/dashboard/",
         views.OrganizationDashboardView.as_view(),
         name="org-dashboard",
+    ),
+    path(
+        "organizations/<slug:slug>/discovery/",
+        discovery_views.OrganizationDiscoveryMetaView.as_view(),
+        name="org-discovery-meta",
+    ),
+    path(
+        "organizations/<slug:slug>/discovery/me/",
+        discovery_views.OrganizationDiscoveryMeView.as_view(),
+        name="org-discovery-me",
+    ),
+    path(
+        "organizations/<slug:slug>/discovery/search/",
+        discovery_views.OrganizationDiscoverySearchView.as_view(),
+        name="org-discovery-search",
+    ),
+    path(
+        "me/youtube/",
+        discovery_views.MeYouTubeView.as_view(),
+        name="me-youtube",
+    ),
+    path(
+        "me/youtube/start/",
+        discovery_views.MeYouTubeOAuthStartView.as_view(),
+        name="me-youtube-start",
+    ),
+    path(
+        "me/youtube/refresh/",
+        discovery_views.MeYouTubeRefreshView.as_view(),
+        name="me-youtube-refresh",
+    ),
+    path(
+        "me/youtube/dev-stub/",
+        discovery_views.MeYouTubeDevStubView.as_view(),
+        name="me-youtube-dev-stub",
+    ),
+    path(
+        "me/youtube/channels/<str:channel_id>/",
+        discovery_views.MeYouTubeChannelUpdateView.as_view(),
+        name="me-youtube-channel-update",
+    ),
+    path(
+        "youtube/oauth/callback/",
+        discovery_views.YouTubeOAuthCallbackView.as_view(),
+        name="youtube-oauth-callback",
     ),
     path(
         "organizations/<slug:slug>/directory-placement/",
@@ -489,6 +540,16 @@ urlpatterns = [
         "organizations/<slug:slug>/board/settings/",
         profile_board_views.OrganizationBoardSettingsView.as_view(),
         name="org-board-settings",
+    ),
+    path(
+        "organizations/<slug:slug>/wall-identity/",
+        profile_board_views.OrganizationWallIdentityView.as_view(),
+        name="org-wall-identity",
+    ),
+    path(
+        "organizations/<slug:slug>/member-profile/",
+        profile_board_views.OrganizationMemberProfileView.as_view(),
+        name="org-member-profile",
     ),
     path(
         "organizations/<slug:slug>/board/posts/<int:pk>/",

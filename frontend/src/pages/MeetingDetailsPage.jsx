@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import api from "../api";
 import AppHeader from "../components/AppHeader";
+import MeetingFlyerButton from "../components/MeetingFlyerButton";
 import "../styles/Dashboard.css";
 
 export default function MeetingDetailsPage() {
@@ -111,6 +112,9 @@ export default function MeetingDetailsPage() {
             </dl>
 
             <div className="dashboard-actions">
+              {wall?.is_organizer && (
+                <MeetingFlyerButton meetingId={id} />
+              )}
               {phase === "in_progress" && (
                 <Link to={`/m/${id}`} className="dashboard-btn dashboard-btn--primary">
                   Join Meeting

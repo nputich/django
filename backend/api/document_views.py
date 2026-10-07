@@ -62,28 +62,65 @@ def _error(exc: DocumentError):
 
 
 class UserLookupView(APIView):
-    """Typeahead for sharing documents with people."""
+    """Typeahead for messaging / sharing with people.
+
+    Usernames are unique; search also matches CommuniBetter ID (U-n),
+    display/first/last name.
+    """
 
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        q = (request.query_params.get("q") or "").strip()
-        if len(q) < 2:
-            return Response({"results": []})
-        users = (
-            User.objects.filter(is_active=True)
-            .filter(Q(username__icontains=q) | Q(profile__display_name__icontains=q))
-            .select_related("profile")
-            .order_by("username")[:12]
+        from api.control_numbers import (
+            format_user_control_number,
+            parse_control_code,
         )
+        from api.models import UserProfile
+
+        q = (request.query_params.get("q") or "").strip()
+        if len(q) < 1:
+            return Response({"results": []})
+
+        kind, number = parse_control_code(q)
+        users = User.objects.filter(is_active=True).exclude(pk=request.user.pk)
+
+        if number is not None and kind in (None, "user"):
+            users = users.filter(profile__control_number=number)
+        elif kind == "org":
+            return Response({"results": []})
+        else:
+            users = users.filter(
+                Q(username__icontains=q)
+                | Q(profile__display_name__icontains=q)
+                | Q(profile__first_name__icontains=q)
+                | Q(profile__last_name__icontains=q)
+            )
+
+        users = users.select_related("profile").order_by("username")[:12]
         results = []
         for u in users:
             profile = getattr(u, "profile", None)
+            if profile is None:
+                profile, _ = UserProfile.objects.get_or_create(user=u)
+            from api.control_numbers import ensure_user_control_number
+
+            n = ensure_user_control_number(profile)
+            display = ""
+            if profile:
+                display = (profile.display_name or "").strip()
+                if not display:
+                    parts = [
+                        (profile.first_name or "").strip(),
+                        (profile.last_name or "").strip(),
+                    ]
+                    display = " ".join(p for p in parts if p)
             results.append(
                 {
                     "id": u.id,
                     "username": u.username,
-                    "display_name": (profile.display_name if profile else "") or u.username,
+                    "display_name": display or u.username,
+                    "control_number": n,
+                    "communibetter_id": format_user_control_number(n),
                 }
             )
         return Response({"results": results})

@@ -620,9 +620,92 @@
   gap: 0.75rem;
 }
 
+.field-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+}
+
+.field-label-row label {
+  margin: 0;
+}
+
+.field-visibility-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: 1px solid var(--cb-border);
+  border-radius: 8px;
+  background: var(--cb-bg);
+  color: var(--cb-text-secondary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.field-visibility-btn:hover {
+  border-color: var(--cb-border-strong);
+  color: var(--cb-text);
+  background: var(--cb-bg-subtle);
+}
+
+.field-visibility-btn--public {
+  color: var(--cb-text);
+}
+
+.field-visibility-btn--org_admins {
+  color: var(--cb-orange, #c45c26);
+}
+
+.field-visibility-btn--private {
+  color: var(--cb-text-muted);
+}
+
+.field-visibility-legend {
+  margin: 0.75rem 0 1rem;
+}
+
+.field-checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  cursor: pointer;
+  line-height: 1.25;
+}
+
+.field-checkbox-label input[type="checkbox"] {
+  margin: 0;
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+.org-fields-intro {
+  margin: 0 0 1rem;
+}
+
+.org-membership-public-row {
+  margin-bottom: 1.25rem;
+}
+
+.org-membership-public-label {
+  width: auto;
+  justify-content: flex-start;
+}
+
 @media (min-width: 640px) {
-  .profile-form-grid--location {
+  .profile-form-grid {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .profile-form-grid--location {
+    grid-template-columns: 1fr 1fr 1fr;
   }
 }
 

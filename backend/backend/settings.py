@@ -246,6 +246,16 @@ PAYPAL_SUBSCRIPTIONS_ENABLED = os.getenv("PAYPAL_SUBSCRIPTIONS_ENABLED", "").low
 # Used for PayPal return/cancel URLs (browser). Local docker: http://localhost:10001
 FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:10001").rstrip("/")
 
+# YouTube / Google OAuth (Map Search channel verification).
+# Google Secret Manager (communib): Google_ID / Google_Secret
+# Mapped to GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET (see wire-google-oauth-prod.ps1).
+GOOGLE_OAUTH_CLIENT_ID = _env_or_file("GOOGLE_OAUTH_CLIENT_ID")
+GOOGLE_OAUTH_CLIENT_SECRET = _env_or_file("GOOGLE_OAUTH_CLIENT_SECRET")
+GOOGLE_OAUTH_REDIRECT_URI = os.getenv(
+    "GOOGLE_OAUTH_REDIRECT_URI",
+    "",
+).strip()
+
 # Temporary Basic complimentary access code (server-side only; never expose to clients).
 # Empty disables access-code redemption. Local Docker sets SUPERBASIC via compose.
 # Redeeming grants Basic for 4 months, then the entitlement expires.

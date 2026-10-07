@@ -137,6 +137,11 @@ class OrganizationHubSerializer(serializers.ModelSerializer):
     has_board = serializers.SerializerMethodField()
     board = serializers.SerializerMethodField()
     relationships = serializers.SerializerMethodField()
+    is_member = serializers.SerializerMethodField()
+    communibetter_id = serializers.SerializerMethodField()
+    community_code = serializers.SerializerMethodField()
+    public_username = serializers.CharField(read_only=True)
+    discovery_enabled = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Organization
@@ -145,12 +150,39 @@ class OrganizationHubSerializer(serializers.ModelSerializer):
             "name",
             "slug",
             "description",
+            "public_username",
+            "community_code",
+            "control_number",
+            "communibetter_id",
             "surveys",
             "meetings",
             "has_board",
             "board",
             "relationships",
+            "is_member",
+            "discovery_enabled",
         ]
+
+    def get_communibetter_id(self, obj):
+        from api.control_numbers import (
+            ensure_org_control_number,
+            format_org_control_number,
+        )
+
+        return format_org_control_number(ensure_org_control_number(obj))
+
+    def get_community_code(self, obj):
+        from api.org_access import get_primary_community_code
+
+        row = get_primary_community_code(obj)
+        return row.code if row else ""
+
+    def get_is_member(self, obj):
+        from api.board_service import is_org_member
+
+        request = self.context.get("request")
+        user = getattr(request, "user", None) if request else None
+        return is_org_member(obj, user)
 
     def get_surveys(self, obj):
         qs = obj.surveys.filter(is_active=True)
@@ -521,6 +553,45 @@ class DashboardMeetingSerializer(serializers.ModelSerializer):
         ]
 
 
+def organization_wall_identity(organization, request=None) -> dict:
+    """Org account / wall profile — never falls back to a personal profile.
+
+    Admins set these on the organization account in Account settings.
+    Until then, fields stay empty so the UI shows a placeholder.
+    """
+    from api.profile_fields import get_visibility_map, visibility_payload
+
+    picture_url = None
+    if organization.profile_picture:
+        try:
+            url = organization.profile_picture.url
+            picture_url = request.build_absolute_uri(url) if request else url
+        except ValueError:
+            picture_url = None
+    username = (organization.public_username or "").strip()
+    vis_map = get_visibility_map(organization.field_visibility)
+    return {
+        "name": organization.name,
+        "slug": organization.slug,
+        "public_username": username,
+        "profile_picture_url": picture_url,
+        "first_name": (organization.first_name or "").strip(),
+        "last_name": (organization.last_name or "").strip(),
+        "city": (organization.city or "").strip(),
+        "state": (organization.state or "").strip(),
+        "zip_code": (organization.zip_code or "").strip(),
+        "phone": (organization.phone or "").strip(),
+        "contact_email": (organization.contact_email or "").strip(),
+        "field_visibility": {
+            k: visibility_payload(v) for k, v in vis_map.items()
+        },
+        "has_wall_identity": bool(picture_url and username),
+        # AuthorAvatar: picture if set; otherwise empty name → "?"
+        "display_name": organization.name if picture_url else "",
+        "username": username if picture_url else "",
+    }
+
+
 class OrganizationDashboardSerializer(serializers.ModelSerializer):
     surveys = DashboardSurveySerializer(many=True, read_only=True)
     meetings = DashboardMeetingSerializer(many=True, read_only=True)
@@ -530,6 +601,8 @@ class OrganizationDashboardSerializer(serializers.ModelSerializer):
     lifecycle = serializers.SerializerMethodField()
     community_code = serializers.SerializerMethodField()
     directory_placement = serializers.SerializerMethodField()
+    wall_identity = serializers.SerializerMethodField()
+    communibetter_id = serializers.SerializerMethodField()
 
     class Meta:
         model = Organization
@@ -540,6 +613,9 @@ class OrganizationDashboardSerializer(serializers.ModelSerializer):
             "description",
             "is_verified",
             "status",
+            "control_number",
+            "communibetter_id",
+            "discovery_enabled",
             "surveys",
             "meetings",
             "board",
@@ -548,7 +624,20 @@ class OrganizationDashboardSerializer(serializers.ModelSerializer):
             "lifecycle",
             "community_code",
             "directory_placement",
+            "wall_identity",
         ]
+
+    def get_communibetter_id(self, obj):
+        from api.control_numbers import (
+            ensure_org_control_number,
+            format_org_control_number,
+        )
+
+        n = ensure_org_control_number(obj)
+        return format_org_control_number(n)
+
+    def get_wall_identity(self, obj):
+        return organization_wall_identity(obj, self.context.get("request"))
 
     def get_board(self, obj):
         if not hasattr(obj, "board"):
@@ -605,50 +694,213 @@ def serialize_post_author(user, request):
     }
 
 
+def _personal_fields_payload(profile, request) -> list:
+    from api.profile_fields import (
+        PERSONAL_FIELD_DEFS,
+        get_visibility_map,
+        personal_field_value,
+        visibility_payload,
+    )
+
+    vis_map = get_visibility_map(getattr(profile, "field_visibility", None))
+    fields = []
+    for defn in PERSONAL_FIELD_DEFS:
+        key = defn["key"]
+        fields.append(
+            {
+                **defn,
+                "value": personal_field_value(profile, key, request),
+                "visibility": visibility_payload(vis_map.get(key), field_key=key),
+            }
+        )
+    return fields
+
+
+def organization_account_field_sections(user, request):
+    """Per-org Account settings sections for memberships.
+
+    - member_fields: values shared with the org (requested on join)
+    - account_fields: org's own profile (admins only)
+    """
+    from api.profile_fields import (
+        DEFAULT_ORG_REQUESTED_MEMBER_FIELDS,
+        ORG_ACCOUNT_FIELD_DEFS,
+        get_visibility_map,
+        personal_field_value,
+        visibility_payload,
+    )
+
+    memberships = (
+        OrganizationMembership.objects.filter(user=user)
+        .exclude(organization__status=Organization.Status.CLOSED)
+        .select_related("organization")
+        .order_by("organization__name")
+    )
+    try:
+        profile = user.profile
+    except UserProfile.DoesNotExist:
+        profile = None
+
+    sections = []
+    for membership in memberships:
+        org = membership.organization
+        is_admin = membership.role in (
+            OrganizationMembership.Role.OWNER,
+            OrganizationMembership.Role.ADMIN,
+        )
+        shared = membership.shared_profile if isinstance(membership.shared_profile, dict) else {}
+        member_vis = get_visibility_map(membership.field_visibility)
+        member_fields = []
+        for defn in DEFAULT_ORG_REQUESTED_MEMBER_FIELDS:
+            key = defn["key"]
+            personal_key = defn.get("personal_key") or key
+            personal_val = personal_field_value(profile, personal_key, request)
+            raw_val = shared.get(key)
+            if raw_val is None or raw_val == "":
+                # Required username defaults to the personal account username.
+                if key == "username" and personal_val:
+                    value = personal_val
+                else:
+                    value = "" if defn["field_type"] != "image" else None
+            else:
+                value = raw_val
+            member_fields.append(
+                {
+                    "key": key,
+                    "label": defn["label"],
+                    "required": defn["required"],
+                    "field_type": defn["field_type"],
+                    "value": value,
+                    "personal_value": personal_val,
+                    "has_personal_value": bool(personal_val),
+                    "visibility": visibility_payload(member_vis.get(key), field_key=key),
+                    "scope": "member",
+                }
+            )
+
+        account_fields = []
+        if is_admin:
+            identity = organization_wall_identity(org, request)
+            org_vis = get_visibility_map(org.field_visibility)
+            for defn in ORG_ACCOUNT_FIELD_DEFS:
+                key = defn["key"]
+                if key == "profile_picture":
+                    value = identity.get("profile_picture_url")
+                else:
+                    value = identity.get(key) or ""
+                account_fields.append(
+                    {
+                        "key": key,
+                        "label": defn["label"],
+                        "required": defn["required"],
+                        "field_type": defn["field_type"],
+                        "help_text": defn.get("help_text"),
+                        "value": value,
+                        "visibility": visibility_payload(org_vis.get(key), field_key=key),
+                        "scope": "organization",
+                    }
+                )
+
+        sections.append(
+            {
+                "organization_id": org.id,
+                "organization_name": org.name,
+                "organization_slug": org.slug,
+                "role": membership.role,
+                "is_admin": is_admin,
+                "show_membership_on_profile": bool(membership.show_on_profile),
+                "member_fields": member_fields,
+                "account_fields": account_fields,
+                "fields": account_fields or member_fields,
+            }
+        )
+    return sections
+
+
 def build_me_payload(user, request):
+    from api.control_numbers import (
+        ensure_user_control_number,
+        format_user_control_number,
+    )
+    from api.profile_fields import FIELD_VISIBILITY_META, FIELD_VISIBILITY_ORDER
+
     try:
         profile, _ = UserProfile.objects.get_or_create(user=user)
     except Exception:
-        # Fail soft if profile tables are mid-migration or unavailable.
         return {
             "id": user.id,
             "username": user.username,
             "email": user.email,
             "display_name": "",
+            "first_name": "",
+            "last_name": "",
             "city": "",
             "state": "",
+            "zip_code": "",
             "phone": "",
             "contact_email": "",
             "profile_picture_url": None,
+            "control_number": None,
+            "communibetter_id": None,
             "extra_data": {},
             "profile_complete": bool(user.username),
-            "required_fields": ["display_name", "username"],
+            "required_fields": ["username"],
+            "show_memberships_on_profile": False,
+            "fields": [],
+            "visibility_options": [
+                {
+                    "value": k,
+                    **FIELD_VISIBILITY_META[k],
+                }
+                for k in FIELD_VISIBILITY_ORDER
+            ],
+            "organization_sections": [],
         }
+    control_number = ensure_user_control_number(profile)
     return {
         "id": user.id,
         "username": user.username,
         "email": user.email,
         "display_name": profile.display_name,
+        "first_name": profile.first_name,
+        "last_name": profile.last_name,
         "city": profile.city,
         "state": profile.state,
+        "zip_code": profile.zip_code,
         "phone": profile.phone,
         "contact_email": profile.contact_email,
         "profile_picture_url": _profile_picture_url(profile, request),
+        "control_number": control_number,
+        "communibetter_id": format_user_control_number(control_number),
         "extra_data": profile.extra_data,
         "profile_complete": profile.is_complete,
-        "required_fields": ["display_name", "username"],
+        "required_fields": ["username"],
+        "show_memberships_on_profile": bool(profile.show_memberships_on_profile),
+        "fields": _personal_fields_payload(profile, request),
+        "visibility_options": [
+            {
+                "value": k,
+                **FIELD_VISIBILITY_META[k],
+            }
+            for k in FIELD_VISIBILITY_ORDER
+        ],
+        "organization_sections": organization_account_field_sections(user, request),
     }
 
 
 class UserProfileUpdateSerializer(serializers.Serializer):
     username = serializers.CharField(max_length=150, required=False, allow_blank=True)
     display_name = serializers.CharField(max_length=200, required=False, allow_blank=True)
+    first_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    last_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
     city = serializers.CharField(max_length=100, required=False, allow_blank=True)
     state = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    zip_code = serializers.CharField(max_length=20, required=False, allow_blank=True)
     phone = serializers.CharField(max_length=30, required=False, allow_blank=True)
     contact_email = serializers.CharField(max_length=254, required=False, allow_blank=True)
     profile_picture = serializers.ImageField(required=False)
     clear_profile_picture = serializers.BooleanField(required=False, default=False)
+    show_memberships_on_profile = serializers.BooleanField(required=False)
 
     def validate_contact_email(self, value):
         value = (value or "").strip()
@@ -865,6 +1117,79 @@ class OrganizationBoardSettingsSerializer(serializers.Serializer):
     hub_preview_count = serializers.IntegerField(
         required=False, min_value=0, max_value=25
     )
+
+
+class OrganizationWallIdentitySerializer(serializers.Serializer):
+    public_username = serializers.SlugField(
+        max_length=50, required=False, allow_blank=True
+    )
+    profile_picture = serializers.ImageField(required=False)
+    clear_profile_picture = serializers.BooleanField(required=False, default=False)
+    first_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    last_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    city = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    state = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    zip_code = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    phone = serializers.CharField(max_length=30, required=False, allow_blank=True)
+    contact_email = serializers.CharField(
+        max_length=254, required=False, allow_blank=True
+    )
+
+    def validate_public_username(self, value):
+        value = (value or "").strip().lower()
+        if not value:
+            return ""
+        org = self.context.get("organization")
+        qs = Organization.objects.filter(public_username__iexact=value)
+        if org is not None:
+            qs = qs.exclude(pk=org.pk)
+        if qs.exists():
+            raise serializers.ValidationError("That @username is already taken.")
+        slug_qs = Organization.objects.filter(slug__iexact=value)
+        if org is not None:
+            slug_qs = slug_qs.exclude(pk=org.pk)
+        if slug_qs.exists():
+            raise serializers.ValidationError(
+                "That @username matches another organization's URL slug."
+            )
+        return value
+
+    def validate_contact_email(self, value):
+        value = (value or "").strip()
+        if not value:
+            return ""
+        return serializers.EmailField().run_validation(value)
+
+
+class OrganizationMemberProfileSerializer(serializers.Serializer):
+    """Member values shared with one organization (+ per-field visibility)."""
+
+    username = serializers.CharField(max_length=150, required=False, allow_blank=True)
+    first_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    last_name = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    city = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    state = serializers.CharField(max_length=100, required=False, allow_blank=True)
+    zip_code = serializers.CharField(max_length=20, required=False, allow_blank=True)
+    phone = serializers.CharField(max_length=30, required=False, allow_blank=True)
+    contact_email = serializers.CharField(
+        max_length=254, required=False, allow_blank=True
+    )
+    profile_picture = serializers.CharField(
+        required=False, allow_blank=True, allow_null=True
+    )
+    clear_profile_picture = serializers.BooleanField(required=False, default=False)
+    use_personal = serializers.ListField(
+        child=serializers.CharField(max_length=64),
+        required=False,
+        allow_empty=True,
+    )
+    show_membership_on_profile = serializers.BooleanField(required=False)
+
+    def validate_contact_email(self, value):
+        value = (value or "").strip()
+        if not value:
+            return ""
+        return serializers.EmailField().run_validation(value)
 
 
 class PersonalBoardSettingsSerializer(serializers.Serializer):

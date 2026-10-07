@@ -98,6 +98,9 @@ def get_organization_capabilities(organization: Organization) -> dict:
         "run_new_ai_analysis": paid and operational,
         "required_plan_for_create": SERVICE_LEVEL_STARTER,
         "required_plan_label": SERVICE_LEVEL_LABELS[SERVICE_LEVEL_STARTER],
+        # Map Search — gated by org.discovery_enabled (no billing in v1)
+        "discovery_map": bool(getattr(organization, "discovery_enabled", False))
+        and operational,
     }
 
 

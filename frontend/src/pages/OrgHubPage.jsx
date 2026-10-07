@@ -1,16 +1,45 @@
 import { useEffect, useState } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import api from "../api";
+import { ensureValidSession } from "../auth";
 import PostingBoard from "../components/PostingBoard";
 import "../styles/Landing.css";
 import "../styles/CodeResults.css";
 import "../styles/Board.css";
 import "../styles/Relationships.css";
+import "../styles/Dashboard.css";
+
+function HubButton({ to, children, primary = false, onClick, disabled = false }) {
+  const className = primary
+    ? "dashboard-btn dashboard-btn--primary"
+    : "dashboard-btn";
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        className={className}
+        onClick={onClick}
+        disabled={disabled}
+      >
+        {children}
+      </button>
+    );
+  }
+  return (
+    <Link to={to} className={className}>
+      {children}
+    </Link>
+  );
+}
 
 export default function OrgHubPage() {
   const { slug } = useParams();
+  const navigate = useNavigate();
   const [org, setOrg] = useState(null);
   const [error, setError] = useState("");
+  const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState("");
+  const signedIn = ensureValidSession();
 
   useEffect(() => {
     api
@@ -19,11 +48,29 @@ export default function OrgHubPage() {
       .catch(() => setError("Organization not found."));
   }, [slug]);
 
+  const handleJoin = async () => {
+    setJoinError("");
+    if (!ensureValidSession()) {
+      navigate(`/?next=/org/${encodeURIComponent(slug)}/hub`);
+      return;
+    }
+    setJoining(true);
+    try {
+      await api.post(`/api/organizations/${slug}/join/`);
+      const res = await api.get(`/api/organizations/${slug}/hub/`);
+      setOrg(res.data);
+    } catch (err) {
+      setJoinError(err.response?.data?.detail || "Could not join organization.");
+    } finally {
+      setJoining(false);
+    }
+  };
+
   if (error) {
     return (
       <div className="resource-page">
         <p>{error}</p>
-        <Link to="/">Back to home</Link>
+        <HubButton to="/">Back to home</HubButton>
       </div>
     );
   }
@@ -50,21 +97,75 @@ export default function OrgHubPage() {
 
   return (
     <div className="resource-page">
-      <Link to="/" className="resource-back">
-        &larr; Back to home
-      </Link>
+      <div className="hub-top-actions">
+        <HubButton to="/">← Back to home</HubButton>
+      </div>
       <h1>{org.name}</h1>
+      {(org.community_code || org.public_username) && (
+        <p className="hub-communibetter-id">
+          Community code:{" "}
+          <strong>{org.community_code || org.public_username}</strong>
+          {org.public_username ? (
+            <span className="dashboard-meta">
+              {" "}
+              (also @{org.public_username})
+            </span>
+          ) : null}
+        </p>
+      )}
       {org.description && <p>{org.description}</p>}
+
+      <section className="hub-section">
+        <h2>Membership</h2>
+        {org.is_member ? (
+          <>
+            <p>You are a member.</p>
+            <div className="hub-button-row">
+              {org.discovery_enabled && (
+                <HubButton
+                  to={`/dashboard/${org.slug}/map-search`}
+                  primary
+                >
+                  Map Search
+                </HubButton>
+              )}
+              <HubButton to={`/dashboard/${org.slug}`}>
+                Open dashboard
+              </HubButton>
+            </div>
+          </>
+        ) : (
+          <>
+            <p>
+              {signedIn
+                ? "Join to access member features."
+                : "Sign in, then join to access member features."}
+            </p>
+            {joinError && <p className="dashboard-error">{joinError}</p>}
+            <div className="hub-button-row">
+              <HubButton primary onClick={handleJoin} disabled={joining}>
+                {joining
+                  ? "Joining…"
+                  : signedIn
+                    ? "Join organization"
+                    : "Sign in to join"}
+              </HubButton>
+            </div>
+          </>
+        )}
+      </section>
 
       <section className="hub-section">
         <h2>Surveys</h2>
         {org.surveys.length === 0 ? (
           <p>No active surveys.</p>
         ) : (
-          <ul className="hub-list">
+          <ul className="hub-list hub-list--actions">
             {org.surveys.map((s) => (
               <li key={s.id}>
-                <Link to={`/s/${s.id}`}>{s.title}</Link>
+                <HubButton to={`/s/${s.id}`} primary>
+                  {s.title}
+                </HubButton>
                 {s.description && <p>{s.description}</p>}
               </li>
             ))}
@@ -77,10 +178,12 @@ export default function OrgHubPage() {
         {org.meetings.length === 0 ? (
           <p>No upcoming meetings.</p>
         ) : (
-          <ul className="hub-list">
+          <ul className="hub-list hub-list--actions">
             {org.meetings.map((m) => (
               <li key={m.id}>
-                <Link to={`/m/${m.id}`}>{m.title}</Link>
+                <HubButton to={`/m/${m.id}`} primary>
+                  {m.title}
+                </HubButton>
                 {m.description && <p>{m.description}</p>}
                 <p className="resource-meta">
                   {m.status}
@@ -102,9 +205,9 @@ export default function OrgHubPage() {
             canReply={false}
             emptyMessage="No posts on this board yet."
           />
-          <p className="hub-board-more">
-            <Link to={`/org/${org.slug}/board`}>View full board</Link>
-          </p>
+          <div className="hub-button-row">
+            <HubButton to={`/org/${org.slug}/board`}>View full board</HubButton>
+          </div>
         </section>
       )}
 
@@ -118,44 +221,49 @@ export default function OrgHubPage() {
       {hasRelationships && (
         <section className="hub-section">
           <h2>Affiliations</h2>
-          <ul className="hub-list hub-affiliations">
+          <ul className="hub-list hub-list--actions relationship-public-list">
             {rel.parent && (
               <li>
-                <span className="resource-meta">Part of</span>{" "}
-                <Link to={`/org/${rel.parent.slug}`}>{rel.parent.name}</Link>
+                <span className="resource-meta">Chapter of</span>
+                <HubButton to={`/org/${rel.parent.slug}`}>
+                  {rel.parent.name}
+                </HubButton>
               </li>
             )}
             {rel.chapters.length > 0 && (
               <li>
-                <span className="resource-meta">Chapters &amp; members</span>{" "}
-                {rel.chapters.map((o, i) => (
-                  <span key={o.slug}>
-                    {i > 0 && ", "}
-                    <Link to={`/org/${o.slug}`}>{o.name}</Link>
-                  </span>
-                ))}
+                <span className="resource-meta">Chapters &amp; members</span>
+                <div className="hub-button-row">
+                  {rel.chapters.map((o) => (
+                    <HubButton key={o.slug} to={`/org/${o.slug}`}>
+                      {o.name}
+                    </HubButton>
+                  ))}
+                </div>
               </li>
             )}
             {rel.partners.length > 0 && (
               <li>
-                <span className="resource-meta">Partners</span>{" "}
-                {rel.partners.map((o, i) => (
-                  <span key={o.slug}>
-                    {i > 0 && ", "}
-                    <Link to={`/org/${o.slug}`}>{o.name}</Link>
-                  </span>
-                ))}
+                <span className="resource-meta">Partners</span>
+                <div className="hub-button-row">
+                  {rel.partners.map((o) => (
+                    <HubButton key={o.slug} to={`/org/${o.slug}`}>
+                      {o.name}
+                    </HubButton>
+                  ))}
+                </div>
               </li>
             )}
             {rel.sponsors.length > 0 && (
               <li>
-                <span className="resource-meta">Sponsored by</span>{" "}
-                {rel.sponsors.map((o, i) => (
-                  <span key={o.slug}>
-                    {i > 0 && ", "}
-                    <Link to={`/org/${o.slug}`}>{o.name}</Link>
-                  </span>
-                ))}
+                <span className="resource-meta">Sponsored by</span>
+                <div className="hub-button-row">
+                  {rel.sponsors.map((o) => (
+                    <HubButton key={o.slug} to={`/org/${o.slug}`}>
+                      {o.name}
+                    </HubButton>
+                  ))}
+                </div>
               </li>
             )}
           </ul>
@@ -165,9 +273,14 @@ export default function OrgHubPage() {
       <section className="hub-section">
         <h2>Message this organization</h2>
         <p>Send a private message to the organization inbox.</p>
-        <Link to={`/dashboard/inbox?to_org=${encodeURIComponent(org.slug)}`}>
-          Message {org.name}
-        </Link>
+        <div className="hub-button-row">
+          <HubButton
+            to={`/dashboard/inbox?to_org=${encodeURIComponent(org.slug)}`}
+            primary
+          >
+            Message {org.name}
+          </HubButton>
+        </div>
       </section>
     </div>
   );

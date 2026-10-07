@@ -48,8 +48,8 @@ export default function CompleteProfile() {
         <div className="dashboard-header">
           <h1>Complete your profile</h1>
           <p>
-            Before using your dashboard, please add your name and username. Other
-            fields are optional and can be updated later.
+            Before using your dashboard, please choose a username. Other fields
+            are optional and can be updated later in Account settings.
           </p>
         </div>
 

@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../api";
 import "../styles/Inbox.css";
 import "../styles/Relationships.css";
 import "../styles/PublicProfile.css";
+import "../styles/Tags.css";
 
 function formatDate(iso) {
   if (!iso) return "";
@@ -43,12 +44,93 @@ function CounterpartyLinks({ item }) {
   return people.map((party, index) => (
     <span key={party.id || party.username || party.organization_slug || index}>
       {index > 0 ? ", " : null}
-      <MailboxLink party={party} />
+      {party.communibetter_id ? (
+        <MailboxLink party={party}>{party.communibetter_id}</MailboxLink>
+      ) : (
+        <MailboxLink party={party} />
+      )}
       {party.username ? (
         <span className="inbox-party-username">@{party.username}</span>
       ) : null}
     </span>
   ));
+}
+
+/** Typeahead — username, name, or CommuniBetter ID (U-n). */
+function UserRecipientPicker({ value, onChange, placeholder = "Username or CommuniBetter ID" }) {
+  const [results, setResults] = useState([]);
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef(null);
+
+  useEffect(() => {
+    const q = (value || "").trim();
+    if (q.length < 1) {
+      setResults([]);
+      return undefined;
+    }
+    const handle = setTimeout(() => {
+      api
+        .get("/api/users/lookup/", { params: { q } })
+        .then((res) => {
+          setResults(res.data.results || []);
+          setOpen(true);
+        })
+        .catch(() => setResults([]));
+    }, 200);
+    return () => clearTimeout(handle);
+  }, [value]);
+
+  useEffect(() => {
+    const onDoc = (e) => {
+      if (wrapRef.current && !wrapRef.current.contains(e.target)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
+  }, []);
+
+  return (
+    <div className="tag-picker inbox-user-picker" ref={wrapRef}>
+      <input
+        value={value}
+        onChange={(e) => {
+          onChange(e.target.value);
+          setOpen(true);
+        }}
+        onFocus={() => {
+          if (results.length) setOpen(true);
+        }}
+        placeholder={placeholder}
+        autoComplete="off"
+        aria-label="To username or CommuniBetter ID"
+        aria-autocomplete="list"
+      />
+      {open && results.length > 0 && (
+        <div className="tag-picker-menu" role="listbox">
+          {results.map((u) => (
+            <button
+              key={u.id || u.username}
+              type="button"
+              className="tag-picker-create"
+              role="option"
+              onClick={() => {
+                onChange(u.username);
+                setOpen(false);
+                setResults([]);
+              }}
+            >
+              {u.display_name}{" "}
+              <span className="dashboard-meta">
+                @{u.username}
+                {u.communibetter_id ? ` · ${u.communibetter_id}` : ""}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 /**
@@ -82,6 +164,13 @@ export default function MessageInbox({
   });
   const [replyBody, setReplyBody] = useState("");
   const [busy, setBusy] = useState(false);
+  const [listQuery, setListQuery] = useState("");
+  const [debouncedQuery, setDebouncedQuery] = useState("");
+
+  useEffect(() => {
+    const handle = setTimeout(() => setDebouncedQuery(listQuery.trim()), 250);
+    return () => clearTimeout(handle);
+  }, [listQuery]);
 
   const recipientMode = useMemo(() => {
     if (mailboxKind === "organization") return "user";
@@ -102,7 +191,9 @@ export default function MessageInbox({
           setDrafts(res.data.drafts || []);
           setConversations([]);
         } else {
-          const res = await api.get(`${apiBase}/`, { params: { folder } });
+          const params = { folder };
+          if (debouncedQuery) params.q = debouncedQuery;
+          const res = await api.get(`${apiBase}/`, { params });
           setSummary(res.data);
           setConversations(res.data.conversations || []);
           setDrafts([]);
@@ -115,7 +206,7 @@ export default function MessageInbox({
         }
       }
     },
-    [apiBase, folder]
+    [apiBase, folder, debouncedQuery]
   );
 
   useEffect(() => {
@@ -412,6 +503,22 @@ export default function MessageInbox({
 
       {error && <p className="dashboard-error">{error}</p>}
 
+      {folder !== "drafts" && (
+        <div className="inbox-search">
+          <label className="inbox-search-label" htmlFor="inbox-search-input">
+            Search
+          </label>
+          <input
+            id="inbox-search-input"
+            type="search"
+            value={listQuery}
+            onChange={(e) => setListQuery(e.target.value)}
+            placeholder="Username or CommuniBetter ID"
+            autoComplete="off"
+          />
+        </div>
+      )}
+
       <div className="inbox-layout">
         <div className="inbox-list-pane">
           {loading && <p className="dashboard-empty">Loading…</p>}
@@ -420,9 +527,11 @@ export default function MessageInbox({
           )}
           {!loading && folder !== "drafts" && conversations.length === 0 && (
             <p className="dashboard-empty">
-              {folder === "unknown"
-                ? "No messages from people you don’t know."
-                : "No conversations yet."}
+              {debouncedQuery
+                ? "No conversations match that search."
+                : folder === "unknown"
+                  ? "No messages from people you don’t know."
+                  : "No conversations yet."}
             </p>
           )}
           {folder === "drafts"
@@ -487,13 +596,12 @@ export default function MessageInbox({
                 </label>
               ) : (
                 <label>
-                  To username
-                  <input
+                  To (username or CommuniBetter ID)
+                  <UserRecipientPicker
                     value={compose.to_username}
-                    onChange={(e) =>
-                      setCompose((c) => ({ ...c, to_username: e.target.value }))
+                    onChange={(username) =>
+                      setCompose((c) => ({ ...c, to_username: username }))
                     }
-                    placeholder="username"
                   />
                 </label>
               )}
@@ -647,7 +755,9 @@ export default function MessageInbox({
                     <div className="inbox-message-meta">
                       <span>
                         <MailboxLink party={msg.sender}>
-                          {msg.sender?.display_name || msg.sender?.username}
+                          {msg.sender?.communibetter_id ||
+                            msg.sender?.display_name ||
+                            msg.sender?.username}
                         </MailboxLink>
                         {msg.sender?.username ? (
                           <span className="inbox-party-username">

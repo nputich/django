@@ -32,6 +32,10 @@ services:
       PAYPAL_CLIENT_SECRET_FILE: /run/secrets/paypal_sandbox_secret
       PAYPAL_WEBHOOK_ID_FILE: /run/secrets/paypal_sandbox_webhook_id
       COMMUNIB_BASIC_ACCESS_CODE: SUPERBASIC
+      # YouTube OAuth (Map Search channel verification) — optional local secrets
+      GOOGLE_OAUTH_CLIENT_ID_FILE: /run/secrets/google_oauth_client_id
+      GOOGLE_OAUTH_CLIENT_SECRET_FILE: /run/secrets/google_oauth_client_secret
+      GOOGLE_OAUTH_REDIRECT_URI: http://localhost:8001/api/youtube/oauth/callback/
       # Contact form SMTP (password from secrets/gmail_key.txt via pull-gmail-key-local.ps1)
       EMAIL_HOST: smtp.gmail.com
       EMAIL_PORT: "587"
@@ -51,6 +55,8 @@ services:
       - paypal_sandbox_client_id
       - paypal_sandbox_secret
       - paypal_sandbox_webhook_id
+      - google_oauth_client_id
+      - google_oauth_client_secret
  
   communib-frontend: # Name of the frontend service
     build:
@@ -76,3 +82,7 @@ secrets:
     file: ./secrets/paypal_sandbox_secret.txt
   paypal_sandbox_webhook_id:
     file: ./secrets/paypal_sandbox_webhook_id.txt
+  google_oauth_client_id:
+    file: ./secrets/google_oauth_client_id.txt
+  google_oauth_client_secret:
+    file: ./secrets/google_oauth_client_secret.txt

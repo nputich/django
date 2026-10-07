@@ -25,10 +25,17 @@ from api.models import (
     BoardPostReply,
     Organization,
     OrganizationBoard,
+    OrganizationMembership,
     PersonalBoardPost,
     UserProfile,
 )
 from api.org_access import get_admin_organization
+from api.profile_fields import (
+    get_visibility_map,
+    normalize_visibility,
+    personal_field_value,
+    sync_display_name,
+)
 from api.serializers import (
     BoardPostCreateSerializer,
     BoardPostReplyCreateSerializer,
@@ -37,6 +44,9 @@ from api.serializers import (
     BoardPollVoteSerializer,
     OrganizationBoardSettingsSerializer,
     OrganizationBoardPublicSerializer,
+    OrganizationMemberProfileSerializer,
+    OrganizationWallIdentitySerializer,
+    organization_wall_identity,
     PersonalBoardPostSerializer,
     PersonalBoardSettingsSerializer,
     UserProfileUpdateSerializer,
@@ -60,11 +70,13 @@ class MeView(APIView):
 
 
 class PublicUserProfileView(APIView):
-    """Public account card for inbox / directory links (no private contact fields)."""
+    """Public account card — fields filtered by visibility + membership prefs."""
 
     permission_classes = [AllowAny]
 
     def get(self, request, username):
+        from api.profile_fields import build_public_profile_payload
+
         user = get_object_or_404(User, username__iexact=username)
         # If the profile owner banned the viewer, hide the account.
         if getattr(request.user, "is_authenticated", False):
@@ -78,15 +90,7 @@ class PublicUserProfileView(APIView):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-        profile, _ = UserProfile.objects.get_or_create(user=user)
-        author = serialize_post_author(user, request)
-        return Response(
-            {
-                **author,
-                "city": profile.city,
-                "state": profile.state,
-            }
-        )
+        return Response(build_public_profile_payload(user, request))
 
 
 class MeProfileView(APIView):
@@ -114,14 +118,32 @@ class MeProfileView(APIView):
 
         profile_fields = [
             "display_name",
+            "first_name",
+            "last_name",
             "city",
             "state",
+            "zip_code",
             "phone",
             "contact_email",
         ]
         for field in profile_fields:
             if field in data:
                 setattr(profile, field, data[field])
+
+        vis_raw = data.get("field_visibility", request.data.get("field_visibility"))
+        if isinstance(vis_raw, str):
+            import json
+
+            try:
+                vis_raw = json.loads(vis_raw)
+            except json.JSONDecodeError:
+                vis_raw = None
+        if isinstance(vis_raw, dict):
+            merged = get_visibility_map(profile.field_visibility)
+            for key, value in vis_raw.items():
+                merged[str(key)] = normalize_visibility(value, field_key=str(key))
+            merged["username"] = normalize_visibility(None, field_key="username")
+            profile.field_visibility = merged
 
         if "profile_picture" in request.FILES:
             profile.profile_picture = request.FILES["profile_picture"]
@@ -131,6 +153,22 @@ class MeProfileView(APIView):
                 if profile.profile_picture:
                     profile.profile_picture.delete(save=False)
                 profile.profile_picture = None
+
+        if "first_name" in data or "last_name" in data or not (profile.display_name or "").strip():
+            sync_display_name(profile)
+
+        if "show_memberships_on_profile" in data:
+            profile.show_memberships_on_profile = bool(
+                data["show_memberships_on_profile"]
+            )
+        else:
+            raw_show = request.data.get("show_memberships_on_profile")
+            if raw_show is not None:
+                profile.show_memberships_on_profile = str(raw_show).lower() in (
+                    "true",
+                    "1",
+                    "yes",
+                )
 
         profile.save()
         return Response(build_me_payload(user, request))
@@ -231,6 +269,7 @@ class OrganizationBoardView(APIView):
                 "organization_id": organization.id,
                 "organization_name": organization.name,
                 "organization_slug": organization.slug,
+                "wall_identity": organization_wall_identity(organization, request),
                 "board": OrganizationBoardPublicSerializer(board).data,
                 "can_view": True,
                 "can_post": can_post_org_board(board, user),
@@ -276,7 +315,27 @@ class OrganizationBoardView(APIView):
 
 
 class OrganizationBoardSettingsView(APIView):
+    """Admin: read/update wall visibility and posting mode."""
+
     permission_classes = [IsAuthenticated]
+
+    def get(self, request, slug):
+        try:
+            organization = get_admin_organization(request.user, slug)
+        except Organization.DoesNotExist:
+            return Response(
+                {"detail": "Organization not found or you are not an admin."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        board = get_org_board(organization)
+        return Response(
+            {
+                "organization_id": organization.id,
+                "organization_name": organization.name,
+                "organization_slug": organization.slug,
+                "board": OrganizationBoardPublicSerializer(board).data,
+            }
+        )
 
     def patch(self, request, slug):
         try:
@@ -295,7 +354,212 @@ class OrganizationBoardSettingsView(APIView):
         for field, value in data.items():
             setattr(board, field, value)
         board.save()
-        return Response(OrganizationBoardPublicSerializer(board).data)
+        return Response(
+            {
+                "organization_id": organization.id,
+                "organization_name": organization.name,
+                "organization_slug": organization.slug,
+                "board": OrganizationBoardPublicSerializer(board).data,
+            }
+        )
+
+
+class OrganizationWallIdentityView(APIView):
+    """Admin: set organization account / wall profile fields."""
+
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    TEXT_FIELDS = (
+        "public_username",
+        "first_name",
+        "last_name",
+        "city",
+        "state",
+        "zip_code",
+        "phone",
+        "contact_email",
+    )
+
+    def get(self, request, slug):
+        try:
+            organization = get_admin_organization(request.user, slug)
+        except Organization.DoesNotExist:
+            return Response(
+                {"detail": "Organization not found or you are not an admin."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        return Response(organization_wall_identity(organization, request))
+
+    def patch(self, request, slug):
+        try:
+            organization = get_admin_organization(request.user, slug)
+        except Organization.DoesNotExist:
+            return Response(
+                {"detail": "Organization not found or you are not an admin."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        serializer = OrganizationWallIdentitySerializer(
+            data=request.data,
+            partial=True,
+            context={"organization": organization},
+        )
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        for field in self.TEXT_FIELDS:
+            if field in data:
+                setattr(organization, field, data[field])
+        vis_raw = request.data.get("field_visibility")
+        if isinstance(vis_raw, str):
+            import json
+
+            try:
+                vis_raw = json.loads(vis_raw)
+            except json.JSONDecodeError:
+                vis_raw = None
+        if isinstance(vis_raw, dict):
+            merged = get_visibility_map(organization.field_visibility)
+            for key, value in vis_raw.items():
+                merged[str(key)] = normalize_visibility(value, field_key=str(key))
+            organization.field_visibility = merged
+        if "profile_picture" in request.FILES:
+            organization.profile_picture = request.FILES["profile_picture"]
+        elif data.get("clear_profile_picture"):
+            if organization.profile_picture:
+                organization.profile_picture.delete(save=False)
+            organization.profile_picture = None
+        organization.save()
+        return Response(organization_wall_identity(organization, request))
+
+
+class OrganizationMemberProfileView(APIView):
+    """Member: values shared with one organization (Account settings)."""
+
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    TEXT_FIELDS = (
+        "username",
+        "first_name",
+        "last_name",
+        "city",
+        "state",
+        "zip_code",
+        "phone",
+        "contact_email",
+    )
+
+    def patch(self, request, slug):
+        membership = (
+            OrganizationMembership.objects.filter(
+                user=request.user,
+                organization__slug=slug,
+            )
+            .exclude(organization__status=Organization.Status.CLOSED)
+            .select_related("organization")
+            .first()
+        )
+        if membership is None:
+            return Response(
+                {"detail": "Organization not found or you are not a member."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        serializer = OrganizationMemberProfileSerializer(
+            data=request.data, partial=True
+        )
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        shared = (
+            dict(membership.shared_profile)
+            if isinstance(membership.shared_profile, dict)
+            else {}
+        )
+
+        profile, _ = UserProfile.objects.get_or_create(user=request.user)
+        use_personal = data.get("use_personal") or []
+        # FormData may send a single string instead of a list.
+        if isinstance(use_personal, str):
+            use_personal = [use_personal]
+        for key in use_personal:
+            personal_val = personal_field_value(profile, key, request)
+            if key == "profile_picture":
+                if personal_val:
+                    shared[key] = personal_val
+            elif personal_val is not None:
+                shared[key] = personal_val
+
+        for field in self.TEXT_FIELDS:
+            if field in data:
+                shared[field] = data[field]
+
+        username_val = (shared.get("username") or "").strip()
+        if not username_val:
+            username_val = (request.user.username or "").strip()
+            shared["username"] = username_val
+        if not username_val:
+            return Response(
+                {"username": ["Username is required."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        shared["username"] = username_val
+
+        if "profile_picture" in request.FILES:
+            # Store uploaded member pic under org-scoped path via temp URL string —
+            # reuse personal upload path pattern on membership JSON as absolute URL.
+            from django.core.files.storage import default_storage
+            from django.utils.text import get_valid_filename
+            import uuid
+
+            upload = request.FILES["profile_picture"]
+            path = default_storage.save(
+                f"org_member_profiles/{membership.organization_id}/{uuid.uuid4().hex}_{get_valid_filename(upload.name)}",
+                upload,
+            )
+            url = default_storage.url(path)
+            shared["profile_picture"] = (
+                request.build_absolute_uri(url) if request else url
+            )
+        elif data.get("clear_profile_picture"):
+            shared["profile_picture"] = ""
+        elif "profile_picture" in data and data["profile_picture"] is not None:
+            shared["profile_picture"] = data["profile_picture"]
+
+        vis_raw = request.data.get("field_visibility")
+        if isinstance(vis_raw, str):
+            import json
+
+            try:
+                vis_raw = json.loads(vis_raw)
+            except json.JSONDecodeError:
+                vis_raw = None
+        if isinstance(vis_raw, dict):
+            merged = get_visibility_map(membership.field_visibility)
+            for key, value in vis_raw.items():
+                merged[str(key)] = normalize_visibility(value, field_key=str(key))
+            merged["username"] = normalize_visibility(None, field_key="username")
+            membership.field_visibility = merged
+
+        if "show_membership_on_profile" in data:
+            membership.show_on_profile = bool(data["show_membership_on_profile"])
+        else:
+            raw_show = request.data.get("show_membership_on_profile")
+            if raw_show is not None:
+                membership.show_on_profile = str(raw_show).lower() in (
+                    "true",
+                    "1",
+                    "yes",
+                )
+
+        membership.shared_profile = shared
+        membership.save()
+        from api.serializers import organization_account_field_sections
+
+        sections = organization_account_field_sections(request.user, request)
+        section = next(
+            (s for s in sections if s["organization_slug"] == slug),
+            None,
+        )
+        return Response(section or {"detail": "Saved."})
 
 
 class OrganizationBoardPostDeleteView(APIView):
