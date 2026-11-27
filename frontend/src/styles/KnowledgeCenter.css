@@ -207,6 +207,22 @@
   line-height: 1.35;
 }
 
+.kc-article-body h3 {
+  margin: 1.5rem 0 0.75rem;
+  font-size: 1.0625rem;
+  font-weight: 700;
+  color: var(--cb-text);
+  line-height: 1.4;
+}
+
+.kc-article-body h4 {
+  margin: 1.15rem 0 0.55rem;
+  font-size: 0.975rem;
+  font-weight: 700;
+  color: var(--cb-text);
+  line-height: 1.4;
+}
+
 .kc-article-body p {
   margin: 0 0 1rem;
 }

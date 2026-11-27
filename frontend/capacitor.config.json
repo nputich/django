@@ -1,0 +1,28 @@
+{
+  "appId": "com.communibetter.app",
+  "appName": "communiBetter",
+  "webDir": "dist",
+  "backgroundColor": "#ffffff",
+  "server": {
+    "androidScheme": "https",
+    "hostname": "localhost"
+  },
+  "plugins": {
+    "SystemBars": {
+      "insetsHandling": "css",
+      "style": "DARK",
+      "initialViewportFitValueHint": "cover"
+    },
+    "SplashScreen": {
+      "launchShowDuration": 1200,
+      "launchAutoHide": true,
+      "backgroundColor": "#FFFFFFFF",
+      "showSpinner": false
+    }
+  },
+  "ios": {
+    "contentInset": "automatic",
+    "preferredContentMode": "mobile",
+    "scrollEnabled": true
+  }
+}

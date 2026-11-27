@@ -60,6 +60,22 @@ export default function ArticleMarkdown({ content }) {
       continue;
     }
 
+    if (trimmed.startsWith("### ")) {
+      blocks.push(
+        <h3 key={`h3-${i}`}>{renderInline(trimmed.slice(4), `h3-${i}`)}</h3>
+      );
+      i += 1;
+      continue;
+    }
+
+    if (trimmed.startsWith("#### ")) {
+      blocks.push(
+        <h4 key={`h4-${i}`}>{renderInline(trimmed.slice(5), `h4-${i}`)}</h4>
+      );
+      i += 1;
+      continue;
+    }
+
     if (/^\* /.test(trimmed)) {
       const items = [];
       while (i < lines.length && /^\* /.test(lines[i].trim())) {
@@ -93,6 +109,8 @@ export default function ArticleMarkdown({ content }) {
       lines[i].trim() &&
       !lines[i].trim().startsWith("# ") &&
       !lines[i].trim().startsWith("## ") &&
+      !lines[i].trim().startsWith("### ") &&
+      !lines[i].trim().startsWith("#### ") &&
       !/^\* /.test(lines[i].trim()) &&
       !/^\d+\.\s/.test(lines[i].trim())
     ) {

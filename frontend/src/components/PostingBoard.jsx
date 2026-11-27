@@ -571,7 +571,6 @@ function WallPostCard({
 function WallComposer({
   canPost,
   onCreatePost,
-  composerAvatar,
   promptPlaceholder = "Share something with your community…",
   postPlaceholder = "Share something with your community…",
   questionPlaceholder = "What do you want to ask your community?",
@@ -658,7 +657,6 @@ function WallComposer({
             className="wall-composer-collapsed"
             onClick={() => setExpanded(true)}
           >
-            <AuthorAvatar author={composerAvatar} />
             <span>{promptPlaceholder}</span>
           </button>
           <div className="wall-composer-types">
@@ -840,7 +838,6 @@ export default function PostingBoard({
   onVotePoll,
   onMeetingRsvp,
   emptyMessage = "No posts yet.",
-  composerAvatar = null,
   composerPrompt = "Share something with your community…",
   composerPostPlaceholder = "Share something with your community…",
   composerQuestionPlaceholder = "What do you want to ask your community?",
@@ -868,7 +865,6 @@ export default function PostingBoard({
         <WallComposer
           canPost={canPost}
           onCreatePost={onCreatePost}
-          composerAvatar={composerAvatar}
           promptPlaceholder={composerPrompt}
           postPlaceholder={composerPostPlaceholder}
           questionPlaceholder={composerQuestionPlaceholder}

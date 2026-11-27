@@ -30,6 +30,7 @@ export default function CreateMeeting() {
   const [allowSelfPaced, setAllowSelfPaced] = useState(false);
   const [aiMode, setAiMode] = useState("none");
   const [resultsVisible, setResultsVisible] = useState(false);
+  const [liveResults, setLiveResults] = useState(false);
   const [minutesCreator, setMinutesCreator] = useState("organizer_only");
   const [aggregateNotice, setAggregateNotice] = useState(true);
   const [shareWith, setShareWith] = useState([]);
@@ -149,6 +150,7 @@ export default function CreateMeeting() {
       allow_self_paced: allowSelfPaced,
       ai_mode: aiMode,
       results_visible_to_community: resultsVisible,
+      live_results_for_participants: liveResults,
       minutes_creator: minutesCreator,
       aggregate_sharing_notice: aggregateNotice,
       share_with: shareWith.map((o) => o.slug),
@@ -284,6 +286,29 @@ export default function CreateMeeting() {
                       checked={resultsVisible}
                       onChange={(e) => setResultsVisible(e.target.checked)}
                       aria-label="Allow participants to view meeting results after the meeting"
+                    />
+                    <span className="dashboard-switch-track" aria-hidden />
+                  </label>
+                </div>
+              </fieldset>
+            </div>
+
+            <div className="dashboard-field">
+              <fieldset className="dashboard-fieldset">
+                <legend>Live results during the meeting</legend>
+                <p className="dashboard-meta">
+                  Let participants see combined results on their phones for questions you
+                  share from the host page. Nothing is shown until you share a question.
+                </p>
+                <div className="dashboard-switch-row">
+                  <span>{liveResults ? "ON" : "OFF"}</span>
+                  <label className="dashboard-switch">
+                    <input
+                      type="checkbox"
+                      role="switch"
+                      checked={liveResults}
+                      onChange={(e) => setLiveResults(e.target.checked)}
+                      aria-label="Let participants see shared results during the meeting"
                     />
                     <span className="dashboard-switch-track" aria-hidden />
                   </label>

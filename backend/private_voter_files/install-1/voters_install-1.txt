@@ -1,0 +1,3 @@
+ncid,last_name,first_name
+AA2,SMITH,JOHN
+ZZ9,NOBODY,HERE

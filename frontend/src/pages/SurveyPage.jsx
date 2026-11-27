@@ -2,18 +2,11 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import api from "../api";
 import ContentBlock from "../components/ContentBlock";
+import LiveResultsPanel from "../components/LiveResultsPanel";
+import { getSurveyResponseSession as getResponseSession } from "../surveySession";
 import "../styles/Landing.css";
 import "../styles/CodeResults.css";
 import "../styles/Tags.css";
-
-function getResponseSession() {
-  let session = localStorage.getItem("survey_response_session");
-  if (!session) {
-    session = crypto.randomUUID();
-    localStorage.setItem("survey_response_session", session);
-  }
-  return session;
-}
 
 export default function SurveyPage() {
   const { id } = useParams();
@@ -82,6 +75,14 @@ export default function SurveyPage() {
       <div className="resource-page">
         <h1>Thank you</h1>
         <p>Your responses have been submitted.</p>
+        {survey.live_results_for_respondents && (
+          <LiveResultsPanel
+            kind="survey"
+            resourceId={id}
+            identity={getResponseSession()}
+            showOpenLink
+          />
+        )}
         <Link to="/">Back to home</Link>
       </div>
     );

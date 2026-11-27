@@ -98,6 +98,23 @@ function ChannelEditor({ channel, onSaved }) {
       </div>
       {error && <p className="dashboard-error">{error}</p>}
       <button
+        type="button"
+        className="dashboard-btn"
+        onClick={async () => {
+          if (!window.confirm("Remove this channel from your account?")) return;
+          try {
+            await api.delete(
+              `/api/me/youtube/channels/${encodeURIComponent(channel.channel_id)}/`
+            );
+            onSaved({ ...channel, removed: true });
+          } catch (err) {
+            setError(err.response?.data?.detail || "Could not remove channel.");
+          }
+        }}
+      >
+        Remove channel
+      </button>{" "}
+      <button
         type="submit"
         className="dashboard-btn dashboard-btn--primary"
         disabled={saving}
@@ -114,6 +131,7 @@ export default function YouTubeChannelsSection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [newChannel, setNewChannel] = useState("");
 
   const load = async () => {
     const res = await api.get("/api/me/youtube/");
@@ -153,22 +171,9 @@ export default function YouTubeChannelsSection() {
         window.location.href = res.data.authorize_url;
       }
     } catch (err) {
-      if (err.response?.status === 503) {
-        try {
-          await api.post("/api/me/youtube/dev-stub/", {
-            channel_id: "UC_LOCAL_STUB",
-            title: "Local test channel",
-            subscriber_count: 1000,
-          });
-          await load();
-          setNotice("Local stub channel added (OAuth not configured).");
-          return;
-        } catch {
-          /* fall through */
-        }
-      }
       setError(
-        err.response?.data?.detail || "YouTube connection is not available yet."
+        err.response?.data?.detail ||
+          "YouTube sign-in is not configured. Add a channel with its URL or @handle instead."
       );
     }
   };
@@ -192,10 +197,33 @@ export default function YouTubeChannelsSection() {
   };
 
   const onChannelSaved = (updated) => {
+    if (updated.removed) {
+      setChannels((prev) => prev.filter((c) => c.channel_id !== updated.channel_id));
+      setNotice("Channel removed.");
+      return;
+    }
     setChannels((prev) =>
       prev.map((c) => (c.channel_id === updated.channel_id ? updated : c))
     );
     setNotice("Channel saved.");
+  };
+
+  const addChannel = async (event) => {
+    event.preventDefault();
+    setError("");
+    try {
+      const res = await api.post("/api/me/youtube/channels/", { channel: newChannel });
+      setChannels((prev) => {
+        const exists = prev.some((c) => c.channel_id === res.data.channel_id);
+        return exists
+          ? prev.map((c) => (c.channel_id === res.data.channel_id ? res.data : c))
+          : [...prev, res.data];
+      });
+      setNewChannel("");
+      setNotice("Channel added. Set its state, ZIP, and tags.");
+    } catch (err) {
+      setError(err.response?.data?.detail || "Could not add that channel.");
+    }
   };
 
   if (loading) {
@@ -205,10 +233,23 @@ export default function YouTubeChannelsSection() {
   return (
     <div className="youtube-account-section">
       <p className="dashboard-meta">
-        Connect your YouTube account here. Set state, ZIP, and your own tags on
-        each channel — Map Search reads this when you are a member of a map-enabled
-        organization.
+        Add every YouTube channel you want on your account. Map Search reads these
+        when you are a member of a map-enabled organization.
       </p>
+      <form className="dashboard-form" onSubmit={addChannel} style={{ marginBottom: "1rem" }}>
+        <div className="dashboard-field">
+          <label htmlFor="yt-add-channel">Add a channel</label>
+          <input
+            id="yt-add-channel"
+            value={newChannel}
+            onChange={(event) => setNewChannel(event.target.value)}
+            placeholder="https://www.youtube.com/@yourchannel or UC..."
+          />
+        </div>
+        <button type="submit" className="dashboard-btn dashboard-btn--primary" disabled={!newChannel.trim()}>
+          Add channel
+        </button>
+      </form>
       {notice && <div className="dashboard-success">{notice}</div>}
       {error && <p className="dashboard-error">{error}</p>}
       <div className="map-search-profile-actions" style={{ marginBottom: "1rem" }}>

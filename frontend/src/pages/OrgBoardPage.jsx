@@ -40,17 +40,6 @@ export default function OrgBoardPage() {
     loadBoard();
   }, [loadBoard]);
 
-  const wallIdentity = boardData?.wall_identity || null;
-  const composerAvatar = wallIdentity
-    ? {
-        profile_picture_url: wallIdentity.profile_picture_url || null,
-        display_name: wallIdentity.profile_picture_url
-          ? wallIdentity.name || wallIdentity.display_name || ""
-          : "",
-        username: wallIdentity.public_username || "",
-      }
-    : null;
-
   const handleCreatePost = async (payload) => {
     await api.post(`/api/organizations/${slug}/board/`, payload);
     await loadBoard();
@@ -130,7 +119,6 @@ export default function OrgBoardPage() {
                   : undefined
               }
               onMeetingRsvp={handleMeetingRsvp}
-              composerAvatar={composerAvatar}
               emptyMessage="This organization board is empty. Share an update with your community."
             />
           </div>

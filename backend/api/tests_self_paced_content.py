@@ -8,7 +8,10 @@ from api.content_media import normalize_content_config, survey_disclosure_payloa
 from api.meeting_service import (
     create_initial_session,
     create_meeting_slides,
+    finalize_self_paced_responses,
     join_session,
+    participant_slide_answers,
+    submit_issue_card_responses,
     submit_slide_response,
 )
 from api.models import (
@@ -116,6 +119,84 @@ class SelfPacedAndContentTests(APITestCase):
 
         with self.assertRaises(ValidationError):
             submit_slide_response(meeting, session, attendance, slides[1], raw_response="nope")
+
+    def test_self_paced_issue_card_reload_and_resubmit(self):
+        meeting = Meeting.objects.create(
+            organization=self.org,
+            title="Issues",
+            allow_self_paced=True,
+            results_visible_to_community=False,
+            minutes_creator=Meeting.MinutesCreator.ORGANIZER_ONLY,
+        )
+        create_meeting_slides(
+            meeting,
+            [{"slide_type": "political_issue_card", "prompt": "Top issues"}],
+        )
+        session = create_initial_session(meeting)
+        session.status = "live"
+        session.started_at = timezone.now()
+        session.save()
+        attendance = join_session(meeting, session)
+        slide = meeting.slides.get(slide_type="political_issue_card")
+        submit_issue_card_responses(
+            meeting,
+            session,
+            attendance,
+            slide,
+            [
+                {"text": "Housing", "importance_order": 1},
+                {"text": "Transit", "importance_order": 2},
+            ],
+        )
+        loaded = participant_slide_answers(session, attendance, slide)
+        self.assertEqual(
+            [row["text"] for row in loaded["issues"]],
+            ["Housing", "Transit"],
+        )
+        submit_issue_card_responses(
+            meeting,
+            session,
+            attendance,
+            slide,
+            [{"text": "Schools", "importance_order": 1}],
+        )
+        reloaded = participant_slide_answers(session, attendance, slide)
+        self.assertEqual([row["text"] for row in reloaded["issues"]], ["Schools"])
+
+    def test_finalize_requires_all_slides(self):
+        meeting = Meeting.objects.create(
+            organization=self.org,
+            title="Finalize",
+            allow_self_paced=True,
+            results_visible_to_community=False,
+            minutes_creator=Meeting.MinutesCreator.ORGANIZER_ONLY,
+        )
+        create_meeting_slides(
+            meeting,
+            [
+                {"slide_type": "standard", "prompt": "Q1", "question_format": "text"},
+                {"slide_type": "standard", "prompt": "Q2", "question_format": "text"},
+            ],
+        )
+        session = create_initial_session(meeting)
+        session.status = "live"
+        session.started_at = timezone.now()
+        session.save()
+        attendance = join_session(meeting, session)
+        disclosure = meeting.slides.filter(slide_type="participant_info").first()
+        if disclosure:
+            from api.meeting_service import submit_participant_profile
+
+            submit_participant_profile(attendance, disclosure, {})
+        slides = list(meeting.slides.filter(slide_type="standard").order_by("order"))
+        submit_slide_response(meeting, session, attendance, slides[0], raw_response="one")
+        from django.core.exceptions import ValidationError
+
+        with self.assertRaises(ValidationError):
+            finalize_self_paced_responses(meeting, session, attendance)
+        submit_slide_response(meeting, session, attendance, slides[1], raw_response="two")
+        attendance = finalize_self_paced_responses(meeting, session, attendance)
+        self.assertIsNotNone(attendance.responses_finalized_at)
 
 
 class SurveyFlowTests(APITestCase):

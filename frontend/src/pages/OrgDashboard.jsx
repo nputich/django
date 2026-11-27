@@ -4,6 +4,7 @@ import api from "../api";
 import AppHeader from "../components/AppHeader";
 import DashboardCollapsibleSection from "../components/DashboardCollapsibleSection";
 import MeetingFlyerButton from "../components/MeetingFlyerButton";
+import LiveResultsQrButton from "../components/LiveResultsQrButton";
 import OrgDashboardSettingsMenu from "../components/OrgDashboardSettingsMenu";
 import PostingBoard from "../components/PostingBoard";
 import UpgradeRequiredModal from "../components/UpgradeRequiredModal";
@@ -29,6 +30,10 @@ export default function OrgDashboard() {
   const [boardLoading, setBoardLoading] = useState(true);
   const [startingId, setStartingId] = useState(null);
   const [upgradeModal, setUpgradeModal] = useState(null);
+  const [voterPlugin, setVoterPlugin] = useState(false);
+  const [mapSearchPlugin, setMapSearchPlugin] = useState(false);
+  const [measurePlugin, setMeasurePlugin] = useState(false);
+  const [canReviewPlugins, setCanReviewPlugins] = useState(false);
 
   const caps = org?.capabilities || {};
   const canCreateMeetings = caps.create_meetings !== false;
@@ -72,20 +77,31 @@ export default function OrgDashboard() {
   useEffect(() => {
     loadDashboard();
     loadBoard();
-  }, [loadDashboard, loadBoard]);
-
-  // Org wall composer uses organization profile only (not personal avatar).
-  const orgWallIdentity =
-    boardData?.wall_identity || org?.wall_identity || null;
-  const composerAvatar = orgWallIdentity
-    ? {
-        profile_picture_url: orgWallIdentity.profile_picture_url || null,
-        display_name: orgWallIdentity.profile_picture_url
-          ? orgWallIdentity.name || orgWallIdentity.display_name || ""
-          : "",
-        username: orgWallIdentity.public_username || "",
-      }
-    : null;
+    api
+      .get(`/api/organizations/${slug}/plugins/`)
+      .then((res) => {
+        setVoterPlugin(
+          (res.data.plugins ?? []).some(
+            (plugin) =>
+              plugin.key === "nc_voter_powerquery" &&
+              plugin.installed &&
+              plugin.status === "approved"
+          )
+        );
+        setCanReviewPlugins(Boolean(res.data.can_review));
+        setMapSearchPlugin(
+          (res.data.plugins ?? []).some(
+            (plugin) => plugin.key === "map_search" && plugin.installed && plugin.status === "approved"
+          )
+        );
+        setMeasurePlugin(
+          (res.data.plugins ?? []).some(
+            (plugin) => plugin.key === "measure_reading" && plugin.installed && plugin.status === "approved"
+          )
+        );
+      })
+      .catch(() => setVoterPlugin(false));
+  }, [loadDashboard, loadBoard, slug]);
 
   const handleStartMeeting = async (meetingId) => {
     setStartingId(meetingId);
@@ -249,7 +265,7 @@ export default function OrgDashboard() {
             </div>
 
             <div className="dashboard-actions">
-              {(org?.discovery_enabled || caps.discovery_map) && (
+              {((org?.discovery_enabled || caps.discovery_map) && mapSearchPlugin) && (
                 <Link
                   to={`/dashboard/${slug}/map-search`}
                   className="dashboard-btn dashboard-btn--primary"
@@ -263,6 +279,28 @@ export default function OrgDashboard() {
               >
                 Messages
               </Link>
+              <Link
+                to={`/dashboard/${slug}/plugins`}
+                className="dashboard-btn dashboard-btn--blue"
+              >
+                Add Plugin
+              </Link>
+              {(voterPlugin || canReviewPlugins) && (
+                <Link
+                  to={`/dashboard/${slug}/plugins/nc-voter`}
+                  className="dashboard-btn dashboard-btn--blue"
+                >
+                  NC Voter Record PowerQuery
+                </Link>
+              )}
+              {measurePlugin && (
+                <Link
+                  to={`/dashboard/${slug}/plugins/measure-reading`}
+                  className="dashboard-btn dashboard-btn--blue"
+                >
+                  Measure Reading
+                </Link>
+              )}
               <Link
                 to={`/dashboard/${slug}/reports`}
                 className="dashboard-btn"
@@ -341,24 +379,6 @@ export default function OrgDashboard() {
               </div>
             )}
 
-            {boardData?.is_admin &&
-              orgWallIdentity &&
-              !orgWallIdentity.has_wall_identity && (
-                <div className="dashboard-card dashboard-upgrade-nudge">
-                  <p>
-                    Add an organization profile picture and @username under{" "}
-                    {org?.name || "this organization"} in Account settings so
-                    the wall doesn&apos;t show a placeholder.
-                  </p>
-                  <Link
-                    to={`/account#org-account-${slug}`}
-                    className="dashboard-btn dashboard-btn--primary"
-                  >
-                    Account settings
-                  </Link>
-                </div>
-              )}
-
             {boardLoading && <p className="dashboard-empty">Loading board...</p>}
             {boardData && (
               <div className="dashboard-card">
@@ -399,7 +419,6 @@ export default function OrgDashboard() {
                       : undefined
                   }
                   onMeetingRsvp={handleMeetingRsvp}
-                  composerAvatar={composerAvatar}
                   emptyMessage="This organization board is empty. Share an update with your community."
                 />
               </div>
@@ -420,6 +439,14 @@ export default function OrgDashboard() {
                           <Link to={`/dashboard/${slug}/surveys/${survey.id}/edit`}>
                             Edit
                           </Link>
+                          {survey.live_results_for_respondents && (
+                            <>
+                              {" · "}
+                              <Link to={`/s/${survey.id}/live-results/flyer`} target="_blank">
+                                Live-results QR
+                              </Link>
+                            </>
+                          )}
                         </p>
                       </div>
                       <div>
@@ -471,41 +498,55 @@ export default function OrgDashboard() {
                       <div>
                         <h3>{meeting.title}</h3>
                         <p className="dashboard-meta">
-                          {meeting.access_mode} · {meeting.status} ·{" "}
-                          <Link to={`/m/${meeting.id}`}>View meeting</Link> ·{" "}
-                          <Link to={`/dashboard/${slug}/meetings/${meeting.id}/edit`}>
+                          {meeting.access_mode} · {meeting.status}
+                        </p>
+                        <div className="dashboard-meeting-actions">
+                          <Link
+                            to={`/m/${meeting.id}`}
+                            className="dashboard-btn dashboard-btn--small"
+                          >
+                            View meeting
+                          </Link>
+                          <Link
+                            to={`/dashboard/${slug}/meetings/${meeting.id}/edit`}
+                            className="dashboard-btn dashboard-btn--small"
+                          >
                             Edit
                           </Link>
-                          {" · "}
                           <Link
                             to={`/dashboard/${slug}/meetings/${meeting.id}/host`}
+                            className="dashboard-btn dashboard-btn--small"
                           >
                             View results / host
                           </Link>
-                        </p>
-                        <MeetingFlyerButton
-                          meetingId={meeting.id}
-                          className="dashboard-btn"
-                          label="Print / share flyer"
-                        />
-                        {meeting.status === "scheduled" &&
-                          (canStartMeetings ? (
-                            <button
-                              type="button"
-                              className="dashboard-btn dashboard-btn--primary"
-                              style={{ marginTop: "0.5rem" }}
-                              disabled={startingId === meeting.id}
-                              onClick={() => handleStartMeeting(meeting.id)}
-                            >
-                              {startingId === meeting.id
-                                ? "Starting..."
-                                : "Start meeting"}
-                            </button>
-                          ) : (
-                            <div className="dashboard-locked-action">
+                          <MeetingFlyerButton
+                            meetingId={meeting.id}
+                            className="dashboard-btn dashboard-btn--small"
+                            label="Print / share flyer"
+                          />
+                          {meeting.live_results_for_participants && (
+                            <LiveResultsQrButton
+                              kind="meeting"
+                              resourceId={meeting.id}
+                              className="dashboard-btn dashboard-btn--small"
+                            />
+                          )}
+                          {meeting.status === "scheduled" &&
+                            (canStartMeetings ? (
                               <button
                                 type="button"
-                                className="dashboard-btn dashboard-btn--locked"
+                                className="dashboard-btn dashboard-btn--small dashboard-btn--primary"
+                                disabled={startingId === meeting.id}
+                                onClick={() => handleStartMeeting(meeting.id)}
+                              >
+                                {startingId === meeting.id
+                                  ? "Starting..."
+                                  : "Start meeting"}
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className="dashboard-btn dashboard-btn--small dashboard-btn--locked"
                                 aria-label="Start meeting requires Starter or higher"
                                 onClick={() =>
                                   openUpgrade(
@@ -516,11 +557,13 @@ export default function OrgDashboard() {
                               >
                                 🔒 Start meeting
                               </button>
-                              <p className="dashboard-lock-hint">
-                                Requires Starter or higher
-                              </p>
-                            </div>
-                          ))}
+                            ))}
+                        </div>
+                        {meeting.status === "scheduled" && !canStartMeetings && (
+                          <p className="dashboard-lock-hint">
+                            Requires Starter or higher
+                          </p>
+                        )}
                       </div>
                       <div>
                         {(meeting.access_codes ?? []).map((code) => (

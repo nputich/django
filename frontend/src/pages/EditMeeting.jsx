@@ -38,6 +38,7 @@ export default function EditMeeting() {
   const [allowSelfPaced, setAllowSelfPaced] = useState(false);
   const [aiMode, setAiMode] = useState("none");
   const [resultsVisible, setResultsVisible] = useState(false);
+  const [liveResults, setLiveResults] = useState(false);
   const [minutesCreator, setMinutesCreator] = useState("organizer_only");
   const [aggregateNotice, setAggregateNotice] = useState(true);
   const [slides, setSlides] = useState([]);
@@ -67,6 +68,7 @@ export default function EditMeeting() {
         setAllowSelfPaced(!!m.allow_self_paced);
         setAiMode(m.ai_mode || "none");
         setResultsVisible(!!m.results_visible_to_community);
+        setLiveResults(!!m.live_results_for_participants);
         setMinutesCreator(m.minutes_creator || "organizer_only");
         setAggregateNotice(m.aggregate_sharing_notice !== false);
         const loadedSlides = (m.slides || [])
@@ -158,6 +160,7 @@ export default function EditMeeting() {
         allow_self_paced: allowSelfPaced,
         ai_mode: aiMode,
         results_visible_to_community: resultsVisible,
+        live_results_for_participants: liveResults,
         minutes_creator: minutesCreator,
         aggregate_sharing_notice: aggregateNotice,
         slides: slides.map((slide, index) => slideToPayload(slide, index + 1)),
@@ -311,6 +314,29 @@ export default function EditMeeting() {
                     checked={resultsVisible}
                     onChange={(e) => setResultsVisible(e.target.checked)}
                     aria-label="Allow participants to view meeting results after the meeting"
+                  />
+                  <span className="dashboard-switch-track" aria-hidden />
+                </label>
+              </div>
+            </fieldset>
+          </div>
+
+          <div className="dashboard-field">
+            <fieldset className="dashboard-fieldset">
+              <legend>Live results during the meeting</legend>
+              <p className="dashboard-meta">
+                Let participants see combined results on their phones for questions you share
+                from the host page. Nothing is shown until you share a question.
+              </p>
+              <div className="dashboard-switch-row">
+                <span>{liveResults ? "ON" : "OFF"}</span>
+                <label className="dashboard-switch">
+                  <input
+                    type="checkbox"
+                    role="switch"
+                    checked={liveResults}
+                    onChange={(e) => setLiveResults(e.target.checked)}
+                    aria-label="Let participants see shared results during the meeting"
                   />
                   <span className="dashboard-switch-track" aria-hidden />
                 </label>

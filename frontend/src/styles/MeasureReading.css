@@ -1,0 +1,171 @@
+.measure-load {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: end;
+  margin: 1rem 0;
+}
+
+.measure-screen {
+  max-width: none;
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.measure-layout {
+  display: grid;
+  grid-template-columns: 11rem minmax(0, 1fr) 13rem;
+  gap: 1rem;
+  align-items: start;
+  margin-top: 0.5rem;
+}
+
+.measure-column {
+  min-width: 0;
+}
+
+.measure-kicker,
+.measure-page-label {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #5f6368;
+}
+
+.measure-document {
+  background: #f7f4ee;
+  min-height: 70vh;
+  margin-top: 0.75rem;
+  padding: 1.25rem 2.5rem 2.5rem;
+  overflow-wrap: anywhere;
+  border: 1px solid #e6e1d8;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(60, 64, 67, 0.12), 0 16px 32px rgba(60, 64, 67, 0.18);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.05rem;
+  line-height: 1.7;
+  color: #202124;
+}
+
+.measure-page-label {
+  padding-bottom: 0.75rem;
+  margin-bottom: 1rem;
+  border-bottom: 1px solid #e8eaed;
+}
+
+.measure-title {
+  font-family: Arial, sans-serif;
+  font-size: 1.5rem;
+  font-weight: 500;
+  margin: 0.15rem 0 0.5rem;
+}
+
+.measure-summary {
+  margin: 0 0 0.25rem;
+  color: #3c4043;
+  font-family: Arial, sans-serif;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.measure-line {
+  margin: 0;
+}
+
+.measure-original {
+  margin: 0;
+  cursor: text;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.measure-enter-warning {
+  margin: 0 0 0.75rem;
+  color: #b06000;
+  font-family: Arial, sans-serif;
+  font-size: 0.9rem;
+}
+
+.measure-original.is-replaced {
+  color: #c5221f;
+  text-decoration: line-through;
+  cursor: default;
+}
+
+.measure-inline,
+.measure-suggestion textarea {
+  display: block;
+  width: 100%;
+  border: 0;
+  padding: 0;
+  margin: 0;
+  resize: none;
+  overflow: hidden;
+  font: inherit;
+  line-height: inherit;
+  color: inherit;
+  background: transparent;
+  outline: none;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.measure-suggestion {
+  border-left: 3px solid #188038;
+  margin: 0.15rem 0 0.85rem;
+  padding: 0.05rem 0 0.05rem 0.7rem;
+}
+
+.measure-suggestion textarea {
+  color: #137333;
+}
+
+.measure-submit {
+  margin-top: 1.5rem;
+  font-family: Arial, sans-serif;
+}
+
+.measure-side {
+  font-family: Arial, sans-serif;
+  font-size: 0.9rem;
+  color: #3c4043;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.measure-side h2 {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin: 0 0 0.35rem;
+}
+
+.measure-side textarea {
+  border: 0;
+  border-bottom: 1px solid #dadce0;
+  resize: vertical;
+  font: inherit;
+  padding: 0.35rem 0;
+}
+
+.measure-check {
+  display: flex;
+  gap: 0.45rem;
+  align-items: flex-start;
+  padding: 0.2rem 0;
+}
+
+@media (max-width: 900px) {
+  .measure-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .measure-document {
+    padding: 1.5rem;
+  }
+}

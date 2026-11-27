@@ -32,7 +32,5 @@ export const UNDER_CONSTRUCTION_ROUTES = [
   "/product",
   "/demo",
   "/blog",
-  "/privacy",
-  "/terms",
   "/careers",
 ];

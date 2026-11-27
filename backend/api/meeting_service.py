@@ -437,6 +437,61 @@ def get_session_stats(session: MeetingSession) -> dict:
     }
 
 
+def participant_slide_answers(
+    session: MeetingSession,
+    attendance: MeetingAttendance,
+    slide: MeetingSlide,
+) -> dict:
+    """Saved answers for one slide (self-paced edit / review)."""
+    if slide.slide_type == MeetingSlide.SlideType.PARTICIPANT_INFO:
+        field_keys = {f["key"] for f in slide.config.get("fields", [])}
+        fields = {}
+        for row in attendance.profile_values.all():
+            if row.field_key == "__disclosure_ack__":
+                continue
+            if field_keys and row.field_key not in field_keys:
+                continue
+            fields[row.field_key] = row.value
+        return {"fields": fields}
+
+    responses = MeetingResponse.objects.filter(
+        session=session,
+        slide=slide,
+        participant_id=attendance.participant_id,
+    )
+    if slide.slide_type in (
+        MeetingSlide.SlideType.ISSUE_CARD,
+        MeetingSlide.SlideType.POLITICAL_ISSUE_CARD,
+    ):
+        rows = list(responses.order_by("importance_order", "id"))
+        if not rows:
+            return {}
+        return {
+            "issues": [
+                {
+                    "text": row.raw_response,
+                    "importance_order": row.importance_order or index,
+                }
+                for index, row in enumerate(rows, start=1)
+            ]
+        }
+
+    response = responses.order_by("id").first()
+    if not response:
+        return {}
+
+    if slide.slide_type == MeetingSlide.SlideType.CONTENT:
+        return {"viewed": True}
+
+    if slide.slide_type == MeetingSlide.SlideType.STANDARD:
+        payload = {"selected_options": list(response.selected_options or [])}
+        if slide.question_format == MeetingSlide.QuestionFormat.TEXT:
+            payload["raw_response"] = response.raw_response or ""
+        return payload
+
+    return {"raw_response": response.raw_response or ""}
+
+
 def participant_completed_slide_ids(session: MeetingSession, participant_id) -> list[int]:
     response_ids = set(
         MeetingResponse.objects.filter(
@@ -459,6 +514,37 @@ def participant_completed_slide_ids(session: MeetingSession, participant_id) -> 
                 if participant_profile_complete(attendance, slide):
                     response_ids.add(slide.id)
     return list(response_ids)
+
+
+def self_paced_incomplete_slide_ids(
+    session: MeetingSession, participant_id
+) -> list[int]:
+    meeting = session.meeting
+    completed = set(participant_completed_slide_ids(session, participant_id))
+    return [
+        slide.id
+        for slide in meeting.slides.filter(is_active=True).order_by("order", "id")
+        if slide.id not in completed
+    ]
+
+
+def finalize_self_paced_responses(
+    meeting: Meeting,
+    session: MeetingSession,
+    attendance: MeetingAttendance,
+) -> MeetingAttendance:
+    if not meeting.allow_self_paced:
+        raise ValidationError("This meeting is not self-paced.")
+    if attendance.responses_finalized_at:
+        return attendance
+    pending = self_paced_incomplete_slide_ids(session, attendance.participant_id)
+    if pending:
+        raise ValidationError("Complete every slide before finishing.")
+    from django.utils import timezone
+
+    attendance.responses_finalized_at = timezone.now()
+    attendance.save(update_fields=["responses_finalized_at"])
+    return attendance
 
 
 def participant_profile_complete(attendance: MeetingAttendance, slide: MeetingSlide) -> bool:
@@ -548,6 +634,7 @@ def get_organizer_live_payload(meeting: Meeting, session: MeetingSession) -> dic
                 complete += 1
         profile_counts[slide.id] = complete
 
+    released_ids = {int(i) for i in (session.participant_results_released_slide_ids or [])}
     slides_payload = []
     for slide in get_active_slides(meeting):
         slides_payload.append(
@@ -568,6 +655,7 @@ def get_organizer_live_payload(meeting: Meeting, session: MeetingSession) -> dic
                     MeetingSlide.SlideType.POLITICAL_ISSUE_CARD,
                 ),
                 "is_content": slide.slide_type == MeetingSlide.SlideType.CONTENT,
+                "results_released": slide.id in released_ids,
             }
         )
 
@@ -577,6 +665,7 @@ def get_organizer_live_payload(meeting: Meeting, session: MeetingSession) -> dic
         "meeting_status": meeting.status,
         "is_anonymous": meeting.is_anonymous,
         "allow_self_paced": meeting.allow_self_paced,
+        "live_results_for_participants": meeting.live_results_for_participants,
         "ai_mode": meeting.ai_mode,
         "ai_pending_count": MeetingResponse.objects.filter(
             meeting=meeting,

@@ -14,6 +14,7 @@ export default function DashboardHome() {
   const [profile, setProfile] = useState(null);
   const [boardData, setBoardData] = useState(null);
   const [error, setError] = useState("");
+  const [voterPlugin, setVoterPlugin] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const loadBoard = useCallback(async () => {
@@ -26,11 +27,16 @@ export default function DashboardHome() {
       api.get("/api/me/organizations/"),
       api.get("/api/me/"),
       api.get("/api/me/board/"),
+      api.get("/api/me/plugins/"),
     ])
-      .then(([orgsRes, meRes, boardRes]) => {
+      .then(([orgsRes, meRes, boardRes, pluginRes]) => {
         setOrganizations(orgsRes.data.organizations ?? []);
         setProfile(meRes.data);
         setBoardData(boardRes.data);
+        const installed = (pluginRes.data.plugins ?? []).some(
+          (plugin) => plugin.key === "nc_voter_powerquery" && plugin.installed
+        );
+        setVoterPlugin(installed);
       })
       .catch((err) => {
         setError(
@@ -81,6 +87,14 @@ export default function DashboardHome() {
             <Link to="/dashboard/inbox" className="dashboard-btn dashboard-btn--primary">
               Messages
             </Link>
+            <Link to="/dashboard/plugins" className="dashboard-btn dashboard-btn--blue">
+              Add Plugin
+            </Link>
+            {voterPlugin && (
+              <Link to="/dashboard/plugins/nc-voter" className="dashboard-btn dashboard-btn--blue">
+                NC Voter Record PowerQuery
+              </Link>
+            )}
             <Link to="/account" className="dashboard-btn">
               Account settings
             </Link>
@@ -103,7 +117,6 @@ export default function DashboardHome() {
               onCreatePost={handleCreatePost}
               onDeletePost={handleDeletePost}
               onVotePoll={handleVotePoll}
-              composerAvatar={profile}
               composerPrompt="Write a note for yourself…"
               composerPostPlaceholder="Write a note for yourself…"
               composerQuestionPlaceholder="What do you want to ask yourself?"

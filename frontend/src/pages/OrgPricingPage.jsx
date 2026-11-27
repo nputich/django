@@ -50,7 +50,7 @@ const PLANS = [
       "Dashboard tools and community engagement features for smaller organizations.",
     features: [
       "10 interactive meetings per month",
-      "200 attendees per meeting",
+      "500 attendees per meeting",
       "2,000 survey responses per month",
       "3 AI-processed meetings per month",
     ],

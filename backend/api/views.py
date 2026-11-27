@@ -26,7 +26,7 @@ from .usage_service import (
     consume_survey_submission,
     reserve_ai_meeting_run,
 )
-from .models import AccessCode, ContactSubmission, Meeting, MeetingAttendance, MeetingSession, MeetingSlide, Organization, OrganizationMembership, Survey, SurveyAnswer, SurveyQuestion
+from .models import AccessCode, ContactSubmission, Meeting, MeetingAttendance, MeetingSession, MeetingSlide, Organization, OrganizationFavorite, OrganizationMembership, Survey, SurveyAnswer, SurveyQuestion
 
 logger = logging.getLogger(__name__)
 from .meeting_access import (
@@ -63,6 +63,8 @@ from .meeting_service import (
     join_session,
     leave_attendance,
     participant_completed_slide_ids,
+    participant_slide_answers,
+    finalize_self_paced_responses,
     replace_meeting_slides,
     submit_participant_profile,
     submit_issue_card_responses,
@@ -92,6 +94,7 @@ from .serializers import (
     MeetingDetailSerializer,
     MeetingJoinSerializer,
     MeetingLeaveSerializer,
+    MeetingParticipantSlideQuerySerializer,
     MeetingProfileSubmitSerializer,
     MeetingRespondSerializer,
     MeetingSessionPublicSerializer,
@@ -329,6 +332,70 @@ class OrganizationJoinView(APIView):
         )
 
 
+def _favorite_org_payload(organization):
+    from api.org_access import get_primary_community_code
+
+    code_row = get_primary_community_code(organization)
+    return {
+        "id": organization.id,
+        "name": organization.name,
+        "slug": organization.slug,
+        "description": organization.description,
+        "community_code": code_row.code if code_row else "",
+        "public_username": organization.public_username or "",
+    }
+
+
+class OrganizationFavoriteView(APIView):
+    """Star or unstar a community. Membership is not required."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, slug):
+        organization = get_object_or_404(
+            Organization,
+            slug=slug,
+            is_active=True,
+            status=Organization.Status.ACTIVE,
+        )
+        favorite, created = OrganizationFavorite.objects.get_or_create(
+            user=request.user,
+            organization=organization,
+        )
+        return Response(
+            {"is_favorite": True, "organization": _favorite_org_payload(organization)},
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+    def delete(self, request, slug):
+        organization = get_object_or_404(Organization, slug=slug)
+        OrganizationFavorite.objects.filter(
+            user=request.user, organization=organization
+        ).delete()
+        return Response({"is_favorite": False}, status=status.HTTP_200_OK)
+
+
+class MyFavoritesView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        favorites = (
+            OrganizationFavorite.objects.filter(user=request.user)
+            .select_related("organization")
+            .order_by("-created_at")
+        )
+        return Response(
+            {
+                "favorites": [
+                    _favorite_org_payload(row.organization)
+                    for row in favorites
+                    if row.organization.is_active
+                    and row.organization.status == Organization.Status.ACTIVE
+                ]
+            }
+        )
+
+
 class MyOrganizationsView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -519,6 +586,7 @@ class OrganizationSurveyCreateView(APIView):
             description=data.get("description", ""),
             is_anonymous=data.get("is_anonymous", True),
             aggregate_sharing_notice=data.get("aggregate_sharing_notice", True),
+            live_results_for_respondents=data.get("live_results_for_respondents", False),
             is_active=True,
         )
         from api.survey_service import create_survey_questions
@@ -585,7 +653,14 @@ class OrganizationSurveyDetailView(APIView):
         serializer = DashboardSurveyUpdateSerializer(data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        for field in ("title", "description", "is_anonymous", "is_active", "aggregate_sharing_notice"):
+        for field in (
+            "title",
+            "description",
+            "is_anonymous",
+            "is_active",
+            "aggregate_sharing_notice",
+            "live_results_for_respondents",
+        ):
             if field in data:
                 setattr(survey, field, data[field])
         survey.save()
@@ -657,6 +732,9 @@ class OrganizationMeetingCreateView(APIView):
             ai_mode=data.get("ai_mode", Meeting.AIMode.NONE),
             results_visible_to_community=data.get(
                 "results_visible_to_community", False
+            ),
+            live_results_for_participants=data.get(
+                "live_results_for_participants", False
             ),
             minutes_creator=data.get(
                 "minutes_creator", Meeting.MinutesCreator.ORGANIZER_ONLY
@@ -780,6 +858,7 @@ class OrganizationMeetingDetailView(APIView):
             "allow_self_paced",
             "ai_mode",
             "results_visible_to_community",
+            "live_results_for_participants",
             "minutes_creator",
             "aggregate_sharing_notice",
         ):
@@ -895,6 +974,7 @@ class MeetingJoinView(APIView):
                     "is_anonymous": meeting.is_anonymous,
                     "session": _serialize_session(session),
                     "completed_slide_ids": completed_slide_ids,
+                    "responses_finalized": bool(attendance.responses_finalized_at),
                     "rejoined": True,
                 }
                 if not meeting.is_anonymous and attendance.user:
@@ -917,6 +997,7 @@ class MeetingJoinView(APIView):
                     "is_anonymous": meeting.is_anonymous,
                     "session": _serialize_session(session),
                     "completed_slide_ids": completed_slide_ids,
+                    "responses_finalized": bool(existing_user.responses_finalized_at),
                     "rejoined": True,
                 }
                 if not meeting.is_anonymous and existing_user.user:
@@ -937,10 +1018,45 @@ class MeetingJoinView(APIView):
             "is_anonymous": meeting.is_anonymous,
             "session": _serialize_session(session),
             "completed_slide_ids": completed_slide_ids,
+            "responses_finalized": bool(attendance.responses_finalized_at),
         }
         if not meeting.is_anonymous and user:
             payload["display_name"] = user.get_username()
         return Response(payload, status=status.HTTP_201_CREATED)
+
+
+class MeetingFinalizeView(APIView):
+    """Self-paced: participant confirms all slide answers are final."""
+
+    permission_classes = [AllowAny]
+
+    @transaction.atomic
+    def post(self, request, pk):
+        meeting = get_object_or_404(Meeting, pk=pk)
+        serializer = MeetingLeaveSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        session = get_latest_session(meeting)
+        if not session or not session_is_joinable(session):
+            return Response({"detail": "Meeting is not active."}, status=409)
+
+        try:
+            attendance = get_attendance(session, str(serializer.validated_data["attendance_id"]))
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=400)
+
+        try:
+            attendance = finalize_self_paced_responses(meeting, session, attendance)
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=400)
+
+        return Response(
+            {
+                "detail": "Your answers have been submitted.",
+                "responses_finalized": True,
+                "finalized_at": attendance.responses_finalized_at,
+            }
+        )
 
 
 class MeetingProfileSubmitView(APIView):
@@ -1036,6 +1152,35 @@ class MeetingRespondView(APIView):
             },
             status=status.HTTP_201_CREATED,
         )
+
+
+class MeetingParticipantSlideView(APIView):
+    """Load a participant's saved answers for one slide (self-paced review/edit)."""
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, pk):
+        meeting = get_object_or_404(Meeting, pk=pk)
+        if not meeting.allow_self_paced:
+            return Response(
+                {"detail": "This meeting is not self-paced."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        serializer = MeetingParticipantSlideQuerySerializer(data=request.query_params)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        session = get_latest_session(meeting)
+        if not session or not session_is_joinable(session):
+            return Response({"detail": "Meeting is not active."}, status=409)
+
+        try:
+            attendance = get_attendance(session, str(data["attendance_id"]))
+        except DjangoValidationError as exc:
+            return Response({"detail": exc.messages[0]}, status=400)
+
+        slide = get_object_or_404(MeetingSlide, pk=data["slide_id"], meeting=meeting)
+        return Response(participant_slide_answers(session, attendance, slide))
 
 
 class MeetingLeaveView(APIView):

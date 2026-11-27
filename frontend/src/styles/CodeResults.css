@@ -139,6 +139,118 @@
   min-height: 100px;
 }
 
+.hub-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.hub-title-row h1 {
+  margin: 0;
+}
+
+.favorite-star {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  padding: 0;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: #b9a27a;
+  cursor: pointer;
+}
+
+.favorite-star:hover,
+.favorite-star--on {
+  color: #d4a017;
+}
+
+.favorite-star:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.favorite-star-icon {
+  width: 1.45rem;
+  height: 1.45rem;
+}
+
+.favorite-text-btn {
+  margin-top: 0.35rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--cb-link, #276690);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
+}
+
+.favorite-text-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.landing-favorites {
+  max-width: 560px;
+  margin: 0 auto 1.5rem;
+  text-align: left;
+}
+
+.landing-favorites-title {
+  margin: 0 0 0.5rem;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+  text-align: center;
+}
+
+.landing-favorites-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.landing-favorites-link {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--cb-border);
+  border-radius: 12px;
+  background: var(--cb-bg);
+  text-decoration: none;
+  color: inherit;
+}
+
+.landing-favorites-link strong {
+  display: block;
+}
+
+.landing-favorites-star {
+  color: #d4a017;
+  font-size: 1.1rem;
+  line-height: 1;
+}
+
+.landing-favorites-meta {
+  display: block;
+  color: var(--cb-text-secondary);
+  font-size: 0.85rem;
+}
+
+.landing-favorites-empty {
+  text-align: center;
+  color: var(--cb-text-secondary);
+}
+
 .hub-section {
   margin-top: 2rem;
 }
@@ -184,6 +296,28 @@
 .meeting-gate,
 .meeting-waiting,
 .meeting-join,
+.meeting-self-paced-finish {
+  margin-top: 1.25rem;
+  padding: 1rem 1.15rem;
+  border: 1px solid var(--cb-border, #e5e7eb);
+  border-radius: 12px;
+  background: var(--cb-bg-subtle, #f9fafb);
+}
+
+.meeting-self-paced-finish--done {
+  border-color: var(--cb-orange, #276690);
+  background: #fff;
+}
+
+.meeting-self-paced-finish h2 {
+  margin: 0 0 0.35rem;
+  font-size: 1.15rem;
+}
+
+.meeting-self-paced-finish-btn {
+  margin-top: 0.65rem;
+}
+
 .meeting-slide {
   margin-top: 1.5rem;
   padding: 1.25rem;

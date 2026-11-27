@@ -223,6 +223,54 @@ class MeYouTubeRefreshView(APIView):
         )
 
 
+class MeYouTubeChannelCreateView(APIView):
+    """Add one channel on the personal account without removing the others."""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        raw = (request.data.get("channel") or request.data.get("url") or "").strip()
+        channel_id, title = _parse_channel_input(raw)
+        if not channel_id:
+            return Response(
+                {"detail": "Enter a YouTube channel URL, @handle, or channel id."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        link, created = YouTubeChannelLink.objects.get_or_create(
+            user=request.user,
+            channel_id=channel_id[:64],
+            defaults={"title": (request.data.get("title") or title or channel_id)[:255]},
+        )
+        if not created and request.data.get("title"):
+            link.title = str(request.data.get("title"))[:255]
+            link.save(update_fields=["title"])
+        refresh_user_discovery_listings(request.user)
+        return Response(
+            serialize_youtube_channel(link),
+            status=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+        )
+
+
+def _parse_channel_input(raw: str) -> tuple[str, str]:
+    import re
+
+    text = (raw or "").strip()
+    if not text:
+        return "", ""
+    match = re.search(r"channel/(UC[\w-]{10,})", text, re.I)
+    if match:
+        return match.group(1), ""
+    match = re.search(r"youtube\.com/@([\w.-]+)", text, re.I)
+    if match:
+        handle = match.group(1)
+        return f"@{handle}", handle
+    if text.startswith("@") and len(text) > 1:
+        return text, text[1:]
+    if re.fullmatch(r"UC[\w-]{20,}", text):
+        return text, ""
+    return "", ""
+
+
 class MeYouTubeChannelUpdateView(APIView):
     """Update state, ZIP, and tags for one connected channel."""
 
@@ -252,6 +300,15 @@ class MeYouTubeChannelUpdateView(APIView):
         link.refresh_from_db()
         refresh_user_discovery_listings(request.user)
         return Response(serialize_youtube_channel(link))
+
+    def delete(self, request, channel_id):
+        deleted, _ = YouTubeChannelLink.objects.filter(
+            user=request.user, channel_id=channel_id
+        ).delete()
+        if not deleted:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        refresh_user_discovery_listings(request.user)
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class MeYouTubeDevStubView(APIView):

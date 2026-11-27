@@ -105,17 +105,25 @@ _db_options = {}
 if os.getenv("DB_SSLMODE"):
     _db_options["sslmode"] = os.getenv("DB_SSLMODE")
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv("DB_NAME"),
-        'USER': os.getenv("DB_USER"),
-        'PASSWORD': os.getenv('DB_PWD'),
-        'HOST': os.getenv('DB_HOST'),
-        'PORT': os.getenv('DB_PORT'),
-        'OPTIONS': _db_options,
+if os.getenv("DB_ENGINE") == "sqlite":
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": os.getenv("DB_NAME") or ":memory:",
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv("DB_NAME"),
+            'USER': os.getenv("DB_USER"),
+            'PASSWORD': os.getenv('DB_PWD'),
+            'HOST': os.getenv('DB_HOST'),
+            'PORT': os.getenv('DB_PORT'),
+            'OPTIONS': _db_options,
+        }
+    }
 
 
 # Password validation
@@ -156,6 +164,8 @@ STATIC_URL = 'static/'
 
 MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
+# Tests parse voter files in the request. Production parses after commit on a background thread.
+VOTER_PARSE_INLINE = False
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -168,6 +178,9 @@ CORS_ALLOW_CREDENTIALS = True
 CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:8000",
     "http://localhost:8000",
+    "https://localhost",
+    "http://localhost",
+    "capacitor://localhost",
     "https://django-backend-460809694305.us-central1.run.app",
     "https://communib.com",
     "https://www.communib.com",

@@ -102,7 +102,23 @@
   border: 1px solid var(--cb-border, #e5e7eb);
   border-radius: 10px;
   font-size: 1rem;
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
+}
+
+.issue-list-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: center;
+}
+
+.issue-list-add-button {
+  background: var(--cb-bg-subtle, #f3f4f6);
+  color: var(--cb-text, #111827);
+}
+
+.issue-list-add-button:hover:not(:disabled) {
+  background: var(--cb-bg, #fff);
 }
 
 .issue-list-input:focus {

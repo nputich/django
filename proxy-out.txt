@@ -1,0 +1,44 @@
+2026/10/28 01:27:15 Authorizing with gcloud user credentials
+2026/10/28 01:27:17 [communib:us-central1:postgres] Listening on 127.0.0.1:5433
+2026/10/28 01:27:17 The proxy has started successfully and is ready for new connections!
+2026/10/28 01:27:19 [communib:us-central1:postgres] Accepted connection from 127.0.0.1:60275
+2026/10/28 01:27:20 [communib:us-central1:postgres] client closed the connection
+2026/10/28 01:28:52 [communib:us-central1:postgres] Accepted connection from 127.0.0.1:61000
+2026/10/28 01:28:53 [communib:us-central1:postgres] client closed the connection
+2026/10/28 01:30:01 [communib:us-central1:postgres] Accepted connection from 127.0.0.1:52962
+2026/10/28 01:30:02 [communib:us-central1:postgres] client closed the connection
+2026/10/28 01:30:23 [communib:us-central1:postgres] Accepted connection from 127.0.0.1:53913
+2026/10/28 01:30:26 [communib:us-central1:postgres] client closed the connection
+2026/10/28 01:30:44 [communib:us-central1:postgres] Accepted connection from 127.0.0.1:63209
+2026/10/28 01:30:46 [communib:us-central1:postgres] client closed the connection
+2026/10/28 01:31:03 [communib:us-central1:postgres] Accepted connection from 127.0.0.1:59763
+2026/10/28 01:31:03 [communib:us-central1:postgres] client closed the connection
+2026/10/28 01:31:30 [communib:us-central1:postgres] Accepted connection from 127.0.0.1:56131
+2026/10/28 01:31:40 [communib:us-central1:postgres] client closed the connection
+2026/10/28 01:31:56 [communib:us-central1:postgres] Accepted connection from 127.0.0.1:58182
+2026/10/28 01:31:57 [communib:us-central1:postgres] client closed the connection
+2026/10/28 01:32:18 [communib:us-central1:postgres] Accepted connection from 127.0.0.1:56572
+2026/10/28 01:32:28 [communib:us-central1:postgres] client closed the connection
+2026/10/28 01:34:45 [communib:us-central1:postgres] Accepted connection from 127.0.0.1:53301
+2026/10/28 01:34:45 [communib:us-central1:postgres] client closed the connection
+2026/10/28 01:49:46 [communib:us-central1:postgres] Accepted connection from 127.0.0.1:49609
+2026/10/28 01:49:47 [communib:us-central1:postgres] client closed the connection
+2026/10/28 01:52:31 [communib:us-central1:postgres] Accepted connection from 127.0.0.1:59677
+2026/10/28 01:52:37 [communib:us-central1:postgres] client closed the connection
+2026/10/28 01:52:45 [communib:us-central1:postgres] Accepted connection from 127.0.0.1:55864
+2026/10/28 01:52:46 [communib:us-central1:postgres] client closed the connection
+2026/10/28 02:09:34 [communib:us-central1:postgres] Accepted connection from 127.0.0.1:54009
+2026/10/28 02:09:35 [communib:us-central1:postgres] client closed the connection
+2026/10/28 02:09:47 [communib:us-central1:postgres] Accepted connection from 127.0.0.1:49382
+2026/10/28 02:09:47 [communib:us-central1:postgres] client closed the connection
+2026/10/28 02:10:16 [communib:us-central1:postgres] Accepted connection from 127.0.0.1:54089
+2026/10/28 02:10:17 [communib:us-central1:postgres] client closed the connection
+2026/10/28 03:19:45 [communib:us-central1:postgres] Accepted connection from 127.0.0.1:49289
+2026/10/28 03:19:48 [communib:us-central1:postgres] client closed the connection
+2026/10/28 03:19:50 [communib:us-central1:postgres] Accepted connection from 127.0.0.1:63769
+2026/10/28 03:19:51 [communib:us-central1:postgres] client closed the connection
+2026/10/28 03:19:52 [communib:us-central1:postgres] Accepted connection from 127.0.0.1:63776
+2026/10/28 03:26:44 [communib:us-central1:postgres] client closed the connection
+2026/10/29 21:15:07 Sending SIGTERM signal for proxy to shutdown.
+2026/10/29 21:15:07 SIGTERM signal received. Shutting down...
+2026/10/29 21:15:07 proxy server error: accept tcp 127.0.0.1:5433: use of closed network connection

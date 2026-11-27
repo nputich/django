@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import api from "../api";
 import { ensureValidSession } from "../auth";
+import FavoriteStarButton from "../components/FavoriteStarButton";
 import PostingBoard from "../components/PostingBoard";
 import "../styles/Landing.css";
 import "../styles/CodeResults.css";
@@ -39,6 +40,8 @@ export default function OrgHubPage() {
   const [error, setError] = useState("");
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState("");
+  const [favoriteBusy, setFavoriteBusy] = useState(false);
+  const [favoriteError, setFavoriteError] = useState("");
   const signedIn = ensureValidSession();
 
   useEffect(() => {
@@ -47,6 +50,29 @@ export default function OrgHubPage() {
       .then((res) => setOrg(res.data))
       .catch(() => setError("Organization not found."));
   }, [slug]);
+
+  const handleFavorite = async () => {
+    if (!ensureValidSession()) {
+      navigate(`/?next=/org/${encodeURIComponent(slug)}/hub`);
+      return;
+    }
+    if (!org) return;
+    setFavoriteError("");
+    setFavoriteBusy(true);
+    try {
+      if (org.is_favorite) {
+        await api.delete(`/api/organizations/${slug}/favorite/`);
+        setOrg({ ...org, is_favorite: false });
+      } else {
+        await api.post(`/api/organizations/${slug}/favorite/`);
+        setOrg({ ...org, is_favorite: true });
+      }
+    } catch {
+      setFavoriteError("Could not update favorites.");
+    } finally {
+      setFavoriteBusy(false);
+    }
+  };
 
   const handleJoin = async () => {
     setJoinError("");
@@ -100,7 +126,19 @@ export default function OrgHubPage() {
       <div className="hub-top-actions">
         <HubButton to="/">← Back to home</HubButton>
       </div>
-      <h1>{org.name}</h1>
+      <div className="hub-title-row">
+        <h1>{org.name}</h1>
+        <FavoriteStarButton
+          favorited={Boolean(org.is_favorite)}
+          onClick={handleFavorite}
+          disabled={favoriteBusy}
+          label={
+            org.is_favorite
+              ? `Remove ${org.name} from favorites`
+              : `Add ${org.name} to favorites`
+          }
+        />
+      </div>
       {(org.community_code || org.public_username) && (
         <p className="hub-communibetter-id">
           Community code:{" "}
@@ -114,6 +152,15 @@ export default function OrgHubPage() {
         </p>
       )}
       {org.description && <p>{org.description}</p>}
+      <button
+        type="button"
+        className="favorite-text-btn"
+        onClick={handleFavorite}
+        disabled={favoriteBusy}
+      >
+        {org.is_favorite ? "Remove from favorites" : "Add to favorites"}
+      </button>
+      {favoriteError && <p className="dashboard-error">{favoriteError}</p>}
 
       <section className="hub-section">
         <h2>Membership</h2>

@@ -12,6 +12,11 @@ body {
     Arial, sans-serif;
 }
 
+.is-native-app,
+.is-native-app body {
+  min-height: 100dvh;
+}
+
 :root {
   --cb-blue: #276690;
   --cb-blue-hover: #1e5475;

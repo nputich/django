@@ -33,7 +33,7 @@ class PlanLimitCatalogTests(APITestCase):
         spec = get_plan_limits(SERVICE_LEVEL_BASIC)
         self.assertEqual(spec["survey_submission_limit"], 2000)
         self.assertEqual(spec["meetings_started_limit"], 10)
-        self.assertEqual(spec["attendee_limit"], 200)
+        self.assertEqual(spec["attendee_limit"], 500)
         self.assertEqual(spec["ai_meeting_runs_limit"], 3)
         self.assertEqual(effective_limit(spec, "meetings_started"), 10)
 

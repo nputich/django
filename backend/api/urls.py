@@ -14,6 +14,10 @@ from . import meeting_sharing_views
 from . import reporting_views
 from . import document_views
 from . import discovery_views
+from . import live_results_views
+from . import plugin_views
+from . import bill_views
+from . import measure_views
 
 urlpatterns = [
     path("me/", profile_board_views.MeView.as_view(), name="me"),
@@ -105,12 +109,28 @@ urlpatterns = [
     path("codes/<str:query>/resolve/", views.ResolveCodeView.as_view(), name="resolve-code"),
     path("surveys/<int:pk>/", views.SurveyDetailView.as_view(), name="survey-detail"),
     path("surveys/<int:pk>/submit/", views.SurveySubmitView.as_view(), name="survey-submit"),
+    path(
+        "surveys/<int:pk>/live-results/",
+        live_results_views.SurveyLiveResultsView.as_view(),
+        name="survey-live-results",
+    ),
+    path(
+        "organizations/<slug:slug>/surveys/<int:pk>/release-results/",
+        live_results_views.OrganizationSurveyReleaseResultsView.as_view(),
+        name="org-survey-release-results",
+    ),
     path("organizations/<slug:slug>/hub/", views.OrganizationHubView.as_view(), name="org-hub"),
     path(
         "organizations/<slug:slug>/join/",
         views.OrganizationJoinView.as_view(),
         name="org-join",
     ),
+    path(
+        "organizations/<slug:slug>/favorite/",
+        views.OrganizationFavoriteView.as_view(),
+        name="org-favorite",
+    ),
+    path("me/favorites/", views.MyFavoritesView.as_view(), name="my-favorites"),
     path("me/organizations/", views.MyOrganizationsView.as_view(), name="my-organizations"),
     path(
         "organizations/",
@@ -156,6 +176,11 @@ urlpatterns = [
         "me/youtube/dev-stub/",
         discovery_views.MeYouTubeDevStubView.as_view(),
         name="me-youtube-dev-stub",
+    ),
+    path(
+        "me/youtube/channels/",
+        discovery_views.MeYouTubeChannelCreateView.as_view(),
+        name="me-youtube-channel-create",
     ),
     path(
         "me/youtube/channels/<str:channel_id>/",
@@ -357,6 +382,26 @@ urlpatterns = [
     path("meetings/<int:pk>/join/", views.MeetingJoinView.as_view(), name="meeting-join"),
     path("meetings/<int:pk>/profile/", views.MeetingProfileSubmitView.as_view(), name="meeting-profile"),
     path("meetings/<int:pk>/respond/", views.MeetingRespondView.as_view(), name="meeting-respond"),
+    path(
+        "meetings/<int:pk>/participant-slide/",
+        views.MeetingParticipantSlideView.as_view(),
+        name="meeting-participant-slide",
+    ),
+    path(
+        "meetings/<int:pk>/live-results/",
+        live_results_views.MeetingLiveResultsView.as_view(),
+        name="meeting-live-results",
+    ),
+    path(
+        "organizations/<slug:slug>/meetings/<int:pk>/release-results/",
+        live_results_views.OrganizationMeetingReleaseResultsView.as_view(),
+        name="org-meeting-release-results",
+    ),
+    path(
+        "meetings/<int:pk>/finalize/",
+        views.MeetingFinalizeView.as_view(),
+        name="meeting-finalize",
+    ),
     path("meetings/<int:pk>/leave/", views.MeetingLeaveView.as_view(), name="meeting-leave"),
     path(
         "organizations/<slug:slug>/meetings/<int:pk>/start/",
@@ -622,4 +667,147 @@ urlpatterns = [
         name="org-inbox-decline",
     ),
     path("contact/", views.ContactSubmitView.as_view(), name="contact-submit"),
+    path("me/plugins/", plugin_views.PluginCatalogView.as_view(), name="me-plugins"),
+    path(
+        "me/plugins/access-requests/",
+        plugin_views.PluginAccessRequestListView.as_view(),
+        name="me-plugin-access-requests",
+    ),
+    path(
+        "me/plugins/access-requests/<int:pk>/",
+        plugin_views.PluginAccessDecisionView.as_view(),
+        name="me-plugin-access-decision",
+    ),
+    path(
+        "me/plugins/<slug:key>/",
+        plugin_views.PluginInstallDetailView.as_view(),
+        name="me-plugin-detail",
+    ),
+    path(
+        "me/plugins/nc-voter/files/",
+        plugin_views.VoterFileListView.as_view(),
+        name="me-voter-files",
+    ),
+    path(
+        "me/plugins/nc-voter/files/<int:file_id>/query/",
+        plugin_views.VoterQueryView.as_view(),
+        name="me-voter-query",
+    ),
+    path(
+        "me/plugins/nc-voter/files/<int:file_id>/browse/",
+        plugin_views.VoterRecordBrowseView.as_view(),
+        name="me-voter-browse",
+    ),
+    path(
+        "me/plugins/nc-voter/files/<int:file_id>/export/",
+        plugin_views.VoterExportView.as_view(),
+        name="me-voter-export",
+    ),
+    path(
+        "me/plugins/nc-voter/compare/",
+        plugin_views.VoterCompareView.as_view(),
+        name="me-voter-compare",
+    ),
+    path(
+        "me/plugins/nc-voter/match/",
+        plugin_views.VoterMatchListView.as_view(),
+        name="me-voter-match",
+    ),
+    path(
+        "me/plugins/nc-voter/county-packets/",
+        plugin_views.VoterCountyPacketView.as_view(),
+        name="me-voter-county-packets",
+    ),
+    path(
+        "plugins/nc-voter/official/",
+        plugin_views.OfficialVoterFileView.as_view(),
+        name="voter-official-file",
+    ),
+    path(
+        "organizations/<slug:slug>/plugins/access-requests/",
+        plugin_views.PluginAccessRequestListView.as_view(),
+        name="org-plugin-access-requests",
+    ),
+    path(
+        "organizations/<slug:slug>/plugins/access-requests/<int:pk>/",
+        plugin_views.PluginAccessDecisionView.as_view(),
+        name="org-plugin-access-decision",
+    ),
+    path(
+        "organizations/<slug:slug>/plugins/",
+        plugin_views.PluginCatalogView.as_view(),
+        name="org-plugins",
+    ),
+    path(
+        "organizations/<slug:slug>/plugins/<slug:key>/",
+        plugin_views.PluginInstallDetailView.as_view(),
+        name="org-plugin-detail",
+    ),
+    path(
+        "organizations/<slug:slug>/plugins/nc-voter/files/",
+        plugin_views.VoterFileListView.as_view(),
+        name="org-voter-files",
+    ),
+    path(
+        "organizations/<slug:slug>/plugins/nc-voter/files/<int:file_id>/query/",
+        plugin_views.VoterQueryView.as_view(),
+        name="org-voter-query",
+    ),
+    path(
+        "organizations/<slug:slug>/plugins/nc-voter/files/<int:file_id>/browse/",
+        plugin_views.VoterRecordBrowseView.as_view(),
+        name="org-voter-browse",
+    ),
+    path(
+        "organizations/<slug:slug>/plugins/nc-voter/files/<int:file_id>/export/",
+        plugin_views.VoterExportView.as_view(),
+        name="org-voter-export",
+    ),
+    path(
+        "organizations/<slug:slug>/plugins/nc-voter/compare/",
+        plugin_views.VoterCompareView.as_view(),
+        name="org-voter-compare",
+    ),
+    path(
+        "organizations/<slug:slug>/plugins/nc-voter/match/",
+        plugin_views.VoterMatchListView.as_view(),
+        name="org-voter-match",
+    ),
+    path(
+        "organizations/<slug:slug>/plugins/nc-voter/county-packets/",
+        plugin_views.VoterCountyPacketView.as_view(),
+        name="org-voter-county-packets",
+    ),
+    path(
+        "organizations/<slug:slug>/plugins/measure-reading/measures/",
+        measure_views.MeasureListView.as_view(),
+        name="org-measures",
+    ),
+    path(
+        "organizations/<slug:slug>/plugins/measure-reading/measures/<int:pk>/",
+        measure_views.MeasureDetailView.as_view(),
+        name="org-measure",
+    ),
+    path(
+        "organizations/<slug:slug>/plugins/measure-reading/measures/<int:pk>/voting/",
+        measure_views.MeasureVotingView.as_view(),
+        name="org-measure-voting",
+    ),
+    path(
+        "organizations/<slug:slug>/plugins/measure-reading/measures/<int:pk>/members/",
+        measure_views.MeasureMemberView.as_view(),
+        name="org-measure-members",
+    ),
+    path(
+        "organizations/<slug:slug>/plugins/measure-reading/measures/<int:pk>/revisions/",
+        measure_views.MeasureRevisionView.as_view(),
+        name="org-measure-revisions",
+    ),
+    path(
+        "organizations/<slug:slug>/plugins/measure-reading/measures/<int:pk>/review-requests/",
+        measure_views.MeasureReviewRequestView.as_view(),
+        name="org-measure-review-requests",
+    ),
+    path("bills/", bill_views.LegislativeBillListView.as_view(), name="bills"),
+    path("bills/<int:pk>/", bill_views.LegislativeBillDetailView.as_view(), name="bill-detail"),
 ]

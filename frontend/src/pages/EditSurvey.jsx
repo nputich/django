@@ -3,7 +3,97 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import api from "../api";
 import AppHeader from "../components/AppHeader";
 import TagPicker from "../components/TagPicker";
+import LiveResultsQrButton from "../components/LiveResultsQrButton";
 import "../styles/Dashboard.css";
+
+/** Toggle respondent live results and share/stop sharing individual questions. */
+function SurveyLiveResultsCard({ slug, survey, onUpdated }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const released = new Set(survey.participant_results_released_question_ids || []);
+  const shareable = (survey.questions || []).filter(
+    (q) => q.question_type !== "content" && !q.is_demographic
+  );
+
+  const update = async (body) => {
+    setBusy(true);
+    setError("");
+    try {
+      const res = await api.post(
+        `/api/organizations/${slug}/surveys/${survey.id}/release-results/`,
+        body
+      );
+      onUpdated(res.data);
+    } catch (err) {
+      setError(err.response?.data?.detail || "Could not update live results.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="dashboard-card">
+      <h2>Live results for respondents</h2>
+      <p className="dashboard-meta">
+        After submitting, respondents can see combined results for questions you share here.
+        Demographic questions are never shared.
+      </p>
+      <div className="dashboard-switch-row">
+        <span>{survey.live_results_for_respondents ? "ON" : "OFF"}</span>
+        <label className="dashboard-switch">
+          <input
+            type="checkbox"
+            role="switch"
+            checked={!!survey.live_results_for_respondents}
+            disabled={busy}
+            onChange={(e) => update({ enabled: e.target.checked })}
+            aria-label="Let respondents see shared survey results"
+          />
+          <span className="dashboard-switch-track" aria-hidden />
+        </label>
+      </div>
+      {error && <p className="dashboard-error">{error}</p>}
+      {survey.live_results_for_respondents && shareable.length > 0 && (
+        <ul className="dashboard-list" style={{ marginTop: "0.75rem" }}>
+          {shareable.map((q) => {
+            const isReleased = released.has(q.id);
+            return (
+              <li key={q.id} className="dashboard-list-item">
+                <div>
+                  <strong>#{q.order}</strong> {q.text}
+                  {isReleased && <p className="dashboard-meta">Shared with respondents</p>}
+                </div>
+                <button
+                  type="button"
+                  className={`dashboard-btn dashboard-btn--small${
+                    isReleased ? "" : " dashboard-btn--primary"
+                  }`}
+                  disabled={busy}
+                  onClick={() => update({ item_id: q.id, released: !isReleased })}
+                >
+                  {isReleased ? "Stop sharing" : "Share results"}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+      {survey.live_results_for_respondents && (
+        <div className="dashboard-actions" style={{ marginTop: "0.75rem" }}>
+          <LiveResultsQrButton kind="survey" resourceId={survey.id} />
+          <Link
+            to={`/s/${survey.id}/live-results`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="dashboard-btn"
+          >
+            Open respondent results view
+          </Link>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /** Tags on an existing survey question — saves immediately, applies to all uses of the text. */
 function ExistingQuestionTags({ slug, surveyId, question }) {
@@ -194,6 +284,8 @@ export default function EditSurvey() {
         </div>
 
         {success && <div className="dashboard-success">{success}</div>}
+
+        <SurveyLiveResultsCard slug={slug} survey={survey} onUpdated={setSurvey} />
 
         <form className="dashboard-form" onSubmit={handleSubmit}>
           <div className="dashboard-field">

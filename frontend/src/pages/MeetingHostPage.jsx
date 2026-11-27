@@ -5,6 +5,7 @@ import AppHeader from "../components/AppHeader";
 import HostResultsPanel from "../components/HostResultsPanel";
 import UpgradeRequiredModal from "../components/UpgradeRequiredModal";
 import MeetingFlyerButton from "../components/MeetingFlyerButton";
+import LiveResultsQrButton from "../components/LiveResultsQrButton";
 import "../styles/Dashboard.css";
 
 function emptyStandardSlide(order) {
@@ -437,6 +438,73 @@ export default function MeetingHostPage() {
               </button>
             </div>
           )}
+
+          <div className="dashboard-card">
+            <h2>Live results for participants</h2>
+            <p className="dashboard-meta">
+              Share combined results one question at a time. Participants see them on their
+              phones and tap Refresh for the latest numbers. Individual answers are never shown.
+            </p>
+            <div className="dashboard-switch-row">
+              <span>{live.live_results_for_participants ? "ON" : "OFF"}</span>
+              <label className="dashboard-switch">
+                <input
+                  type="checkbox"
+                  role="switch"
+                  checked={!!live.live_results_for_participants}
+                  disabled={busy}
+                  onChange={(e) =>
+                    runAction("release-results/", { enabled: e.target.checked })
+                  }
+                  aria-label="Let participants see shared results during the meeting"
+                />
+                <span className="dashboard-switch-track" aria-hidden />
+              </label>
+            </div>
+            {live.live_results_for_participants && analyzableSlides.length > 0 && (
+              <ul className="dashboard-list" style={{ marginTop: "0.75rem" }}>
+                {analyzableSlides.map((s) => (
+                  <li key={s.id} className="dashboard-list-item">
+                    <div>
+                      <strong>
+                        #{s.order} {s.title || s.prompt || s.slide_type}
+                      </strong>
+                      <p className="dashboard-meta">
+                        {s.response_count} response{s.response_count === 1 ? "" : "s"}
+                        {s.results_released ? " · Shared with participants" : ""}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      className={`dashboard-btn dashboard-btn--small${
+                        s.results_released ? "" : " dashboard-btn--primary"
+                      }`}
+                      disabled={busy}
+                      onClick={() =>
+                        runAction("release-results/", {
+                          item_id: s.id,
+                          released: !s.results_released,
+                        })
+                      }
+                    >
+                      {s.results_released ? "Stop sharing" : "Share results"}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="dashboard-actions" style={{ marginTop: "0.75rem" }}>
+              <LiveResultsQrButton kind="meeting" resourceId={meetingId} />
+              <Link
+                to={`/m/${meetingId}/live-results`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="dashboard-btn"
+              >
+                Open participant results view
+              </Link>
+            </div>
+          </div>
 
           {(isEnded || canControlSlides) && (
             <div className="dashboard-card">

@@ -26,16 +26,6 @@ const MESSAGES = {
     body: "News and updates from communiBetter will appear here soon.",
     back: { to: "/", label: "← Back to home" },
   },
-  "/privacy": {
-    title: "Privacy Policy",
-    body: "Our privacy policy is being finalized. Please check back soon.",
-    back: { to: "/", label: "← Back to home" },
-  },
-  "/terms": {
-    title: "Terms of Service",
-    body: "Terms of service are being finalized. Please check back soon.",
-    back: { to: "/", label: "← Back to home" },
-  },
   "/careers": {
     title: "Careers",
     body: "We're not hiring yet, but we'd love to hear from you. Check back later.",

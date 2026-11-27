@@ -4,6 +4,7 @@ import api from "../api";
 import { ensureValidSession } from "../auth";
 import IssueCardForm from "../components/IssueCardForm";
 import ContentBlock from "../components/ContentBlock";
+import LiveResultsPanel from "../components/LiveResultsPanel";
 import {
   clearMeetingParticipant,
   getMeetingParticipant,
@@ -48,7 +49,15 @@ function MeetingDisclosure({ disclosure }) {
   );
 }
 
-function ParticipantInfoForm({ slide, values, onChange, onSubmit, submitting, error }) {
+function ParticipantInfoForm({
+  slide,
+  values,
+  onChange,
+  onSubmit,
+  submitting,
+  error,
+  submitLabel = "Continue",
+}) {
   const fields = slide.participant_fields || [];
 
   return (
@@ -120,20 +129,72 @@ function ParticipantInfoForm({ slide, values, onChange, onSubmit, submitting, er
       ))}
       {error && <p className="landing-code-error">{error}</p>}
       <button type="submit" className="landing-code-button" disabled={submitting}>
-        {submitting ? "Saving..." : "Continue"}
+        {submitting ? "Saving..." : submitLabel}
       </button>
     </form>
   );
 }
 
-function QuestionForm({ slide, responseText, selectedOptions, onTextChange, onOptionsChange, onSubmit, submitting, error, alreadyAnswered }) {
-  if (alreadyAnswered) {
+function SelfPacedFinishPanel({
+  allSlidesComplete,
+  responsesFinalized,
+  submitting,
+  finalizeError,
+  onFinalize,
+}) {
+  if (responsesFinalized) {
+    return (
+      <div className="meeting-self-paced-finish meeting-self-paced-finish--done">
+        <h2>Thank you</h2>
+        <p>
+          Your answers have been submitted. You can leave this page or use the slide buttons
+          above to review what you sent.
+        </p>
+      </div>
+    );
+  }
+  if (!allSlidesComplete) return null;
+  return (
+    <div className="meeting-self-paced-finish">
+      <p className="resource-note">
+        You have visited every slide. Review your answers if you like, then submit when you
+        are ready.
+      </p>
+      {finalizeError && <p className="landing-code-error">{finalizeError}</p>}
+      <button
+        type="button"
+        className="landing-code-button meeting-self-paced-finish-btn"
+        disabled={submitting}
+        onClick={onFinalize}
+      >
+        {submitting ? "Submitting…" : "Finish and submit answers"}
+      </button>
+    </div>
+  );
+}
+
+function QuestionForm({
+  slide,
+  responseText,
+  selectedOptions,
+  onTextChange,
+  onOptionsChange,
+  onSubmit,
+  submitting,
+  error,
+  alreadyAnswered,
+  allowRevisions = false,
+  saveProgressLabel = "Save and continue",
+}) {
+  if (alreadyAnswered && !allowRevisions) {
     return (
       <p className="resource-note">
         You submitted a response for this slide. Waiting for the organizer to advance.
       </p>
     );
   }
+
+  const revising = alreadyAnswered && allowRevisions;
 
   const isStandard = slide.slide_type === "standard";
   const isChoice =
@@ -142,6 +203,12 @@ function QuestionForm({ slide, responseText, selectedOptions, onTextChange, onOp
 
   return (
     <form onSubmit={onSubmit} className="resource-form">
+      {revising && (
+        <p className="resource-note">
+          Update your answer below, then use <strong>{saveProgressLabel}</strong> to move
+          forward.
+        </p>
+      )}
       {isChoice ? (
         <div className="resource-field">
           {(slide.choices || []).map((opt) => (
@@ -177,7 +244,11 @@ function QuestionForm({ slide, responseText, selectedOptions, onTextChange, onOp
       )}
       {error && <p className="landing-code-error">{error}</p>}
       <button type="submit" className="landing-code-button" disabled={submitting}>
-        {submitting ? "Submitting..." : "Submit response"}
+        {submitting
+          ? "Saving..."
+          : allowRevisions
+            ? saveProgressLabel
+            : "Submit response"}
       </button>
     </form>
   );
@@ -201,6 +272,16 @@ export default function MeetingPage() {
   const [loading, setLoading] = useState(true);
   const [joining, setJoining] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [responsesFinalized, setResponsesFinalized] = useState(false);
+  const [finalizeError, setFinalizeError] = useState("");
+  const [finalizing, setFinalizing] = useState(false);
+  const [showLiveResults, setShowLiveResults] = useState(false);
+
+  const selfPaced = !!meeting?.allow_self_paced;
+  const activeSlides = (meeting?.slides || [])
+    .filter((s) => s.is_active !== false)
+    .slice()
+    .sort((a, b) => a.order - b.order);
 
   const loadSession = useCallback(async () => {
     const res = await api.get(`/api/meetings/${id}/session/`);
@@ -260,6 +341,7 @@ export default function MeetingPage() {
       })
       .then((res) => {
         setCompletedSlideIds(res.data.completed_slide_ids || []);
+        setResponsesFinalized(!!res.data.responses_finalized);
         setSession(res.data.session);
         if (res.data.session?.id) {
           saveMeetingParticipant(id, {
@@ -272,11 +354,55 @@ export default function MeetingPage() {
   }, [id, participant?.attendance_id, session?.status]);
 
   useEffect(() => {
+    if (selfPaced) return;
     setResponseText("");
     setSelectedOptions([]);
     setIssueItems([]);
+    setProfileValues({});
     setActionError("");
-  }, [viewingSlideId, session?.current_slide?.id]);
+  }, [session?.current_slide?.id, selfPaced]);
+
+  useEffect(() => {
+    if (!selfPaced || !participant?.attendance_id || !viewingSlideId) return undefined;
+    let cancelled = false;
+    setResponseText("");
+    setSelectedOptions([]);
+    setIssueItems([]);
+    setProfileValues({});
+    setActionError("");
+    api
+      .get(`/api/meetings/${id}/participant-slide/`, {
+        params: {
+          attendance_id: participant.attendance_id,
+          slide_id: viewingSlideId,
+        },
+      })
+      .then((res) => {
+        if (cancelled) return;
+        const data = res.data || {};
+        if (Array.isArray(data.issues)) {
+          setIssueItems(
+            data.issues.map((issue, index) => ({
+              id: `issue-${viewingSlideId}-${index}`,
+              text: issue.text,
+            }))
+          );
+        } else if (data.fields) {
+          setProfileValues(data.fields);
+        } else {
+          if (data.raw_response !== undefined) {
+            setResponseText(data.raw_response);
+          }
+          if (Array.isArray(data.selected_options)) {
+            setSelectedOptions(data.selected_options);
+          }
+        }
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [selfPaced, participant?.attendance_id, viewingSlideId, id]);
 
   const needsLogin =
     meeting &&
@@ -286,11 +412,6 @@ export default function MeetingPage() {
   const sessionLive = session && ["live", "paused"].includes(session.status);
   const sessionPaused = session?.status === "paused";
   const sessionEnded = session?.status === "ended";
-  const selfPaced = !!meeting?.allow_self_paced;
-  const activeSlides = (meeting?.slides || [])
-    .filter((s) => s.is_active !== false)
-    .slice()
-    .sort((a, b) => a.order - b.order);
 
   const hostSlideId = session?.current_slide?.id || session?.current_slide_id;
   const hostSlide =
@@ -318,13 +439,41 @@ export default function MeetingPage() {
     currentSlide && completedSlideIds.includes(currentSlide.id);
 
   const markCompleteAndAdvance = (slideId) => {
-    const done = new Set([...completedSlideIds, slideId]);
-    setCompletedSlideIds([...done]);
-    if (!selfPaced) return;
-    const idx = activeSlides.findIndex((s) => s.id === slideId);
-    const following = activeSlides.slice(idx + 1).find((s) => !done.has(s.id));
-    const anyLeft = activeSlides.find((s) => !done.has(s.id));
-    setViewingSlideId((following || anyLeft || activeSlides[idx] || null)?.id ?? null);
+    setCompletedSlideIds((prev) => {
+      const next = prev.includes(slideId) ? prev : [...prev, slideId];
+      if (selfPaced) {
+        const done = new Set(next);
+        const idx = activeSlides.findIndex((s) => s.id === slideId);
+        const following = activeSlides.slice(idx + 1).find((s) => !done.has(s.id));
+        const anyLeft = activeSlides.find((s) => !done.has(s.id));
+        setViewingSlideId((following || anyLeft || null)?.id ?? null);
+      }
+      return next;
+    });
+  };
+
+  const allSlidesComplete =
+    selfPaced &&
+    activeSlides.length > 0 &&
+    activeSlides.every((s) => completedSlideIds.includes(s.id));
+
+  const canEditSelfPaced = selfPaced && !responsesFinalized;
+
+  const handleFinalize = async () => {
+    setFinalizeError("");
+    setFinalizing(true);
+    try {
+      await api.post(`/api/meetings/${id}/finalize/`, {
+        attendance_id: participant.attendance_id,
+      });
+      setResponsesFinalized(true);
+    } catch (err) {
+      setFinalizeError(
+        err.response?.data?.detail || "Could not submit your answers. Try again."
+      );
+    } finally {
+      setFinalizing(false);
+    }
   };
 
   const handleJoin = async (e) => {
@@ -346,6 +495,7 @@ export default function MeetingPage() {
       saveMeetingParticipant(id, record);
       setParticipant(record);
       setCompletedSlideIds(res.data.completed_slide_ids || []);
+      setResponsesFinalized(!!res.data.responses_finalized);
       setSession(res.data.session);
     } catch (err) {
       const detail = err.response?.data?.detail;
@@ -371,7 +521,9 @@ export default function MeetingPage() {
         slide_id: currentSlide.id,
         fields: profileValues,
       });
-      setProfileValues({});
+      if (!completedSlideIds.includes(currentSlide.id)) {
+        setProfileValues({});
+      }
       markCompleteAndAdvance(currentSlide.id);
     } catch (err) {
       setActionError(err.response?.data?.detail || "Could not save profile.");
@@ -392,7 +544,9 @@ export default function MeetingPage() {
           importance_order: index + 1,
         })),
       });
-      setIssueItems([]);
+      if (!completedSlideIds.includes(currentSlide.id)) {
+        setIssueItems([]);
+      }
       markCompleteAndAdvance(currentSlide.id);
     } catch (err) {
       setActionError(err.response?.data?.detail || "Could not submit issues.");
@@ -412,8 +566,10 @@ export default function MeetingPage() {
         raw_response: responseText,
         selected_options: selectedOptions,
       });
-      setResponseText("");
-      setSelectedOptions([]);
+      if (!completedSlideIds.includes(currentSlide.id)) {
+        setResponseText("");
+        setSelectedOptions([]);
+      }
       markCompleteAndAdvance(currentSlide.id);
     } catch (err) {
       setActionError(err.response?.data?.detail || "Could not submit response.");
@@ -451,6 +607,7 @@ export default function MeetingPage() {
     clearMeetingParticipant(id);
     setParticipant(null);
     setCompletedSlideIds([]);
+    setResponsesFinalized(false);
   };
 
   if (loading) {
@@ -599,86 +756,147 @@ export default function MeetingPage() {
             </div>
           )}
 
-          {currentSlide.slide_type !== "content" && <SlidePrompt slide={currentSlide} />}
-
-          {currentSlide.slide_type === "participant_info" && (
-            alreadyAnswered ? (
-              <p className="resource-note">
-                {selfPaced
-                  ? "Saved. Choose another slide above, or wait — you will move forward automatically."
-                  : "Profile saved. Waiting for the organizer to advance."}
-              </p>
-            ) : (
-              <ParticipantInfoForm
-                slide={currentSlide}
-                values={profileValues}
-                onChange={(key, val) =>
-                  setProfileValues((prev) => ({ ...prev, [key]: val }))
-                }
-                onSubmit={handleProfileSubmit}
-                submitting={submitting}
-                error={actionError}
-              />
-            )
-          )}
-
-          {currentSlide.slide_type === "content" && (
-            <>
-              <ContentBlock
-                title={currentSlide.title}
-                content={currentSlide.content || currentSlide.config}
-              />
-              {alreadyAnswered ? (
-                <p className="resource-note">
-                  {selfPaced ? "Continue with the next slide above." : "Waiting for the organizer to advance."}
-                </p>
-              ) : (
-                <button
-                  type="button"
-                  className="landing-code-button"
-                  disabled={submitting}
-                  onClick={handleContentContinue}
-                >
-                  {submitting ? "Saving…" : "Continue"}
-                </button>
-              )}
-              {actionError && <p className="landing-code-error">{actionError}</p>}
-            </>
-          )}
-
-          {currentSlide.slide_type === "standard" && (
-            <QuestionForm
-              slide={currentSlide}
-              responseText={responseText}
-              selectedOptions={selectedOptions}
-              onTextChange={setResponseText}
-              onOptionsChange={setSelectedOptions}
-              onSubmit={handleRespond}
-              submitting={submitting}
-              error={actionError}
-              alreadyAnswered={alreadyAnswered}
+          {selfPaced && responsesFinalized && (
+            <SelfPacedFinishPanel
+              allSlidesComplete={allSlidesComplete}
+              responsesFinalized
+              submitting={finalizing}
+              finalizeError={finalizeError}
+              onFinalize={handleFinalize}
             />
           )}
 
-          {["issue_card", "political_issue_card"].includes(currentSlide.slide_type) && (
-            <IssueCardForm
-              issues={issueItems}
-              onChange={setIssueItems}
-              onSubmit={handleIssueSubmit}
-              submitting={submitting}
-              error={actionError}
-              alreadyAnswered={alreadyAnswered}
+          {currentSlide.slide_type !== "content" && <SlidePrompt slide={currentSlide} />}
+
+          {responsesFinalized && selfPaced ? (
+            <p className="resource-note">
+              Your answers for this slide were submitted. Use another slide button above to
+              review.
+            </p>
+          ) : (
+            <>
+              {currentSlide.slide_type === "participant_info" &&
+                (alreadyAnswered && !selfPaced ? (
+                  <p className="resource-note">
+                    Profile saved. Waiting for the organizer to advance.
+                  </p>
+                ) : (
+                  <ParticipantInfoForm
+                    slide={currentSlide}
+                    values={profileValues}
+                    onChange={(key, val) =>
+                      setProfileValues((prev) => ({ ...prev, [key]: val }))
+                    }
+                    onSubmit={handleProfileSubmit}
+                    submitting={submitting}
+                    error={actionError}
+                    submitLabel={canEditSelfPaced ? "Save and continue" : "Continue"}
+                  />
+                ))}
+
+              {currentSlide.slide_type === "content" && (
+                <>
+                  <ContentBlock
+                    title={currentSlide.title}
+                    content={currentSlide.content || currentSlide.config}
+                  />
+                  {alreadyAnswered && !selfPaced ? (
+                    <p className="resource-note">Waiting for the organizer to advance.</p>
+                  ) : (
+                    <button
+                      type="button"
+                      className="landing-code-button"
+                      disabled={submitting}
+                      onClick={handleContentContinue}
+                    >
+                      {submitting
+                        ? "Saving…"
+                        : canEditSelfPaced
+                          ? "Save and continue"
+                          : "Continue"}
+                    </button>
+                  )}
+                  {actionError && <p className="landing-code-error">{actionError}</p>}
+                </>
+              )}
+
+              {currentSlide.slide_type === "standard" && (
+                <QuestionForm
+                  slide={currentSlide}
+                  responseText={responseText}
+                  selectedOptions={selectedOptions}
+                  onTextChange={setResponseText}
+                  onOptionsChange={setSelectedOptions}
+                  onSubmit={handleRespond}
+                  submitting={submitting}
+                  error={actionError}
+                  alreadyAnswered={alreadyAnswered}
+                  allowRevisions={canEditSelfPaced}
+                />
+              )}
+
+              {["issue_card", "political_issue_card"].includes(currentSlide.slide_type) && (
+                <IssueCardForm
+                  issues={issueItems}
+                  onChange={setIssueItems}
+                  onSubmit={handleIssueSubmit}
+                  submitting={submitting}
+                  error={actionError}
+                  alreadyAnswered={alreadyAnswered}
+                  allowRevisions={canEditSelfPaced}
+                />
+              )}
+            </>
+          )}
+
+          {selfPaced && !responsesFinalized && (
+            <SelfPacedFinishPanel
+              allSlidesComplete={allSlidesComplete}
+              responsesFinalized={false}
+              submitting={finalizing}
+              finalizeError={finalizeError}
+              onFinalize={handleFinalize}
             />
           )}
         </section>
       )}
 
       {!needsLogin && sessionLive && participant && !currentSlide && !sessionPaused && (
-        <p className="resource-note">
-          {selfPaced
-            ? "You've reached the end of this meeting's slides. Thank you."
-            : "No active slide. Waiting for the organizer."}
-        </p>
+        <>
+          {selfPaced ? (
+            <SelfPacedFinishPanel
+              allSlidesComplete={allSlidesComplete}
+              responsesFinalized={responsesFinalized}
+              submitting={finalizing}
+              finalizeError={finalizeError}
+              onFinalize={handleFinalize}
+            />
+          ) : (
+            <p className="resource-note">No active slide. Waiting for the organizer.</p>
+          )}
+        </>
+      )}
+
+      {!needsLogin && participant && meeting.live_results_for_participants && (sessionLive || sessionEnded) && (
+        <div className="live-results-toggle">
+          <button
+            type="button"
+            className="dashboard-btn"
+            aria-expanded={showLiveResults}
+            onClick={() => setShowLiveResults((v) => !v)}
+          >
+            {showLiveResults ? "Hide live results" : "Show live results"}
+            {` (${(session?.participant_results_released_slide_ids || []).length} shared)`}
+          </button>
+          {showLiveResults && (
+            <LiveResultsPanel
+              kind="meeting"
+              resourceId={id}
+              identity={participant.attendance_id}
+              showOpenLink
+            />
+          )}
+        </div>
       )}
 
       {participant && (

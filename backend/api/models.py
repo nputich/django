@@ -235,6 +235,10 @@ class Organization(models.Model):
         blank=True,
         help_text="Org-defined discovery schema: [{key,label,type,required,searchable,options?}].",
     )
+    is_communibetter = models.BooleanField(
+        default=False,
+        help_text="Official Communibetter organization. State and national ones can approve voter-plugin access.",
+    )
 
     def __str__(self):
         return self.name
@@ -293,6 +297,25 @@ class OrganizationMembership(models.Model):
 
     def __str__(self):
         return f"{self.user.username} @ {self.organization.name} ({self.role})"
+
+
+class OrganizationFavorite(models.Model):
+    """A community a signed-in user pinned for quick return from the home page."""
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name="organization_favorites"
+    )
+    organization = models.ForeignKey(
+        Organization, on_delete=models.CASCADE, related_name="favorites"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        unique_together = ("user", "organization")
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.user.username} ★ {self.organization.name}"
 
 
 class YouTubeChannelLink(models.Model):
@@ -609,6 +632,15 @@ class Survey(models.Model):
             "policymakers and decision makers not listed in the disclosure."
         ),
     )
+    live_results_for_respondents = models.BooleanField(
+        default=False,
+        help_text="Respondents may view combined results for questions the organizer releases.",
+    )
+    participant_results_released_question_ids = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Survey question IDs whose combined results respondents may view.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
@@ -747,6 +779,10 @@ class Meeting(models.Model):
     results_visible_to_community = models.BooleanField(
         default=False,
         help_text="When True, eligible users may view meeting results after the meeting ends.",
+    )
+    live_results_for_participants = models.BooleanField(
+        default=False,
+        help_text="Participants may view combined results for slides the organizer releases during the meeting.",
     )
     minutes_creator = models.CharField(
         max_length=32,
@@ -980,6 +1016,11 @@ class MeetingSession(models.Model):
         blank=True,
         help_text="Snapshot of plan interactive-attendee cap when the session went live.",
     )
+    participant_results_released_slide_ids = models.JSONField(
+        default=list,
+        blank=True,
+        help_text="Slide IDs whose combined results participants may view in this session.",
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -1005,6 +1046,11 @@ class MeetingAttendance(models.Model):
     )
     joined_at = models.DateTimeField(auto_now_add=True)
     left_at = models.DateTimeField(null=True, blank=True)
+    responses_finalized_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text="Self-paced meetings: participant confirmed all answers are final.",
+    )
     status = models.CharField(
         max_length=20, choices=Status.choices, default=Status.JOINED
     )
@@ -2063,3 +2109,282 @@ class OrgDocumentShare(models.Model):
 
     def __str__(self):
         return f"doc {self.document_id} share [{self.status}]"
+
+
+class PluginDefinition(models.Model):
+    """A tool that a person or an organization can add from the warehouse."""
+
+    class Audience(models.TextChoices):
+        PERSONAL = "personal", "Personal"
+        ORGANIZATION = "organization", "Organization"
+        BOTH = "both", "Personal and organization"
+
+    key = models.SlugField(max_length=64, unique=True)
+    name = models.CharField(max_length=120)
+    description = models.TextField(blank=True)
+    enabled = models.BooleanField(default=True)
+    audience = models.CharField(
+        max_length=20, choices=Audience.choices, default=Audience.BOTH
+    )
+    requires_approval = models.BooleanField(
+        default=False,
+        help_text="Install stays pending until a Communibetter state or national admin approves it.",
+    )
+
+    def __str__(self):
+        return self.name
+
+    def allows(self, owner_kind: str) -> bool:
+        if self.audience == self.Audience.BOTH:
+            return True
+        return self.audience == owner_kind
+
+
+class PluginInstall(models.Model):
+    """One plugin added for exactly one owner: a user or an organization."""
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        APPROVED = "approved", "Approved"
+        DENIED = "denied", "Denied"
+
+    plugin = models.ForeignKey(
+        PluginDefinition, on_delete=models.CASCADE, related_name="installs"
+    )
+    user = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="plugin_installs",
+    )
+    organization = models.ForeignKey(
+        Organization,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="plugin_installs",
+    )
+    installed_at = models.DateTimeField(auto_now_add=True)
+    installed_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.APPROVED
+    )
+    request_comment = models.TextField(blank=True)
+    decision_comment = models.TextField(blank=True)
+    decided_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    decided_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(user__isnull=False, organization__isnull=True)
+                    | models.Q(user__isnull=True, organization__isnull=False)
+                ),
+                name="plugin_install_one_owner",
+            ),
+            models.UniqueConstraint(
+                fields=["plugin", "user"],
+                condition=models.Q(user__isnull=False),
+                name="plugin_install_unique_user",
+            ),
+            models.UniqueConstraint(
+                fields=["plugin", "organization"],
+                condition=models.Q(organization__isnull=False),
+                name="plugin_install_unique_org",
+            ),
+        ]
+
+    def __str__(self):
+        owner = self.user_id or self.organization_id
+        return f"{self.plugin_id} for {owner}"
+
+
+class VoterFile(models.Model):
+    class Source(models.TextChoices):
+        OWNER_UPLOAD = "owner_upload", "Owner upload"
+        OFFICIAL = "official", "Official"
+        COMPARISON_LIST = "comparison_list", "Comparison list"
+
+    class Status(models.TextChoices):
+        QUEUED = "queued", "Queued"
+        PARSING = "parsing", "Parsing"
+        READY = "ready", "Ready"
+        FAILED = "failed", "Failed"
+
+    install = models.ForeignKey(
+        PluginInstall,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="voter_files",
+    )
+    source = models.CharField(max_length=32, choices=Source.choices)
+    original_filename = models.CharField(max_length=255, blank=True)
+    label = models.CharField(max_length=120, blank=True)
+    stored_path = models.CharField(max_length=500, blank=True)
+    row_count = models.PositiveIntegerField(default=0)
+    rows_skipped = models.PositiveIntegerField(default=0)
+    skip_samples = models.JSONField(default=list, blank=True)
+    status = models.CharField(
+        max_length=16, choices=Status.choices, default=Status.QUEUED
+    )
+    error = models.TextField(blank=True)
+    parsed_at = models.DateTimeField(null=True, blank=True)
+    submitted_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    is_current_official = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["install", "source", "status"]),
+            models.Index(fields=["is_current_official"]),
+        ]
+
+
+class VoterRecord(models.Model):
+    voter_file = models.ForeignKey(
+        VoterFile, on_delete=models.CASCADE, related_name="records"
+    )
+    county = models.CharField(max_length=80, blank=True, db_index=True)
+    county_id = models.CharField(max_length=16, blank=True)
+    ncid = models.CharField(max_length=32, blank=True, db_index=True)
+    last_name = models.CharField(max_length=80, blank=True)
+    first_name = models.CharField(max_length=80, blank=True)
+    middle_name = models.CharField(max_length=80, blank=True)
+    address = models.CharField(max_length=200, blank=True)
+    city = models.CharField(max_length=80, blank=True)
+    zip_code = models.CharField(max_length=16, blank=True)
+    status = models.CharField(max_length=40, blank=True)
+    party = models.CharField(max_length=16, blank=True)
+    line_hash = models.CharField(max_length=64, blank=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["voter_file", "ncid"]),
+            models.Index(fields=["voter_file", "county"]),
+        ]
+
+
+class LegislativeBill(models.Model):
+    """A North Carolina House or Senate bill analyzed with a local model."""
+
+    class Chamber(models.TextChoices):
+        HOUSE = "house", "House"
+        SENATE = "senate", "Senate"
+
+    class AnalysisStatus(models.TextChoices):
+        PENDING = "pending", "Pending"
+        DONE = "done", "Done"
+        FAILED = "failed", "Failed"
+
+    session_year = models.PositiveIntegerField(db_index=True)
+    bill_type = models.CharField(max_length=12, db_index=True)
+    bill_number = models.PositiveIntegerField()
+    chamber = models.CharField(max_length=12, choices=Chamber.choices)
+    title = models.TextField(blank=True)
+    introduced_date = models.DateField(null=True, blank=True)
+    latest_action = models.TextField(blank=True)
+    latest_action_date = models.DateField(null=True, blank=True)
+    official_summary = models.TextField(blank=True)
+    bill_text = models.TextField(blank=True)
+    source_url = models.URLField(max_length=500, blank=True)
+    analysis_summary = models.TextField(blank=True)
+    analysis = models.JSONField(default=dict, blank=True)
+    analysis_status = models.CharField(
+        max_length=16,
+        choices=AnalysisStatus.choices,
+        default=AnalysisStatus.PENDING,
+    )
+    analysis_error = models.TextField(blank=True)
+    analysis_model = models.CharField(max_length=80, blank=True)
+    analyzed_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["session_year", "bill_type", "bill_number"],
+                name="uniq_legislative_bill",
+            ),
+        ]
+        ordering = ["-latest_action_date", "-bill_number"]
+
+    def __str__(self):
+        return f"{self.bill_type.upper()}{self.bill_number} ({self.session_year})"
+
+
+class Measure(models.Model):
+    """A working copy of a government document inside the Measure Reading plugin."""
+
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        VOTING = "voting", "Voting"
+
+    install = models.ForeignKey(
+        PluginInstall, on_delete=models.CASCADE, related_name="measures"
+    )
+    organization = models.ForeignKey(
+        Organization, on_delete=models.CASCADE, related_name="measures"
+    )
+    source_key = models.CharField(max_length=32, default="ncga")
+    external_key = models.CharField(max_length=64, blank=True)
+    session_year = models.PositiveIntegerField(null=True, blank=True)
+    bill_type = models.CharField(max_length=12, blank=True)
+    bill_number = models.PositiveIntegerField(null=True, blank=True)
+    title = models.CharField(max_length=300, blank=True)
+    body = models.TextField(blank=True)
+    summary = models.TextField(blank=True)
+    source_url = models.URLField(max_length=500, blank=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.DRAFT)
+    passage_percent = models.PositiveSmallIntegerField(default=50)
+    created_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.SET_NULL, related_name="+"
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-updated_at"]
+
+    def __str__(self):
+        return self.title or self.external_key or f"Measure {self.pk}"
+
+
+class MeasureMember(models.Model):
+    """Someone invited to mark up one measure. The label is what the group shows."""
+
+    measure = models.ForeignKey(Measure, on_delete=models.CASCADE, related_name="members")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="measure_seats")
+    label = models.CharField(max_length=80, blank=True)
+    color_index = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["measure", "user"], name="uniq_measure_member"),
+        ]
+
+    def display_name(self) -> str:
+        return self.label or self.user.get_full_name() or self.user.username
+
+
+class MeasureRevision(models.Model):
+    """One member's proposed full text for a measure."""
+
+    measure = models.ForeignKey(Measure, on_delete=models.CASCADE, related_name="revisions")
+    member = models.ForeignKey(MeasureMember, on_delete=models.CASCADE, related_name="revisions")
+    body = models.TextField()
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["measure", "member"], name="uniq_measure_revision"),
+        ]

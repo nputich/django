@@ -16,6 +16,7 @@ from .models import (
     Note,
     Organization,
     OrganizationBoard,
+    OrganizationFavorite,
     OrganizationMembership,
     PersonalBoardPost,
     Survey,
@@ -103,6 +104,7 @@ class SurveyDetailSerializer(serializers.ModelSerializer):
             "organization_name",
             "is_anonymous",
             "aggregate_sharing_notice",
+            "live_results_for_respondents",
             "disclosure",
             "questions",
         ]
@@ -138,6 +140,7 @@ class OrganizationHubSerializer(serializers.ModelSerializer):
     board = serializers.SerializerMethodField()
     relationships = serializers.SerializerMethodField()
     is_member = serializers.SerializerMethodField()
+    is_favorite = serializers.SerializerMethodField()
     communibetter_id = serializers.SerializerMethodField()
     community_code = serializers.SerializerMethodField()
     public_username = serializers.CharField(read_only=True)
@@ -160,6 +163,7 @@ class OrganizationHubSerializer(serializers.ModelSerializer):
             "board",
             "relationships",
             "is_member",
+            "is_favorite",
             "discovery_enabled",
         ]
 
@@ -183,6 +187,15 @@ class OrganizationHubSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         user = getattr(request, "user", None) if request else None
         return is_org_member(obj, user)
+
+    def get_is_favorite(self, obj):
+        request = self.context.get("request")
+        user = getattr(request, "user", None) if request else None
+        if not user or not user.is_authenticated:
+            return False
+        return OrganizationFavorite.objects.filter(
+            user=user, organization=obj
+        ).exists()
 
     def get_surveys(self, obj):
         qs = obj.surveys.filter(is_active=True)
@@ -340,6 +353,7 @@ class DashboardSurveySerializer(serializers.ModelSerializer):
             "description",
             "is_active",
             "is_anonymous",
+            "live_results_for_respondents",
             "created_at",
             "access_codes",
         ]
@@ -359,6 +373,8 @@ class DashboardSurveyDetailSerializer(serializers.ModelSerializer):
             "is_active",
             "is_anonymous",
             "aggregate_sharing_notice",
+            "live_results_for_respondents",
+            "participant_results_released_question_ids",
             "disclosure",
             "created_at",
             "questions",
@@ -476,6 +492,7 @@ class MeetingDetailSerializer(serializers.ModelSerializer):
             "allow_self_paced",
             "ai_mode",
             "results_visible_to_community",
+            "live_results_for_participants",
             "minutes_creator",
             "aggregate_sharing_notice",
             "community_code",
@@ -547,6 +564,7 @@ class DashboardMeetingSerializer(serializers.ModelSerializer):
             "is_anonymous",
             "ai_mode",
             "results_visible_to_community",
+            "live_results_for_participants",
             "minutes_creator",
             "created_at",
             "access_codes",
@@ -557,7 +575,6 @@ def organization_wall_identity(organization, request=None) -> dict:
     """Org account / wall profile — never falls back to a personal profile.
 
     Admins set these on the organization account in Account settings.
-    Until then, fields stay empty so the UI shows a placeholder.
     """
     from api.profile_fields import get_visibility_map, visibility_payload
 
@@ -586,7 +603,6 @@ def organization_wall_identity(organization, request=None) -> dict:
             k: visibility_payload(v) for k, v in vis_map.items()
         },
         "has_wall_identity": bool(picture_url and username),
-        # AuthorAvatar: picture if set; otherwise empty name → "?"
         "display_name": organization.name if picture_url else "",
         "username": username if picture_url else "",
     }
@@ -1286,6 +1302,7 @@ class DashboardSurveyCreateSerializer(serializers.Serializer):
     description = serializers.CharField(required=False, allow_blank=True, default="")
     is_anonymous = serializers.BooleanField(default=True)
     aggregate_sharing_notice = serializers.BooleanField(required=False, default=True)
+    live_results_for_respondents = serializers.BooleanField(required=False, default=False)
     access_code = serializers.CharField(
         required=False, allow_blank=True, max_length=32
     )
@@ -1302,6 +1319,7 @@ class DashboardSurveyUpdateSerializer(serializers.Serializer):
     is_anonymous = serializers.BooleanField(required=False)
     is_active = serializers.BooleanField(required=False)
     aggregate_sharing_notice = serializers.BooleanField(required=False)
+    live_results_for_respondents = serializers.BooleanField(required=False)
 
 
 class SurveyAppendQuestionsSerializer(serializers.Serializer):
@@ -1435,6 +1453,7 @@ class DashboardMeetingCreateSerializer(serializers.Serializer):
         default=Meeting.AIMode.NONE,
     )
     results_visible_to_community = serializers.BooleanField(required=False, default=False)
+    live_results_for_participants = serializers.BooleanField(required=False, default=False)
     minutes_creator = serializers.ChoiceField(
         choices=Meeting.MinutesCreator.choices,
         required=False,
@@ -1465,6 +1484,7 @@ class DashboardMeetingUpdateSerializer(serializers.Serializer):
     allow_self_paced = serializers.BooleanField(required=False)
     ai_mode = serializers.ChoiceField(choices=Meeting.AIMode.choices, required=False)
     results_visible_to_community = serializers.BooleanField(required=False)
+    live_results_for_participants = serializers.BooleanField(required=False)
     minutes_creator = serializers.ChoiceField(
         choices=Meeting.MinutesCreator.choices, required=False
     )
@@ -1502,6 +1522,7 @@ class MeetingSessionPublicSerializer(serializers.ModelSerializer):
             "started_at",
             "attendance_count",
             "current_slide_response_count",
+            "participant_results_released_slide_ids",
         ]
 
 
@@ -1554,6 +1575,22 @@ class MeetingRespondSerializer(serializers.Serializer):
         if not cleaned:
             raise serializers.ValidationError("Each issue must include non-empty text.")
         return cleaned
+
+
+class MeetingParticipantSlideQuerySerializer(serializers.Serializer):
+    attendance_id = serializers.UUIDField()
+    slide_id = serializers.IntegerField()
+
+
+class LiveResultsReleaseSerializer(serializers.Serializer):
+    item_id = serializers.IntegerField(required=False)
+    released = serializers.BooleanField(required=False, default=True)
+    enabled = serializers.BooleanField(required=False)
+
+    def validate(self, attrs):
+        if "item_id" not in attrs and "enabled" not in attrs:
+            raise serializers.ValidationError("Provide item_id and/or enabled.")
+        return attrs
 
 
 class MeetingLeaveSerializer(serializers.Serializer):

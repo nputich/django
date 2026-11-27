@@ -18,19 +18,23 @@ export default function IssueCardForm({
   submitting,
   error,
   alreadyAnswered,
+  allowRevisions = false,
+  saveProgressLabel = "Save and continue",
 }) {
   const [draft, setDraft] = useState("");
   const [dragIndex, setDragIndex] = useState(null);
   const [dragOverIndex, setDragOverIndex] = useState(null);
   const [positionDrafts, setPositionDrafts] = useState({});
 
-  if (alreadyAnswered) {
+  if (alreadyAnswered && !allowRevisions) {
     return (
       <p className="resource-note">
         Your ranked issues were submitted. Waiting for the organizer to advance.
       </p>
     );
   }
+
+  const revising = alreadyAnswered && allowRevisions;
 
   const displayPosition = (index, id) =>
     positionDrafts[id] !== undefined ? positionDrafts[id] : String(index + 1);
@@ -85,10 +89,16 @@ export default function IssueCardForm({
 
   return (
     <form onSubmit={handleFormSubmit} className="resource-form">
+      {revising && (
+        <p className="resource-note">
+          Update your list below, then use <strong>{saveProgressLabel}</strong> to move
+          forward. When every slide is done, use <strong>Finish and submit answers</strong>.
+        </p>
+      )}
       <p className="issue-list-hint">
-        Type an issue and press <strong>Enter</strong> to add it. Drag the handle or
-        change the position number to rank by importance (1 = most important). Entering a
-        number larger than the list length moves the issue to last.
+        Type an issue and press <strong>Enter</strong> or click <strong>Add issue</strong>.
+        Drag the handle or change the position number to rank by importance (1 = most
+        important). Entering a number larger than the list length moves the issue to last.
       </p>
 
       {issues.length === 0 ? (
@@ -178,13 +188,27 @@ export default function IssueCardForm({
       />
 
       {error && <p className="landing-code-error">{error}</p>}
-      <button
-        type="submit"
-        className="landing-code-button"
-        disabled={submitting || (issues.length === 0 && !draft.trim())}
-      >
-        {submitting ? "Submitting..." : "Submit ranked issues"}
-      </button>
+      <div className="issue-list-actions">
+        <button
+          type="button"
+          className="landing-code-button issue-list-add-button"
+          disabled={!draft.trim()}
+          onClick={addDraftIssue}
+        >
+          Add issue
+        </button>
+        <button
+          type="submit"
+          className="landing-code-button"
+          disabled={submitting || (issues.length === 0 && !draft.trim())}
+        >
+          {submitting
+            ? "Saving..."
+            : allowRevisions
+              ? saveProgressLabel
+              : "Submit ranked issues"}
+        </button>
+      </div>
     </form>
   );
 }

@@ -10,6 +10,7 @@ import AboutPage from "./pages/AboutPage";
 import KnowledgeCenter from "./pages/KnowledgeCenter";
 import KnowledgeCenterArticle from "./pages/KnowledgeCenterArticle";
 import UnderConstruction from "./pages/UnderConstruction";
+import LegalDocumentPage from "./pages/LegalDocumentPage";
 import SurveyPage from "./pages/SurveyPage";
 import OrgHubPage from "./pages/OrgHubPage";
 import OrgPricingPage from "./pages/OrgPricingPage";
@@ -19,8 +20,13 @@ import MeetingDetailsPage from "./pages/MeetingDetailsPage";
 import MeetingResultsPage from "./pages/MeetingResultsPage";
 import MeetingSummaryPage from "./pages/MeetingSummaryPage";
 import MeetingFlyerPage from "./pages/MeetingFlyerPage";
+import LiveResultsPage from "./pages/LiveResultsPage";
+import LiveResultsFlyerPage from "./pages/LiveResultsFlyerPage";
 import MeetingHostPage from "./pages/MeetingHostPage";
 import DashboardHome from "./pages/DashboardHome";
+import PluginWarehousePage from "./pages/PluginWarehousePage";
+import NcVoterPluginPage from "./pages/NcVoterPluginPage";
+import MeasureReadingPage from "./pages/MeasureReadingPage";
 import OrgDashboard from "./pages/OrgDashboard";
 import OrgBilling from "./pages/OrgBilling";
 import BillingEntry from "./pages/BillingEntry";
@@ -81,11 +87,23 @@ function App() {
         />
         <Route path="/org" element={<OrgPricingPage />} />
         <Route path="/pricing" element={<PricingRedirect />} />
+        <Route path="/privacy" element={<LegalDocumentPage />} />
+        <Route path="/terms" element={<LegalDocumentPage />} />
         {UNDER_CONSTRUCTION_ROUTES.map((path) => (
           <Route key={path} path={path} element={<UnderConstruction />} />
         ))}
         <Route path="/s/:id" element={<SurveyPage />} />
+        <Route path="/s/:id/live-results" element={<LiveResultsPage kind="survey" />} />
+        <Route
+          path="/s/:id/live-results/flyer"
+          element={<LiveResultsFlyerPage kind="survey" />}
+        />
         <Route path="/m/:id" element={<MeetingPage />} />
+        <Route path="/m/:id/live-results" element={<LiveResultsPage kind="meeting" />} />
+        <Route
+          path="/m/:id/live-results/flyer"
+          element={<LiveResultsFlyerPage kind="meeting" />}
+        />
         <Route path="/m/:id/details" element={<MeetingDetailsPage />} />
         <Route path="/m/:id/results" element={<MeetingResultsPage />} />
         <Route path="/m/:id/summary" element={<MeetingSummaryPage />} />
@@ -119,6 +137,22 @@ function App() {
           }
         />
         <Route
+          path="/dashboard/plugins/nc-voter"
+          element={
+            <ProtectedRoute>
+              <NcVoterPluginPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/plugins"
+          element={
+            <ProtectedRoute>
+              <PluginWarehousePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
           path="/dashboard/inbox"
           element={
             <ProtectedRoute>
@@ -139,6 +173,38 @@ function App() {
           element={
             <ProtectedRoute>
               <BillingEntry />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/:slug/plugins/measure-reading/:measureId"
+          element={
+            <ProtectedRoute>
+              <MeasureReadingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/:slug/plugins/measure-reading"
+          element={
+            <ProtectedRoute>
+              <MeasureReadingPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/:slug/plugins/nc-voter"
+          element={
+            <ProtectedRoute>
+              <NcVoterPluginPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/dashboard/:slug/plugins"
+          element={
+            <ProtectedRoute>
+              <PluginWarehousePage />
             </ProtectedRoute>
           }
         />

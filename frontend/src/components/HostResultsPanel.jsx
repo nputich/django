@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import api from "../api";
+import ResultsBarChart from "./ResultsBarChart";
 import "../styles/HostResults.css";
 
 const isLocalDev = import.meta.env.DEV;
@@ -15,33 +16,7 @@ function isPoliticalSlide(slide) {
   return slide?.slide_type === "political_issue_card";
 }
 
-function BarChart({ bars, compact = false }) {
-  if (!bars?.length) {
-    return <p className="dashboard-meta host-results-empty">No responses yet.</p>;
-  }
-
-  return (
-    <div
-      className={`host-bar-chart${compact ? " host-bar-chart--compact" : ""}`}
-      aria-label="Results chart"
-    >
-      {bars.map((bar) => (
-        <div key={bar.label} className="host-bar-row">
-          <span className="host-bar-label" title={bar.label}>
-            {bar.label}
-          </span>
-          <div className="host-bar-track">
-            <div
-              className="host-bar-fill"
-              style={{ width: `${bar.percent}%` }}
-            />
-          </div>
-          <span className="host-bar-count">{bar.count}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
+const BarChart = ResultsBarChart;
 
 function CompareColumn({ title, subtitle, bars }) {
   return (
