@@ -3,7 +3,7 @@ import logging
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import transaction
-from django.db.models import Prefetch
+from django.db.models import Prefetch, Q
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 from django.conf import settings
@@ -159,80 +159,104 @@ def build_access_code_result(access_code):
         "is_primary": access_code.is_primary,
         "is_verified": org.is_verified,
     }
+
+
+def build_organization_lookup_result(org):
+    from api.org_access import get_primary_community_code
+
+    code_row = get_primary_community_code(org)
+    code = (code_row.code if code_row else org.public_username or org.slug).upper()
+    return {
+        "target_id": f"org-short-{org.id}",
+        "code": code,
+        "label": org.name,
+        "description": org.description or "Organization hub",
+        "type": "organization",
+        "organization_name": org.name,
+        "requires_login": False,
+        "requires_private_code": False,
+        "path": f"/org/{org.slug}/hub",
+        "sort_order": 0,
+        "is_primary": True,
+        "is_verified": org.is_verified,
+    }
+
+
+def _lookup_rank(item, q):
+    code = (item.get("code") or "").upper()
+    name = (item.get("organization_name") or item.get("label") or "").upper()
+    exact = code == q or name == q
+    prefix = code.startswith(q) or name.startswith(q)
+    return (
+        not exact,
+        not prefix,
+        not item.get("is_verified"),
+        not item.get("is_primary"),
+        item.get("sort_order") or 0,
+        code,
+    )
+
+
 class ResolveCodeView(APIView):
     permission_classes = [AllowAny]
     authentication_classes = []
     MATCH_LIMIT = 10
+    FETCH_LIMIT = 40
 
     def get(self, request, query):
         from api.models import Organization
-        from api.org_access import get_primary_community_code
 
         raw = query.strip()
         q = raw.upper()
         if not q:
             return Response({"query": "", "match_count": 0, "results": []})
 
+        now = timezone.now()
+        results = []
+        seen_keys = set()
+
+        def add_item(item):
+            if not item:
+                return
+            key = item["target_id"]
+            if key in seen_keys:
+                return
+            seen_keys.add(key)
+            results.append(item)
+
         codes = (
-            AccessCode.objects.filter(code__istartswith=q, is_active=True)
+            AccessCode.objects.filter(is_active=True)
+            .filter(
+                Q(code__istartswith=q)
+                | Q(label__icontains=raw)
+                | Q(organization__name__icontains=raw)
+            )
             .select_related(
                 "organization",
                 "resource_type",
                 "survey",
                 "meeting",
             )
-            .order_by("sort_order", "code", "id")
+            .order_by("sort_order", "code", "id")[: self.FETCH_LIMIT]
         )
-        now = timezone.now()
-        results = []
-        seen_org_ids = set()
         for access_code in codes:
             if access_code.expires_at and access_code.expires_at < now:
                 continue
-            item = build_access_code_result(access_code)
-            if item:
-                results.append(item)
-                if access_code.organization_id:
-                    seen_org_ids.add(access_code.organization_id)
-            if len(results) >= self.MATCH_LIMIT:
-                break
+            add_item(build_access_code_result(access_code))
 
-        # Also match org shortcodes (public_username) for enter-a-code lookup.
-        if len(results) < self.MATCH_LIMIT:
-            for org in Organization.objects.filter(
-                is_active=True,
-                status=Organization.Status.ACTIVE,
-                public_username__istartswith=raw,
-            ).exclude(id__in=seen_org_ids)[: self.MATCH_LIMIT]:
-                code_row = get_primary_community_code(org)
-                code = (code_row.code if code_row else org.public_username or org.slug).upper()
-                results.append(
-                    {
-                        "target_id": f"org-short-{org.id}",
-                        "code": code,
-                        "label": org.name,
-                        "description": org.description or "Organization hub",
-                        "type": "organization",
-                        "organization_name": org.name,
-                        "requires_login": False,
-                        "requires_private_code": False,
-                        "path": f"/org/{org.slug}/hub",
-                        "sort_order": 0,
-                        "is_primary": True,
-                        "is_verified": org.is_verified,
-                    }
-                )
-                if len(results) >= self.MATCH_LIMIT:
-                    break
+        orgs = Organization.objects.filter(
+            is_active=True,
+            status=Organization.Status.ACTIVE,
+        ).filter(
+            Q(public_username__icontains=raw)
+            | Q(name__icontains=raw)
+            | Q(slug__icontains=raw)
+        )[: self.FETCH_LIMIT]
+        for org in orgs:
+            add_item(build_organization_lookup_result(org))
 
-        results.sort(
-            key=lambda r: (
-                not r["is_primary"],
-                not r["is_verified"],
-                r["sort_order"],
-                r["code"],
-            )
-        )
+        results.sort(key=lambda item: _lookup_rank(item, q))
+        results = results[: self.MATCH_LIMIT]
         return Response(
             {
                 "query": q,

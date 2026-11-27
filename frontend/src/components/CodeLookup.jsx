@@ -111,7 +111,7 @@ export default function CodeLookup({ className = "" }) {
         <input
           type="search"
           className="landing-code-input"
-          placeholder="Enter community or organization code"
+          placeholder="Start typing a name or code"
           value={query}
           onChange={(e) => setQuery(normalizeAccessCode(e.target.value))}
           aria-label="Code"

@@ -163,3 +163,20 @@ class AccessCodeDisabledTests(TestCase):
         )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertEqual(res.data["code"], "access_code_disabled")
+
+
+class ResolveCodeLookupTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        self.org = Organization.objects.create(
+            name="Streamers International",
+            slug="streamers-international",
+            is_active=True,
+            status=Organization.Status.ACTIVE,
+        )
+
+    def test_partial_name_populates_org_match(self):
+        res = self.client.get("/api/codes/STREAMER/resolve/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        names = [item["organization_name"] for item in res.data["results"]]
+        self.assertIn("Streamers International", names)
