@@ -2,9 +2,47 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="/favicon.png" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CommuniB</title>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <link rel="icon" href="/favicon.ico?v=4" sizes="any" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png?v=4" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png?v=4" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/favicon-48x48.png?v=4" />
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon-64x64.png?v=4" />
+    <link rel="shortcut icon" href="/favicon.ico?v=4" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=5" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#276690" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="communiBetter" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>communiBetter</title>
+    <script>
+      (function () {
+        // Break /app redirect loops without a full reload
+        var path = location.pathname;
+        if (path === "/app" || path === "/login") {
+          history.replaceState(null, "", "/");
+        }
+
+        // Clear expired or corrupt JWT so React never enters an auth loop
+        try {
+          var token = localStorage.getItem("access");
+          if (!token) return;
+          var payload = JSON.parse(atob(token.split(".")[1].replace(/-/g, "+").replace(/_/g, "/")));
+          if (payload.exp * 1000 < Date.now()) {
+            localStorage.removeItem("access");
+            localStorage.removeItem("refresh");
+          }
+        } catch (e) {
+          localStorage.removeItem("access");
+          localStorage.removeItem("refresh");
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

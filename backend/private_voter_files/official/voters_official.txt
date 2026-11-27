@@ -1,0 +1,4 @@
+county_desc	ncid	last_name	first_name	res_street_address	voter_status_desc	party_cd
+WAKE	AA1	DOE	JANET	1 MAIN ST	ACTIVE	DEM
+DURHAM	AA3	LEE	ANN	3 PINE ST	INACTIVE	UNA
+WAKE	AA4	NGUYEN	KIM	4 ELM ST	ACTIVE	DEM

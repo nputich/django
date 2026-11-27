@@ -136,6 +136,10 @@ celerybeat.pid
 
 # Environments
 .env
+.env.local
+.env.production
+.env.*.local
+!.env.example
 .envrc
 .venv
 env/
@@ -216,6 +220,19 @@ secrets
 data/
 data
 
+# Uploaded profile pictures / media (local Docker volume)
+backend/media/
+
 grafana-storage/
 grafana-storage
 chrome_hits.txt
+
+.env
+.env.local
+.env.production.local
+.env.*.local
+
+venv
+venv/
+.venv
+.venv/

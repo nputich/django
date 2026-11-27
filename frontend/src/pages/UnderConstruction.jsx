@@ -1,12 +1,34 @@
 import { Link, useLocation } from "react-router-dom";
-import logo from "../assets/logo-full.png";
+import MarketingLayout from "../components/MarketingLayout";
+import SiteLogo from "../components/SiteLogo";
 import "../styles/Landing.css";
 import "../styles/EnterCode.css";
 
+const DEFAULT = {
+  title: "Under construction",
+  body: "This page is still under construction. Please check back later.",
+  back: { to: "/", label: "← Back to home" },
+};
+
 const MESSAGES = {
-  "/org": {
-    title: "Organization accounts",
-    body: "Organization sign-up and management are not available yet. Please check back later.",
+  "/product": {
+    title: "Product",
+    body: "Product details and features are coming soon.",
+    back: { to: "/", label: "← Back to home" },
+  },
+  "/demo": {
+    title: "Demo",
+    body: "A live product demo is not available yet. Please check back later.",
+    back: { to: "/", label: "← Back to home" },
+  },
+  "/blog": {
+    title: "Blog",
+    body: "News and updates from communiBetter will appear here soon.",
+    back: { to: "/", label: "← Back to home" },
+  },
+  "/careers": {
+    title: "Careers",
+    body: "We're not hiring yet, but we'd love to hear from you. Check back later.",
     back: { to: "/", label: "← Back to home" },
   },
   "/search-another-way": {
@@ -18,20 +40,18 @@ const MESSAGES = {
 
 export default function UnderConstruction() {
   const { pathname } = useLocation();
-  const content = MESSAGES[pathname] ?? MESSAGES["/search-another-way"];
+  const content = MESSAGES[pathname] ?? DEFAULT;
 
   return (
-    <div className="enter-code">
-      <div className="enter-code-logo-wrap">
-        <img src={logo} alt="communiB" className="enter-code-logo" />
-      </div>
-      <h1>{content.title}</h1>
+    <MarketingLayout mainClassName="landing-main enter-code-page">
+      <SiteLogo />
+      <h1 className="enter-code-title">{content.title}</h1>
       <p className="enter-code-subtitle">{content.body}</p>
       <p className="enter-code-alt">
         <Link to={content.back.to}>{content.back.label}</Link>
         {" · "}
         <Link to="/">Home</Link>
       </p>
-    </div>
+    </MarketingLayout>
   );
 }

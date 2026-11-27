@@ -1,0 +1,387 @@
+import { useCallback, useEffect, useState } from "react";
+import { Link, useNavigate, useParams } from "react-router-dom";
+import api from "../api";
+import AppHeader from "../components/AppHeader";
+import TagPicker from "../components/TagPicker";
+import { normalizeAccessCode } from "../accessCode";
+import "../styles/Dashboard.css";
+
+function emptyQuestion(order) {
+  return {
+    order,
+    text: "",
+    question_type: "text",
+    choices: [],
+    tag_ids: [],
+    is_demographic: false,
+    body: "",
+    banner_url: "",
+    video_url: "",
+  };
+}
+
+export default function CreateSurvey() {
+  const { slug } = useParams();
+  const navigate = useNavigate();
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [accessCode, setAccessCode] = useState("");
+  const [codeStatus, setCodeStatus] = useState(null);
+  const [isAnonymous, setIsAnonymous] = useState(true);
+  const [aggregateNotice, setAggregateNotice] = useState(true);
+  const [questions, setQuestions] = useState([emptyQuestion(1)]);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [entitlementBlocked, setEntitlementBlocked] = useState(false);
+
+  useEffect(() => {
+    api
+      .get(`/api/organizations/${slug}/dashboard/`)
+      .then((res) => {
+        if (res.data.capabilities && !res.data.capabilities.create_surveys) {
+          setEntitlementBlocked(true);
+        }
+      })
+      .catch(() => {});
+  }, [slug]);
+
+  const checkCode = useCallback(async (code) => {
+    if (!code.trim()) {
+      setCodeStatus(null);
+      return;
+    }
+    try {
+      const res = await api.get("/api/access-codes/check/", {
+        params: { code: code.trim(), type: "survey" },
+      });
+      setCodeStatus(res.data);
+    } catch (err) {
+      setCodeStatus({
+        available: false,
+        detail: err.response?.data?.detail || "Could not check code.",
+      });
+    }
+  }, []);
+
+  const updateQuestion = (index, field, value) => {
+    setQuestions((prev) =>
+      prev.map((q, i) => (i === index ? { ...q, [field]: value } : q))
+    );
+  };
+
+  const addQuestion = () => {
+    setQuestions((prev) => [...prev, emptyQuestion(prev.length + 1)]);
+  };
+
+  const removeQuestion = (index) => {
+    if (questions.length <= 1) return;
+    setQuestions((prev) =>
+      prev.filter((_, i) => i !== index).map((q, i) => ({ ...q, order: i + 1 }))
+    );
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setError("");
+    setSuccess(null);
+    setSubmitting(true);
+
+    const payload = {
+      title: title.trim(),
+      description: description.trim(),
+      is_anonymous: isAnonymous,
+      aggregate_sharing_notice: aggregateNotice,
+      access_code: accessCode.trim(),
+      questions: questions.map((q, i) => ({
+        order: i + 1,
+        text: q.text.trim(),
+        question_type: q.question_type,
+        choices: q.question_type === "choice" ? q.choices : [],
+        is_demographic: !!q.is_demographic && q.question_type !== "content",
+        body: q.body || "",
+        banner_url: q.banner_url || "",
+        video_url: q.video_url || "",
+        tag_ids: q.tag_ids || [],
+        tag_scope: "all",
+      })),
+    };
+
+    try {
+      const res = await api.post(
+        `/api/organizations/${slug}/surveys/`,
+        payload
+      );
+      setSuccess(res.data);
+      setTimeout(() => navigate(`/dashboard/${slug}`), 2500);
+    } catch (err) {
+      setError(
+        err.response?.data?.detail ||
+          JSON.stringify(err.response?.data) ||
+          "Could not create survey."
+      );
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="dashboard">
+      <AppHeader />
+      <main className="dashboard-main">
+        <Link to={`/dashboard/${slug}`} className="dashboard-back">
+          ← Back to {slug}
+        </Link>
+        <div className="dashboard-header">
+          <h1>Create survey</h1>
+          <p>Add questions and an access code for public search.</p>
+        </div>
+
+        {entitlementBlocked && (
+          <div className="dashboard-card">
+            <h2>Create a New Survey</h2>
+            <p>
+              New surveys require communiBetter Starter or higher. You can continue
+              viewing your previous surveys and results.
+            </p>
+            <div className="dashboard-actions">
+              <Link to={`/dashboard/${slug}`} className="dashboard-btn">
+                Back to dashboard
+              </Link>
+              <Link
+                to={`/dashboard/${slug}/billing`}
+                className="dashboard-btn dashboard-btn--primary"
+              >
+                View plans
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {success && (
+          <div className="dashboard-success">
+            <strong>Survey created!</strong>
+            <p>
+              Access code: <span className="dashboard-code">{success.access_code.code}</span>
+            </p>
+            <p>Redirecting to dashboard...</p>
+          </div>
+        )}
+
+        {!entitlementBlocked && !success && (
+        <form className="dashboard-form" onSubmit={handleSubmit}>
+          <div className="dashboard-field">
+            <label htmlFor="survey-title">Title</label>
+            <input
+              id="survey-title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              required
+            />
+          </div>
+
+          <div className="dashboard-field">
+            <label htmlFor="survey-description">Description</label>
+            <textarea
+              id="survey-description"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+            />
+          </div>
+
+          <div className="dashboard-field">
+            <label htmlFor="survey-code">Access code (optional)</label>
+            <input
+              id="survey-code"
+              value={accessCode}
+              onChange={(e) => {
+                setAccessCode(normalizeAccessCode(e.target.value));
+                setCodeStatus(null);
+              }}
+              onBlur={() => checkCode(accessCode)}
+              placeholder="Leave blank to auto-generate"
+            />
+            <small>
+              3–32 characters, uppercase letters, numbers, and hyphens. Must not be in
+              use by an active survey.
+            </small>
+            {codeStatus && (
+              <p
+                className={`dashboard-code-status ${
+                  codeStatus.available
+                    ? "dashboard-code-status--ok"
+                    : "dashboard-code-status--bad"
+                }`}
+              >
+                {codeStatus.available
+                  ? `Available${codeStatus.normalized ? `: ${codeStatus.normalized}` : ""}`
+                  : codeStatus.detail || "Not available"}
+              </p>
+            )}
+          </div>
+
+          <div className="dashboard-field dashboard-field--inline">
+            <input
+              id="survey-anonymous"
+              type="checkbox"
+              checked={isAnonymous}
+              onChange={(e) => setIsAnonymous(e.target.checked)}
+            />
+            <label htmlFor="survey-anonymous">Anonymous responses</label>
+          </div>
+
+          <div className="dashboard-field dashboard-field--inline">
+            <input
+              id="survey-agg"
+              type="checkbox"
+              checked={aggregateNotice}
+              onChange={(e) => setAggregateNotice(e.target.checked)}
+            />
+            <label htmlFor="survey-agg">
+              Tell respondents anonymous combined results may be shared with policymakers
+            </label>
+          </div>
+
+          <div className="dashboard-card">
+            <h2>Questions</h2>
+            <p className="dashboard-meta">
+              Respondents see a short disclosure first, then these questions. Mark demographic
+              questions so they appear at the end (optional to answer). Use Content blocks for
+              banners, text, or YouTube/Vimeo before a question.
+            </p>
+            {questions.map((q, index) => (
+              <div key={index} className="dashboard-question-block">
+                <div className="dashboard-question-header">
+                  <strong>
+                    {q.question_type === "content"
+                      ? `Content ${index + 1}`
+                      : q.is_demographic
+                        ? `Demographic ${index + 1}`
+                        : `Question ${index + 1}`}
+                  </strong>
+                  {questions.length > 1 && (
+                    <button
+                      type="button"
+                      className="dashboard-link-btn"
+                      onClick={() => removeQuestion(index)}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+                <div className="dashboard-field">
+                  <label>Type</label>
+                  <select
+                    value={q.question_type}
+                    onChange={(e) =>
+                      updateQuestion(index, "question_type", e.target.value)
+                    }
+                  >
+                    <option value="text">Text</option>
+                    <option value="choice">Multiple choice</option>
+                    <option value="content">Content (banner / video / text)</option>
+                  </select>
+                </div>
+                {q.question_type === "content" ? (
+                  <>
+                    <div className="dashboard-field">
+                      <label>Heading (optional)</label>
+                      <input
+                        value={q.text}
+                        onChange={(e) => updateQuestion(index, "text", e.target.value)}
+                      />
+                    </div>
+                    <div className="dashboard-field">
+                      <label>Text</label>
+                      <textarea
+                        value={q.body || ""}
+                        onChange={(e) => updateQuestion(index, "body", e.target.value)}
+                      />
+                    </div>
+                    <div className="dashboard-field">
+                      <label>Banner image URL</label>
+                      <input
+                        value={q.banner_url || ""}
+                        onChange={(e) => updateQuestion(index, "banner_url", e.target.value)}
+                      />
+                    </div>
+                    <div className="dashboard-field">
+                      <label>Video URL (YouTube / Vimeo)</label>
+                      <input
+                        value={q.video_url || ""}
+                        onChange={(e) => updateQuestion(index, "video_url", e.target.value)}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="dashboard-field">
+                      <label>Question text</label>
+                      <textarea
+                        value={q.text}
+                        onChange={(e) => updateQuestion(index, "text", e.target.value)}
+                        required
+                      />
+                    </div>
+                    {q.question_type === "choice" && (
+                      <div className="dashboard-field">
+                        <label>Choices (comma-separated)</label>
+                        <input
+                          value={(q.choices || []).join(", ")}
+                          onChange={(e) =>
+                            updateQuestion(
+                              index,
+                              "choices",
+                              e.target.value
+                                .split(",")
+                                .map((s) => s.trim())
+                                .filter(Boolean)
+                            )
+                          }
+                          placeholder="Option A, Option B, Option C"
+                        />
+                      </div>
+                    )}
+                    <label className="dashboard-radio-row">
+                      <input
+                        type="checkbox"
+                        checked={!!q.is_demographic}
+                        onChange={(e) =>
+                          updateQuestion(index, "is_demographic", e.target.checked)
+                        }
+                      />{" "}
+                      Demographic (shown at the end, optional)
+                    </label>
+                    <div className="dashboard-field">
+                      <label>Report tags</label>
+                      <TagPicker
+                        orgSlug={slug}
+                        value={q.tag_ids || []}
+                        questionText={q.text}
+                        onChange={(ids) => updateQuestion(index, "tag_ids", ids)}
+                      />
+                    </div>
+                  </>
+                )}
+              </div>
+            ))}
+            <button type="button" className="dashboard-btn" onClick={addQuestion}>
+              Add question
+            </button>
+          </div>
+
+          {error && <p className="dashboard-error">{error}</p>}
+
+          <button
+            type="submit"
+            className="dashboard-btn dashboard-btn--primary"
+            disabled={submitting}
+          >
+            {submitting ? "Creating..." : "Create survey"}
+          </button>
+        </form>
+        )}
+      </main>
+    </div>
+  );
+}

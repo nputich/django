@@ -24,3 +24,15 @@ dist-ssr
 *.sw?
 
 secrets
+
+# Capacitor native build output
+android/.gradle
+android/build
+android/app/build
+android/app/release
+android/local.properties
+ios/App/Pods
+ios/App/Output
+ios/DerivedData
+ios/App/App/public
+icons/

@@ -1,24 +1,36 @@
-import { Link } from "react-router-dom";
-import logo from "../assets/logo-full.png";
+import SiteNavLinks from "./SiteNavLinks";
+import HeaderAccountLinks from "./HeaderAccountLinks";
+import { isDevEnvironment } from "../envFlags";
 import "../styles/Landing.css";
 
+/**
+ * App chrome for signed-in pages: full marketing nav + account actions.
+ */
 function AppHeader() {
+  const isDev = isDevEnvironment();
+
   return (
-    <header className="landing-nav app-header">
-      <Link to="/app" className="landing-nav-brand">
-        <img src={logo} alt="" className="landing-nav-logo" aria-hidden />
-        <span className="landing-nav-name">
-          communi<span>B</span>
-        </span>
-      </Link>
-      <nav className="landing-nav-links" aria-label="Account">
-        <Link className="landing-nav-pill" to="/app">
-          Home
-        </Link>
-        <Link className="landing-nav-pill landing-nav-pill--logout" to="/logout">
-          Log out
-        </Link>
-      </nav>
+    <header
+      className={[
+        "landing-nav",
+        "landing-nav--with-account",
+        "app-header",
+        isDev ? "landing-nav--dev" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      {isDev && (
+        <div className="landing-dev-banner" role="status">
+          Development environment — not production
+        </div>
+      )}
+      <div className="landing-nav-inner">
+        <SiteNavLinks />
+      </div>
+      <div className="landing-nav-login landing-nav-login--account">
+        <HeaderAccountLinks />
+      </div>
     </header>
   );
 }

@@ -1,0 +1,186 @@
+.meeting-flyer-page {
+  min-height: 100vh;
+  background: #ececec;
+  padding: 1rem;
+  color: #1a1a1a;
+  font-family: "Segoe UI", system-ui, sans-serif;
+}
+
+.meeting-flyer-page--error {
+  max-width: 40rem;
+  margin: 2rem auto;
+}
+
+.meeting-flyer-loading {
+  text-align: center;
+  padding: 3rem;
+}
+
+.meeting-flyer-toolbar {
+  max-width: 8.5in;
+  margin: 0 auto 1rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.meeting-flyer-toolbar-btn {
+  padding: 0.5rem 1rem;
+  font-size: 0.95rem;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  background: #0d5c4b;
+  color: #fff;
+}
+
+.meeting-flyer-toolbar-btn--secondary {
+  background: #fff;
+  color: #0d5c4b;
+  border: 1px solid #0d5c4b;
+}
+
+.meeting-flyer-toolbar-link {
+  margin-left: auto;
+  color: #0d5c4b;
+  font-size: 0.95rem;
+}
+
+.meeting-flyer-sheet {
+  max-width: 8.5in;
+  margin: 0 auto;
+  padding: 0.65in 0.75in;
+  background: #fff;
+  box-shadow: 0 2px 16px rgba(0, 0, 0, 0.08);
+}
+
+.meeting-flyer-org {
+  margin: 0 0 0.35rem;
+  color: #0d5c4b;
+  font-weight: 600;
+  font-size: 1.05rem;
+}
+
+.meeting-flyer-title {
+  margin: 0 0 0.75rem;
+  font-size: 1.65rem;
+  line-height: 1.2;
+}
+
+.meeting-flyer-desc {
+  margin: 0 0 1rem;
+  color: #444;
+  font-size: 1rem;
+  line-height: 1.45;
+}
+
+.meeting-flyer-meta {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 1rem;
+  margin: 0 0 1.25rem;
+  font-size: 0.95rem;
+}
+
+.meeting-flyer-meta dt {
+  font-weight: 600;
+  margin: 0;
+}
+
+.meeting-flyer-meta dd {
+  margin: 0;
+}
+
+.meeting-flyer-hero {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  align-items: flex-start;
+  padding: 1rem;
+  border: 2px solid #0d5c4b;
+  border-radius: 8px;
+  margin-bottom: 1.25rem;
+}
+
+.meeting-flyer-qr img {
+  display: block;
+  width: 2.35in;
+  height: 2.35in;
+}
+
+.meeting-flyer-scan {
+  text-align: center;
+  font-weight: 700;
+  margin: 0.5rem 0 0;
+}
+
+.meeting-flyer-join {
+  flex: 1 1 12rem;
+  font-size: 1rem;
+}
+
+.meeting-flyer-code-label {
+  margin: 0.75rem 0 0.25rem;
+}
+
+.meeting-flyer-code {
+  margin: 0;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 1.35rem;
+  font-weight: 700;
+  padding: 0.4rem 0.65rem;
+  background: #f0f7f5;
+  border: 1px solid #0d5c4b;
+  border-radius: 4px;
+  display: inline-block;
+  letter-spacing: 0.02em;
+}
+
+.meeting-flyer-link {
+  margin: 0.75rem 0 0;
+  font-size: 0.9rem;
+  color: #555;
+  word-break: break-all;
+}
+
+.meeting-flyer-steps-title {
+  font-size: 1.1rem;
+  color: #0d5c4b;
+  margin: 0 0 0.5rem;
+}
+
+.meeting-flyer-steps {
+  margin: 0 0 1rem;
+  padding-left: 1.25rem;
+}
+
+.meeting-flyer-steps li {
+  margin-bottom: 0.35rem;
+}
+
+.meeting-flyer-foot {
+  margin: 0;
+  padding-top: 0.75rem;
+  border-top: 1px solid #ddd;
+  font-size: 0.85rem;
+  color: #666;
+}
+
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  .meeting-flyer-page {
+    background: #fff;
+    padding: 0;
+  }
+
+  .meeting-flyer-sheet {
+    box-shadow: none;
+    max-width: none;
+    margin: 0;
+    padding: 0.4in;
+  }
+}

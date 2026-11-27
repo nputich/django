@@ -1,0 +1,2091 @@
+================================================================================
+CommuniB backend inventory
+Root: C:\Users\nputi\OneDrive\Documents\Workspace\django\backend
+Migrations and caches are omitted from this inventory.
+Function summaries use docstrings when present; otherwise name-based heuristics.
+================================================================================
+
+DIRECTORY TREE
+--------------------------------------------------------------------------------
+backend/
+|-- api
+|   |-- data
+|   |   `-- us_county_fips.csv
+|   |-- management
+|   |   |-- commands
+|   |   |   |-- __init__.py
+|   |   |   |-- process_meeting_ai.py
+|   |   |   |-- seed_billing_demo.py
+|   |   |   |-- seed_demo_data.py
+|   |   |   |-- seed_directory_data.py
+|   |   |   |-- seed_resource_types.py
+|   |   |   `-- simulate_billing_activate.py
+|   |   `-- __init__.py
+|   |-- __init__.py
+|   |-- access_codes.py
+|   |-- admin.py
+|   |-- apps.py
+|   |-- billing_plans.py
+|   |-- billing_service.py
+|   |-- billing_views.py
+|   |-- board_service.py
+|   |-- contact_email.py
+|   |-- directory_placement.py
+|   |-- directory_placement_views.py
+|   |-- directory_service.py
+|   |-- directory_taxonomy.py
+|   |-- directory_views.py
+|   |-- feature_entitlements.py
+|   |-- inbox_service.py
+|   |-- inbox_views.py
+|   |-- meeting_access.py
+|   |-- meeting_ai.py
+|   |-- meeting_analytics.py
+|   |-- meeting_export.py
+|   |-- meeting_service.py
+|   |-- meeting_wall.py
+|   |-- meeting_wall_views.py
+|   |-- models.py
+|   |-- org_access.py
+|   |-- organization_create.py
+|   |-- organization_lifecycle.py
+|   |-- organization_lifecycle_views.py
+|   |-- paypal_client.py
+|   |-- political_issue_classifier.py
+|   |-- profile_board_views.py
+|   |-- serializers.py
+|   |-- signals.py
+|   |-- survey_service.py
+|   |-- tests.py
+|   |-- tests_access_codes.py
+|   |-- tests_billing_checkout.py
+|   |-- tests_billing_plans.py
+|   |-- tests_feature_entitlements.py
+|   |-- tests_inbox.py
+|   |-- tests_organization_create.py
+|   |-- tests_organization_lifecycle.py
+|   |-- tests_organization_service.py
+|   |-- tests_paypal_checkout.py
+|   |-- tests_paypal_webhook.py
+|   |-- urls.py
+|   |-- views.py
+|   `-- wall_service.py
+|-- backend
+|   |-- __init__.py
+|   |-- asgi.py
+|   |-- settings.py
+|   |-- urls.py
+|   `-- wsgi.py
+|-- db.sqlite3
+|-- Dockerfile
+|-- manage.py
+`-- requirements.txt
+
+================================================================================
+FILE DETAILS
+================================================================================
+
+--------------------------------------------------------------------------------
+FILE: backend/Dockerfile
+--------------------------------------------------------------------------------
+Summary: Container image build instructions for the backend service.
+Functions: (none — not a Python module)
+
+--------------------------------------------------------------------------------
+FILE: backend/db.sqlite3
+--------------------------------------------------------------------------------
+Summary: Non-Python file (.sqlite3).
+Functions: (none — not a Python module)
+
+--------------------------------------------------------------------------------
+FILE: backend/manage.py
+--------------------------------------------------------------------------------
+Summary: Django's command-line utility for administrative tasks.
+  [function L7] main()
+      Run administrative tasks.
+
+--------------------------------------------------------------------------------
+FILE: backend/requirements.txt
+--------------------------------------------------------------------------------
+Summary: Python package dependencies for the backend.
+Functions: (none — not a Python module)
+
+--------------------------------------------------------------------------------
+FILE: backend/api/__init__.py
+--------------------------------------------------------------------------------
+Summary: Python module: api/__init__.py
+Functions/classes: (none)
+
+--------------------------------------------------------------------------------
+FILE: backend/api/access_codes.py
+--------------------------------------------------------------------------------
+Summary: Access-code grants for organization service levels (no PayPal).
+  [class L27] AccessCodeError
+      Invalid or unusable access code.
+      Methods: (none)
+  [function L31] normalize_access_code(raw)
+      Function implementing normalize access code.
+  [function L35] basic_access_code_configured()
+      Function implementing basic access code configured.
+  [function L39] _configured_basic_access_code()
+      Function implementing  configured basic access code.
+  [function L43] validate_temporary_basic_access_code(code)
+      Server-side validation for the temporary Basic code.
+  [function L64] redeem_basic_access_code(*, organization, user, code)
+      Activate BASIC for an organization via access code (no PayPal).
+  [function L149] serialize_access_code_activation(service, *, redemption)
+      Function implementing serialize access code activation.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/admin.py
+--------------------------------------------------------------------------------
+Summary: Django admin registrations.
+  [class L36] NoteAdmin
+      Django admin configuration.
+      Methods: (none)
+  [class L41] GeographicAreaAdmin
+      Django admin configuration.
+      Methods: (none)
+  [class L49] OrgCategoryAdmin
+      Django admin configuration.
+      Methods: (none)
+  [class L57] OrganizationAdmin
+      Django admin configuration.
+      Methods: (none)
+  [class L79] ResourceTypeAdmin
+      Django admin configuration.
+      Methods: (none)
+  [class L84] OrganizationMembershipAdmin
+      Django admin configuration.
+      Methods: (none)
+  [class L89] OrganizationServiceAdmin
+      Django admin configuration.
+      Methods: (none)
+  [class L113] AccessCodeRedemptionAdmin
+      Django admin configuration.
+      Methods: (none)
+  [class L133] SurveyQuestionInline
+      Class defining SurveyQuestionInline behavior and state.
+      Methods: (none)
+  [class L139] SurveyAdmin
+      Django admin configuration.
+      Methods: (none)
+  [class L145] SurveyAnswerAdmin
+      Django admin configuration.
+      Methods: (none)
+  [class L149] MeetingSlideInline
+      Class defining MeetingSlideInline behavior and state.
+      Methods: (none)
+  [class L155] MeetingSessionInline
+      Class defining MeetingSessionInline behavior and state.
+      Methods: (none)
+  [class L163] MeetingAdmin
+      Django admin configuration.
+      Methods: (none)
+  [class L187] MeetingExpectedAttendanceAdmin
+      Django admin configuration.
+      Methods: (none)
+  [class L193] MeetingSummaryAdmin
+      Django admin configuration.
+      Methods: (none)
+  [class L206] MeetingSlideAdmin
+      Django admin configuration.
+      Methods: (none)
+  [class L211] MeetingSessionAdmin
+      Django admin configuration.
+      Methods: (none)
+  [class L216] MeetingAttendanceAdmin
+      Django admin configuration.
+      Methods: (none)
+  [class L221] ParticipantProfileValueAdmin
+      Django admin configuration.
+      Methods: (none)
+  [class L226] MeetingQuestionAdmin
+      Django admin configuration.
+      Methods: (none)
+  [class L231] MeetingResponseAdmin
+      Django admin configuration.
+      Methods: (none)
+  [class L243] MeetingResponseAIAdmin
+      Django admin configuration.
+      Methods: (none)
+  [class L248] PoliticalClassificationAdmin
+      Django admin configuration.
+      Methods: (none)
+  [class L258] OrganizationBoardAdmin
+      Django admin configuration.
+      Methods: (none)
+  [class L263] UserProfileAdmin
+      Django admin configuration.
+      Methods: (none)
+  [class L269] PersonalBoardAdmin
+      Django admin configuration.
+      Methods: (none)
+  [class L274] PersonalBoardPostAdmin
+      Django admin configuration.
+      Methods: (none)
+  [class L280] BoardPostAdmin
+      Django admin configuration.
+      Methods: (none)
+  [class L286] AccessCodeAdmin
+      Django admin configuration.
+      Methods: (none)
+  [class L293] ContactSubmissionAdmin
+      Django admin configuration.
+      Methods: (none)
+
+--------------------------------------------------------------------------------
+FILE: backend/api/apps.py
+--------------------------------------------------------------------------------
+Summary: Django app configuration.
+  [class L4] ApiConfig
+      Class defining ApiConfig behavior and state.
+      [method L8] ready(self)
+          Method on ApiConfig.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/billing_plans.py
+--------------------------------------------------------------------------------
+Summary: Authoritative CommuniB service plan catalog (server-side).
+  [class L15] PlanResolutionError
+      Invalid or non-checkoutable service level.
+      [method L18] __init__(self, message, *, code)
+          Special method __init__.
+  [function L73] _plans_for_ids(plan_ids)
+      Function implementing  plans for ids.
+  [function L88] paypal_plans_for_current_mode()
+      Return Basic/Community/Community Plus maps for the active PayPal mode.
+  [function L154] list_available_plans()
+      Plans shown on the Billing & Service page (paid + Enterprise).
+  [function L165] get_plan(service_level)
+      Returns plan.
+  [function L169] public_plan_payload(plan)
+      Catalog payload for the billing UI.
+  [function L187] normalize_service_level(raw)
+      Function implementing normalize service level.
+  [function L196] resolve_paypal_checkout_plan(service_level)
+      Map a CommuniB service_level to the official PayPal plan + price.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/billing_service.py
+--------------------------------------------------------------------------------
+Summary: Organization service entitlements and service-level resolution.
+  [class L30] CheckoutError
+      Custom exception type.
+      [method L31] __init__(self, message, *, code)
+          Special method __init__.
+  [function L36] billing_simulation_allowed()
+      Dev/test-only simulated activation (never unrestricted in production).
+  [function L46] get_active_organization_service(organization)
+      Return the current ACTIVE entitlement that grants paid/enterprise access,
+  [function L80] get_pending_checkout(organization)
+      Latest PENDING PayPal checkout for the organization, if any.
+  [function L93] get_current_service_level(organization)
+      Authoritative effective service level for feature authorization.
+  [function L101] serialize_organization_service(service)
+      Function implementing serialize organization service.
+  [function L122] get_current_service_summary(organization)
+      Payload for Billing & Service UI.
+  [function L139] next_billing_reference(organization)
+      Opaque reference: COMMUNIB-SUB-{org_id:06d}-{seq:05d}.
+  [function L146] create_pending_organization_service(*, organization, service_level, billing_source, paypal_plan_id, billing_reference, requested_by)
+      Create a PENDING entitlement.
+  [function L182] start_pending_checkout(*, organization, user, service_level, return_url, cancel_url)
+      Authorize + resolve official plan + create PENDING OrganizationService.
+  [function L272] attach_paypal_subscription_id(*, organization, subscription_id, billing_reference)
+      Record a PayPal subscription ID on a PENDING checkout.
+  [function L326] confirm_paypal_subscription_return(*, organization, subscription_id, billing_reference)
+      Browser return handler: attach subscription id, then verify with PayPal.
+  [function L389] activate_organization_service(service, *, paypal_subscription_id)
+      Mark an entitlement ACTIVE.
+  [function L423] cancel_organization_service(service)
+      Immediately mark entitlement CANCELLED.
+  [function L441] request_cancel_paid_service(service, *, actor)
+      Cancel future renewal; keep ACTIVE paid access until current_period_end.
+  [function L515] _parse_paypal_datetime(value)
+      Function implementing  parse paypal datetime.
+  [function L526] _period_end_from_subscription_resource(resource)
+      Function implementing  period end from subscription resource.
+  [function L531] find_organization_service_for_paypal_event(resource)
+      Locate local entitlement by PayPal subscription id or custom_id (billing_reference).
+  [function L555] _record_paypal_webhook_audit(service, *, event_type, event_id, action, extra)
+      Function implementing  record paypal webhook audit.
+  [function L584] handle_paypal_webhook_event(event)
+      Apply a verified PayPal webhook event to CommuniB entitlements.
+  [function L753] simulate_activate_pending_service(service, *, paypal_subscription_id)
+      Development/test helper: PENDING → ACTIVE without PayPal.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/billing_views.py
+--------------------------------------------------------------------------------
+Summary: Organization billing API.
+  [function L45] _require_admin_org(request, slug)
+      Function implementing  require admin org.
+  [function L67] _ignored_client_price_fields(data)
+      Function implementing  ignored client price fields.
+  [function L75] _checkout_mode()
+      Function implementing  checkout mode.
+  [class L79] OrganizationBillingView
+      GET billing summary for an organization the user administers.
+      [method L84] get(self, request, slug)
+          Handles GET HTTP operation.
+  [class L111] OrganizationBillingCheckoutPreviewView
+      POST { service_level } — authoritative price/plan; no entitlement change.
+      [method L116] post(self, request, slug)
+          Handles POST HTTP operation.
+  [class L147] OrganizationBillingCheckoutStartView
+      POST { service_level }
+      [method L157] post(self, request, slug)
+          Handles POST HTTP operation.
+  [class L217] OrganizationBillingAccessCodeRedeemView
+      POST { access_code, service_level? }
+      [method L226] post(self, request, slug)
+          Handles POST HTTP operation.
+  [class L289] OrganizationBillingPayPalConfirmView
+      POST { subscription_id }
+      [method L300] post(self, request, slug)
+          Handles POST HTTP operation.
+  [class L357] PayPalWebhookView
+      POST /api/billing/paypal/webhook/
+      [method L367] post(self, request)
+          Handles POST HTTP operation.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/board_service.py
+--------------------------------------------------------------------------------
+Summary: Access rules for organization and personal posting boards.
+  [function L18] get_org_board(organization)
+      Returns org board.
+  [function L23] get_personal_board(user)
+      Returns personal board.
+  [function L28] is_org_member(organization, user)
+      Boolean check: org member.
+  [function L36] is_org_admin(organization, user)
+      True for organization owners and admins (dashboard / inbox managers).
+  [function L50] can_view_org_board(board, user)
+      Function implementing can view org board.
+  [function L59] can_post_org_board(board, user)
+      Function implementing can post org board.
+  [function L69] can_reply_org_board(board, user)
+      Function implementing can reply org board.
+  [function L73] can_delete_org_post(post, user)
+      Function implementing can delete org post.
+  [function L81] can_delete_org_reply(reply, user)
+      Function implementing can delete org reply.
+  [function L89] can_delete_personal_post(post, user)
+      Function implementing can delete personal post.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/contact_email.py
+--------------------------------------------------------------------------------
+Summary: Outbound contact/email helpers.
+  [function L5] send_contact_notification(*, name, email, subject, message)
+      Function implementing send contact notification.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/directory_placement.py
+--------------------------------------------------------------------------------
+Summary: Directory placement for Explore Communities (geo scope + category).
+  [class L21] PlacementError
+      Invalid directory placement payload.
+      Methods: (none)
+  [function L33] area_ancestry(area)
+      Function implementing area ancestry.
+  [function L42] _load_area(area_id, *, expected_type, label)
+      Function implementing  load area.
+  [function L57] resolve_placement_areas(*, geographic_scope, country_id, state_id, county_id)
+      Function implementing resolve placement areas.
+  [function L111] resolve_subcategory(subcategory_id)
+      Function implementing resolve subcategory.
+  [function L133] apply_directory_placement(organization, *, geographic_scope, primary_subcategory_id, country_id, state_id, county_id)
+      Function implementing apply directory placement.
+  [function L164] serialize_directory_placement(organization)
+      Function implementing serialize directory placement.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/directory_placement_views.py
+--------------------------------------------------------------------------------
+Summary: Organization directory placement (Explore Communities) API.
+  [class L17] OrganizationDirectoryPlacementView
+      GET / PATCH directory placement for an organization the user administers.
+      [method L28] get(self, request, slug)
+          Handles GET HTTP operation.
+      [method L58] patch(self, request, slug)
+          Handles PATCH HTTP operation.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/directory_service.py
+--------------------------------------------------------------------------------
+Summary: Directory helpers: geography filters, org search, taxonomy serialization.
+  [function L69] serialize_area(area)
+      Function implementing serialize area.
+  [function L83] serialize_category(category)
+      Function implementing serialize category.
+  [function L94] serialize_organization(org)
+      Function implementing serialize organization.
+  [function L112] search_areas(*, area_type, parent_id, query, country_code, limit)
+      Function implementing search areas.
+  [function L131] search_localities(*, parent_id, query, limit)
+      Return locality areas, falling back to distinct HQ city names under a county.
+  [function L185] resolve_area_path(*, country_slug, state_slug, county_slug, locality_slug)
+      Function implementing resolve area path.
+  [function L232] service_area_for_scope(scope, *, country, state, county, locality)
+      Function implementing service area for scope.
+  [function L255] organizations_for_directory(*, scope, country, state, county, locality, locality_slug, category_slug, subcategory_slug, query)
+      Function implementing organizations for directory.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/directory_taxonomy.py
+--------------------------------------------------------------------------------
+Summary: Initial organization directory category / subcategory taxonomy.
+Functions/classes: (none)
+
+--------------------------------------------------------------------------------
+FILE: backend/api/directory_views.py
+--------------------------------------------------------------------------------
+Summary: Directory HTTP endpoints.
+  [class L21] DirectoryScopesView
+      API view handling HTTP requests for this resource.
+      [method L25] get(self, request)
+          Handles GET HTTP operation.
+  [class L39] DirectoryGeoSearchView
+      API view handling HTTP requests for this resource.
+      [method L43] get(self, request)
+          Handles GET HTTP operation.
+  [class L107] DirectoryCategoriesView
+      API view handling HTTP requests for this resource.
+      [method L111] get(self, request)
+          Handles GET HTTP operation.
+  [class L140] DirectoryOrganizationsView
+      API view handling HTTP requests for this resource.
+      [method L144] get(self, request)
+          Handles GET HTTP operation.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/feature_entitlements.py
+--------------------------------------------------------------------------------
+Summary: Feature capabilities by organization service level.
+  [class L50] EntitlementDenied
+      Class defining EntitlementDenied behavior and state.
+      [method L51] __init__(self, message, *, code)
+          Special method __init__.
+  [function L57] service_level_rank(level)
+      Function implementing service level rank.
+  [function L61] is_paid_service_level(level)
+      Boolean check: paid service level.
+  [function L65] get_organization_capabilities(organization)
+      Capability flags for UI + API.
+  [function L101] require_capability(organization, capability)
+      Return capabilities if allowed; raise EntitlementDenied otherwise.
+  [function L136] entitlement_denied_response(exc)
+      Function implementing entitlement denied response.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/inbox_service.py
+--------------------------------------------------------------------------------
+Summary: Unified inbox for personal and organization mailboxes.
+  [function L29] get_personal_mailbox(user)
+      Returns personal mailbox.
+  [function L37] get_organization_mailbox(organization)
+      Returns organization mailbox.
+  [function L45] mailbox_label(mailbox)
+      Function implementing mailbox label.
+  [function L67] resolve_recipient_mailbox(*, to_username, to_organization_slug)
+      Function implementing resolve recipient mailbox.
+  [function L90] _have_prior_accepted_contact(a, b)
+      True if these mailboxes already share a primary (accepted) conversation.
+  [function L102] _recipient_folder_for(sender, recipient)
+      Function implementing  recipient folder for.
+  [function L119] user_can_access_mailbox(user, mailbox)
+      Function implementing user can access mailbox.
+  [function L125] require_mailbox_access(user, mailbox)
+      Function implementing require mailbox access.
+  [function L130] is_blocked(*, blocker, blocked)
+      Boolean check: blocked.
+  [function L134] either_blocks(a, b)
+      Function implementing either blocks.
+  [function L140] blocked_mailbox_ids_for(mailbox)
+      Mailboxes that this mailbox blocked, or that blocked this mailbox.
+  [function L154] promote_organization_unknown_to_primary(mailbox)
+      Move legacy first-contact threads on org mailboxes into the main inbox.
+  [function L169] list_conversations_for_mailbox(mailbox, *, folder)
+      Function implementing list conversations for mailbox.
+  [function L217] serialize_conversation_list_item(link, mailbox)
+      Function implementing serialize conversation list item.
+  [function L251] inbox_summary(mailbox)
+      Function implementing inbox summary.
+  [function L278] list_drafts(mailbox)
+      Function implementing list drafts.
+  [function L288] serialize_draft(message)
+      Function implementing serialize draft.
+  [function L300] save_draft(*, mailbox, draft_id, subject, body, to_username, to_organization_slug, conversation_id)
+      Function implementing save draft.
+  [function L360] send_draft(mailbox, draft_id)
+      Function implementing send draft.
+  [function L427] send_new_message(*, mailbox, subject, body, to_username, to_organization_slug)
+      Function implementing send new message.
+  [function L445] delete_draft(mailbox, draft_id)
+      Deletes/removes draft.
+  [function L453] get_conversation_for_mailbox(mailbox, conversation_id)
+      Returns conversation for mailbox.
+  [function L472] mark_conversation_read(link)
+      Mark read only — never move/delete the conversation.
+  [function L480] accept_unknown_conversation(mailbox, conversation_id)
+      Function implementing accept unknown conversation.
+  [function L489] decline_unknown_conversation(mailbox, conversation_id)
+      Function implementing decline unknown conversation.
+  [function L497] delete_conversation_for_mailbox(mailbox, conversation_id)
+      Remove this conversation from the current mailbox only.
+  [function L507] ban_counterparty(mailbox, conversation_id)
+      Ban the other party in this conversation.
+  [function L545] serialize_message(message)
+      Function implementing serialize message.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/inbox_views.py
+--------------------------------------------------------------------------------
+Summary: HTTP API for the unified personal / organization inbox.
+  [function L39] _validation_response(exc)
+      Function implementing  validation response.
+  [class L47] PersonalMailboxMixin
+      Class defining PersonalMailboxMixin behavior and state.
+      [method L48] get_mailbox(self, request)
+          Returns mailbox.
+  [class L54] OrganizationMailboxMixin
+      Class defining OrganizationMailboxMixin behavior and state.
+      [method L55] get_mailbox(self, request, slug)
+          Returns mailbox.
+  [class L62] InboxSummaryView
+      API view handling HTTP requests for this resource.
+      [method L65] get(self, request, slug)
+          Handles GET HTTP operation.
+  [class L82] InboxConversationListView
+      API view handling HTTP requests for this resource.
+      [method L85] get(self, request, slug)
+          Handles GET HTTP operation.
+      [method L112] post(self, request, slug)
+          Compose + send a new message (also creates an intermediate draft).
+  [class L145] InboxConversationDetailView
+      API view handling HTTP requests for this resource.
+      [method L148] get(self, request, pk, slug)
+          Handles GET HTTP operation.
+      [method L181] delete(self, request, pk, slug)
+          Handles DELETE HTTP operation.
+  [class L199] InboxConversationBanView
+      API view handling HTTP requests for this resource.
+      [method L202] post(self, request, pk, slug)
+          Handles POST HTTP operation.
+  [class L220] InboxConversationAcceptView
+      API view handling HTTP requests for this resource.
+      [method L223] post(self, request, pk, slug)
+          Handles POST HTTP operation.
+  [class L241] InboxConversationDeclineView
+      API view handling HTTP requests for this resource.
+      [method L244] post(self, request, pk, slug)
+          Handles POST HTTP operation.
+  [class L262] InboxDraftListView
+      API view handling HTTP requests for this resource.
+      [method L265] get(self, request, slug)
+          Handles GET HTTP operation.
+      [method L287] post(self, request, slug)
+          Handles POST HTTP operation.
+  [class L316] InboxDraftDetailView
+      API view handling HTTP requests for this resource.
+      [method L319] patch(self, request, pk, slug)
+          Handles PATCH HTTP operation.
+      [method L347] delete(self, request, pk, slug)
+          Handles DELETE HTTP operation.
+  [class L365] InboxDraftSendView
+      API view handling HTTP requests for this resource.
+      [method L368] post(self, request, pk, slug)
+          Handles POST HTTP operation.
+  [class L390] InboxReplyView
+      API view handling HTTP requests for this resource.
+      [method L393] post(self, request, pk, slug)
+          Save a reply as draft (default) or send immediately when send=true.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/meeting_access.py
+--------------------------------------------------------------------------------
+Summary: Access-code / join permission checks for meetings.
+  [function L8] hash_private_code(code)
+      Function implementing hash private code.
+  [function L13] verify_private_code(meeting, code)
+      Function implementing verify private code.
+  [function L21] meeting_join_error(meeting, user, private_code)
+      Function implementing meeting join error.
+  [function L32] get_latest_session(meeting)
+      Returns latest session.
+  [function L36] session_is_joinable(session)
+      Function implementing session is joinable.
+  [function L43] session_accepts_responses(session)
+      Function implementing session accepts responses.
+  [function L47] get_active_slides(meeting)
+      Returns active slides.
+  [function L51] get_slide_by_id(meeting, slide_id)
+      Returns slide by id.
+  [function L55] can_start_meeting(meeting, session)
+      Function implementing can start meeting.
+  [function L64] start_meeting_session(meeting, session, from_slide)
+      Function implementing start meeting session.
+  [function L98] pause_meeting_session(meeting, session)
+      Function implementing pause meeting session.
+  [function L108] resume_meeting_session(meeting, session)
+      Function implementing resume meeting session.
+  [function L118] end_meeting_session(meeting, session)
+      Function implementing end meeting session.
+  [function L131] _require_controllable_session(session)
+      Function implementing  require controllable session.
+  [function L139] go_to_slide(meeting, session, slide)
+      Function implementing go to slide.
+  [function L153] go_to_next_slide(meeting, session)
+      Function implementing go to next slide.
+  [function L172] go_to_previous_slide(meeting, session)
+      Function implementing go to previous slide.
+  [function L191] restart_meeting_session(meeting, current_session, from_slide)
+      Function implementing restart meeting session.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/meeting_ai.py
+--------------------------------------------------------------------------------
+Summary: AI enrichment for meeting responses.
+  [class L59] PoliticalPath
+      Class defining PoliticalPath behavior and state.
+      Methods: (none)
+  [class L66] AnalysisResult
+      Class defining AnalysisResult behavior and state.
+      Methods: (none)
+  [function L80] ai_mode_enabled(meeting)
+      Function implementing ai mode enabled.
+  [function L84] _raw_response(response)
+      Function implementing  raw response.
+  [function L88] _rule_sentiment(text)
+      Function implementing  rule sentiment.
+  [function L99] _rule_political_paths(text)
+      Function implementing  rule political paths.
+  [function L122] _rule_normalized_response(text, slide_type, paths)
+      Function implementing  rule normalized response.
+  [function L131] _rule_analyze(text, slide_type)
+      Function implementing  rule analyze.
+  [function L156] _http_post_json(url, payload, headers, timeout)
+      Function implementing  http post json.
+  [function L168] _build_llm_prompt(text, slide_type)
+      Function implementing  build llm prompt.
+  [function L184] _parse_llm_json(content)
+      Function implementing  parse llm json.
+  [function L192] _parse_political_path(entry)
+      Function implementing  parse political path.
+  [function L216] _llm_result_to_analysis(data, provider)
+      Function implementing  llm result to analysis.
+  [function L244] _analyze_openai(text, slide_type, meeting)
+      Function implementing  analyze openai.
+  [function L283] _analyze_ollama(text, slide_type, meeting)
+      Function implementing  analyze ollama.
+  [function L310] analyze_response(meeting, text, slide_type)
+      Function implementing analyze response.
+  [function L329] _should_analyze_slide(slide)
+      Function implementing  should analyze slide.
+  [function L340] apply_analysis(response, analysis)
+      Function implementing apply analysis.
+  [function L367] process_meeting_response(response)
+      Function implementing process meeting response.
+  [function L397] process_meeting_response_by_id(response_id)
+      Function implementing process meeting response by id.
+  [function L402] process_session_ai(session)
+      Function implementing process session ai.
+  [function L421] process_slide_responses_ai(session, slide)
+      Deprecated: political slides use batch classification via political_issue_classifier.
+  [function L432] process_meeting_ai(meeting, session_id)
+      Function implementing process meeting ai.
+  [function L481] schedule_response_ai_processing(response)
+      Run after DB commit so participants are not blocked on AI latency.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/meeting_analytics.py
+--------------------------------------------------------------------------------
+Summary: Live meeting analytics for host results panels.
+  [function L19] _normalize_profile_value(value)
+      Function implementing  normalize profile value.
+  [function L29] _profile_value_matches(stored, split_value)
+      Function implementing  profile value matches.
+  [function L38] get_demographic_fields(meeting)
+      Voluntary participant-info fields available for one-at-a-time splits.
+  [function L62] get_demographic_values(session, field_key)
+      Distinct values submitted for a demographic field in this session.
+  [function L81] _filtered_attendance_ids(session, split_field, split_value)
+      Function implementing  filtered attendance ids.
+  [function L99] _responses_for_slide(session, slide, attendance_ids)
+      Function implementing  responses for slide.
+  [function L112] _distinct_respondents(responses)
+      Function implementing  distinct respondents.
+  [function L116] _bars_from_counter(counts, ordered_labels, limit, *, include_zero_labels)
+      Function implementing  bars from counter.
+  [function L147] _issue_response_display_text(slide, response)
+      For political issue cards, chart by issue_type when classification is available.
+  [function L167] _response_answer_text(slide, response)
+      Function implementing  response answer text.
+  [function L190] _counts_for_responses(slide, responses)
+      Function implementing  counts for responses.
+  [function L217] _label_order_for_compare(slide, counters, limit)
+      Function implementing  label order for compare.
+  [function L237] _split_values_for_field(meeting, session, field_key)
+      Function implementing  split values for field.
+  [function L255] _demographics_by_attendance(session, field_keys)
+      Function implementing  demographics by attendance.
+  [function L271] _individual_responses(meeting, session, slide, responses)
+      Function implementing  individual responses.
+  [function L310] _analytics_standard(slide, responses, limit, *, label_order, include_zero_labels)
+      Function implementing  analytics standard.
+  [function L330] _analytics_issues(slide, responses, limit, *, label_order, include_zero_labels)
+      Function implementing  analytics issues.
+  [function L351] is_analyzable_slide(slide)
+      Boolean check: analyzable slide.
+  [function L362] get_slide_analytics(meeting, session, slide, *, split_field, split_value, limit, include_individual)
+      Returns slide analytics.
+  [function L428] get_slide_analytics_compare(meeting, session, slide, *, split_field, limit, include_individual)
+      Returns slide analytics compare.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/meeting_export.py
+--------------------------------------------------------------------------------
+Summary: Export of meeting data/results.
+  [function L64] _community_code(meeting)
+      Function implementing  community code.
+  [function L71] _question_type(slide)
+      Function implementing  question type.
+  [function L77] _question_text(slide)
+      Function implementing  question text.
+  [function L81] _selected_option(response)
+      Function implementing  selected option.
+  [function L87] _ai_fields(response)
+      Function implementing  ai fields.
+  [function L115] _base_row(meeting, session, response, slide)
+      Function implementing  base row.
+  [function L143] _rows_for_response(meeting, session, response)
+      Function implementing  rows for response.
+  [function L155] get_sessions_for_export(meeting, session_id)
+      Returns sessions for export.
+  [function L162] build_meeting_df(meeting, session_id)
+      Function implementing build meeting df.
+  [function L178] build_profile_export(meeting, session_id)
+      Function implementing build profile export.
+  [function L208] meeting_export_summary(meeting)
+      Function implementing meeting export summary.
+  [function L221] render_csv(rows, columns)
+      Function implementing render csv.
+  [function L230] csv_http_response(filename, content)
+      Function implementing csv http response.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/meeting_service.py
+--------------------------------------------------------------------------------
+Summary: Meeting lifecycle, slides, RSVP, and participation logic.
+  [function L15] create_meeting_slides(meeting, slide_payloads)
+      Creates meeting slides.
+  [function L37] create_initial_session(meeting)
+      Creates initial session.
+  [function L48] replace_meeting_slides(meeting, slide_payloads)
+      Function implementing replace meeting slides.
+  [function L53] join_session(meeting, session, user)
+      Function implementing join session.
+  [function L68] get_attendance(session, attendance_id)
+      Returns attendance.
+  [function L83] leave_attendance(attendance)
+      Function implementing leave attendance.
+  [function L91] submit_participant_profile(attendance, slide, field_values)
+      Function implementing submit participant profile.
+  [function L138] submit_slide_response(meeting, session, attendance, slide, raw_response, selected_options)
+      Function implementing submit slide response.
+  [function L217] submit_issue_card_responses(meeting, session, attendance, slide, issues)
+      Function implementing submit issue card responses.
+  [function L280] get_session_stats(session)
+      Returns session stats.
+  [function L297] participant_completed_slide_ids(session, participant_id)
+      Function implementing participant completed slide ids.
+  [function L321] participant_profile_complete(attendance, slide)
+      Function implementing participant profile complete.
+  [function L335] append_meeting_slides(meeting, slide_payloads)
+      Function implementing append meeting slides.
+  [function L346] get_organizer_live_payload(meeting, session)
+      Returns organizer live payload.
+  [function L428] get_active_slides(meeting)
+      Returns active slides.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/meeting_wall.py
+--------------------------------------------------------------------------------
+Summary: Meeting wall post lifecycle: create, serialize, RSVP, summaries, permissions.
+  [function L20] meeting_lifecycle_phase(meeting)
+      upcoming | in_progress | complete — based on meeting status, not wall bumps.
+  [function L30] published_summary(meeting)
+      Function implementing published summary.
+  [function L38] can_view_meeting_results(meeting, user)
+      Function implementing can view meeting results.
+  [function L46] can_create_meeting_minutes(meeting, user)
+      Function implementing can create meeting minutes.
+  [function L60] can_publish_meeting_summary(meeting, user)
+      Function implementing can publish meeting summary.
+  [function L64] participation_totals(meeting)
+      Function implementing participation totals.
+  [function L78] create_meeting_wall_post(*, meeting, author)
+      Create a chronological wall post for a new meeting. Do not bump later.
+  [function L98] sync_meeting_wall_post_fields(meeting)
+      Update display fields on the linked wall post without changing created_at.
+  [function L113] serialize_meeting_wall_card(meeting, user)
+      Function implementing serialize meeting wall card.
+  [function L171] set_expected_attendance(*, meeting, user, status)
+      Set Going/Pending or remove response when status is None/empty.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/meeting_wall_views.py
+--------------------------------------------------------------------------------
+Summary: Meeting wall RSVP, summary, and community results endpoints.
+  [class L31] MeetingRsvpView
+      API view handling HTTP requests for this resource.
+      [method L34] post(self, request, pk)
+          Handles POST HTTP operation.
+  [class L56] MeetingSummaryView
+      API view handling HTTP requests for this resource.
+      [method L59] get(self, request, pk)
+          Handles GET HTTP operation.
+      [method L79] post(self, request, pk)
+          Handles POST HTTP operation.
+  [class L142] MeetingSummaryPublishView
+      API view handling HTTP requests for this resource.
+      [method L145] post(self, request, pk, summary_id)
+          Handles POST HTTP operation.
+  [class L171] MeetingCommunityResultsView
+      API view handling HTTP requests for this resource.
+      [method L174] get(self, request, pk)
+          Handles GET HTTP operation.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/models.py
+--------------------------------------------------------------------------------
+Summary: Django ORM models for core domain entities.
+  [class L4] Note
+      Class defining Note behavior and state.
+      [method L9] __str__(self)
+          Human-readable string representation.
+  [class L11] GeographicArea
+      Reusable geographic reference node (country → admin1 → admin2 / region).
+      [method L57] __str__(self)
+          Human-readable string representation.
+      [method L60] save(self, *args, **kwargs)
+          Persists changes.
+  [class L65] OrgCategory
+      Directory taxonomy: top-level categories and subcategories (parent set).
+      [method L96] __str__(self)
+          Human-readable string representation.
+      [method L102] is_subcategory(self)
+          Boolean check: subcategory.
+  [class L106] Organization
+      Class defining Organization behavior and state.
+      [method L199] __str__(self)
+          Human-readable string representation.
+      [method L203] primary_category(self)
+          Method on Organization.
+      [method L208] get_current_service_level(self)
+          Authoritative effective service level (FREE when no active paid entitlement).
+  [class L215] ResourceType
+      Class defining ResourceType behavior and state.
+      [method L219] __str__(self)
+          Human-readable string representation.
+  [class L221] OrganizationMembership
+      Class defining OrganizationMembership behavior and state.
+      [method L238] __str__(self)
+          Human-readable string representation.
+  [class L242] OrganizationService
+      Billing entitlement for an organization.
+      [method L326] __str__(self)
+          Human-readable string representation.
+  [class L333] AccessCodeRedemption
+      History of access-code grants (complimentary / promo / temp codes).
+      [method L387] __str__(self)
+          Human-readable string representation.
+  [class L391] Survey
+      Class defining Survey behavior and state.
+      [method L400] __str__(self)
+          Human-readable string representation.
+  [class L402] SurveyQuestion
+      Class defining SurveyQuestion behavior and state.
+      [method L417] __str__(self)
+          Human-readable string representation.
+  [class L419] SurveyAnswer
+      Class defining SurveyAnswer behavior and state.
+      Methods: (none)
+  [class L427] Meeting
+      Class defining Meeting behavior and state.
+      [method L473] __str__(self)
+          Human-readable string representation.
+  [class L477] MeetingExpectedAttendance
+      RSVP / expected attendance — separate from actual MeetingAttendance.
+      [method L502] __str__(self)
+          Human-readable string representation.
+  [class L506] MeetingSummary
+      Meeting minutes / narrative summary with draft → publish lifecycle.
+      [method L533] __str__(self)
+          Human-readable string representation.
+  [class L537] MeetingSlide
+      Ordered slide in a meeting deck (info, questions, issue cards).
+      [method L572] __str__(self)
+          Human-readable string representation.
+  [class L577] MeetingSession
+      One run of a meeting (supports restart in later phases).
+      [method L615] __str__(self)
+          Human-readable string representation.
+  [class L619] MeetingAttendance
+      Class defining MeetingAttendance behavior and state.
+      [method L641] __str__(self)
+          Human-readable string representation.
+  [class L645] ParticipantProfileValue
+      Voluntary participant info — stored separately from anonymous responses.
+      Methods: (none)
+  [class L660] MeetingQuestion
+      Legacy Q&A model — superseded by MeetingSlide in Phase 1+.
+      Methods: (none)
+  [class L674] MeetingResponse
+      Class defining MeetingResponse behavior and state.
+      Methods: (none)
+  [class L733] MeetingResponseAI
+      AI enrichments — populated only when meeting.ai_mode is enabled.
+      Methods: (none)
+  [class L751] PoliticalClassification
+      One path in a political issue taxonomy — multiple rows per response allowed.
+      Methods: (none)
+  [class L770] UserProfile
+      Extensible account profile; required fields gate dashboard access.
+      [method L788] __str__(self)
+          Human-readable string representation.
+      [method L792] is_complete(self)
+          Boolean check: complete.
+  [class L796] PersonalBoard
+      Private posting board for a single user (restricted — owner only).
+      [method L805] __str__(self)
+          Human-readable string representation.
+  [class L809] WallPostType
+      Shared wall content types for personal and organization boards.
+      Methods: (none)
+  [class L819] PersonalBoardPost
+      Class defining PersonalBoardPost behavior and state.
+      Methods: (none)
+  [class L840] PersonalBoardPollOption
+      Class defining PersonalBoardPollOption behavior and state.
+      Methods: (none)
+  [class L851] PersonalBoardPollVote
+      Class defining PersonalBoardPollVote behavior and state.
+      Methods: (none)
+  [class L869] OrganizationBoard
+      Class defining OrganizationBoard behavior and state.
+      [method L889] __str__(self)
+          Human-readable string representation.
+  [class L893] BoardPost
+      Class defining BoardPost behavior and state.
+      Methods: (none)
+  [class L922] BoardPollOption
+      Class defining BoardPollOption behavior and state.
+      Methods: (none)
+  [class L933] BoardPollVote
+      Class defining BoardPollVote behavior and state.
+      Methods: (none)
+  [class L951] BoardPostReply
+      Class defining BoardPostReply behavior and state.
+      Methods: (none)
+  [class L962] Mailbox
+      Unified inbox identity for a personal account or an organization.
+      [method L1005] __str__(self)
+          Human-readable string representation.
+      [method L1013] display_name(self)
+          Method on Mailbox.
+  [class L1024] MailboxBlock
+      Blocker mailbox bans blocked mailbox.
+      [method L1045] __str__(self)
+          Human-readable string representation.
+  [class L1049] Conversation
+      Class defining Conversation behavior and state.
+      Methods: (none)
+  [class L1058] ConversationParticipant
+      Per-mailbox view of a conversation (folder + read state).
+      Methods: (none)
+  [class L1088] InboxMessage
+      Unified message row — drafts and sent messages for any mailbox.
+      [method L1131] __str__(self)
+          Human-readable string representation.
+  [class L1135] AccessCode
+      Class defining AccessCode behavior and state.
+      [method L1154] __str__(self)
+          Human-readable string representation.
+      [method L1156] clean(self)
+          Cleans/normalizes model or form data before save.
+      [method L1194] save(self, *args, **kwargs)
+          Persists changes.
+  [class L1201] ContactSubmission
+      Class defining ContactSubmission behavior and state.
+      [method L1211] __str__(self)
+          Human-readable string representation.
+  [class L1213] OrganizationAuditEvent
+      Append-only audit trail for ownership, billing, and closure actions.
+      [method L1262] __str__(self)
+          Human-readable string representation.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/org_access.py
+--------------------------------------------------------------------------------
+Summary: Organization membership and admin permission helpers.
+  [function L17] normalize_access_code(code)
+      Function implementing normalize access code.
+  [function L21] validate_access_code_format(code)
+      Validates the 'access_code_format' field or related input.
+  [function L30] user_admin_organizations(user)
+      Orgs the user can manage (owner or admin), including closure_pending.
+  [function L42] user_owned_organizations(user)
+      Function implementing user owned organizations.
+  [function L49] get_admin_organization(user, slug, *, allow_closed)
+      Owner or admin of an organization.
+  [function L64] get_owner_organization(user, slug, *, allow_closed)
+      Returns owner organization.
+  [function L75] is_resource_code_available(code, type_slug)
+      Boolean check: resource code available.
+  [function L93] generate_access_code(type_slug)
+      Function implementing generate access code.
+  [function L108] resolve_access_code(raw_code, type_slug)
+      Function implementing resolve access code.
+  [function L119] get_resource_type(slug)
+      Returns resource type.
+  [function L128] reserved_community_codes()
+      Codes that must never be used as public Community Codes (billing, etc.).
+  [function L139] is_community_code_available(code, *, exclude_organization_id)
+      Boolean check: community code available.
+  [function L155] validate_community_code(raw_code, *, exclude_organization_id)
+      Validates the 'community_code' field or related input.
+  [function L172] generate_community_code(organization_name)
+      Auto Community Code: initials (or name stem) + hyphen + 4 chars.
+  [function L194] get_primary_community_code(organization)
+      Returns primary community code.
+  [function L208] assign_community_code(organization, *, community_code)
+      Create the primary organization Community Code (AccessCode, type=organization).
+
+--------------------------------------------------------------------------------
+FILE: backend/api/organization_create.py
+--------------------------------------------------------------------------------
+Summary: Create organizations owned by the requesting user (owner membership).
+  [function L14] unique_organization_slug(name)
+      Function implementing unique organization slug.
+  [function L26] create_organization_for_user(*, user, name, description, community_code, geographic_scope, country_id, state_id, county_id, primary_subcategory_id)
+      Creates organization for user.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/organization_lifecycle.py
+--------------------------------------------------------------------------------
+Summary: Organization ownership, subscription cancel (keep org), and soft-close lifecycle.
+  [class L30] LifecycleError
+      Custom exception type.
+      [method L31] __init__(self, message, *, code)
+          Special method __init__.
+  [function L37] record_audit(organization, *, actor, event_type, event_data)
+      Function implementing record audit.
+  [function L52] normalize_org_name(name)
+      Function implementing normalize org name.
+  [function L56] find_closed_name_conflicts(name, *, exclude_org_id)
+      Closed / archived orgs that match this name (duplicate protection).
+  [function L71] organization_is_directory_visible(organization)
+      Function implementing organization is directory visible.
+  [function L76] organization_accepts_new_activity(organization)
+      Meetings/surveys/board posts/new members while org is operational.
+  [function L85] ensure_organization_lifecycle(organization)
+      Apply due closure and expire cancel-at-period-end entitlements.
+  [function L139] count_owners(organization)
+      Function implementing count owners.
+  [function L145] list_transfer_candidates(organization, *, exclude_user)
+      Admins eligible to receive ownership (not the current actor).
+  [function L161] transfer_ownership(organization, *, actor, new_owner)
+      Function implementing transfer ownership.
+  [function L212] cancel_my_ownership(organization, *, actor)
+      Function implementing cancel my ownership.
+  [function L236] close_organization(organization, *, actor, confirmation_name)
+      Function implementing close organization.
+  [function L317] cancel_organization_closure(organization, *, actor)
+      Function implementing cancel organization closure.
+  [function L352] restore_organization(organization, *, actor)
+      Function implementing restore organization.
+  [function L408] serialize_lifecycle(organization)
+      Function implementing serialize lifecycle.
+  [function L421] default_period_end(*, started_at)
+      Function implementing default period end.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/organization_lifecycle_views.py
+--------------------------------------------------------------------------------
+Summary: Owner-facing organization ownership, subscription cancel, and close APIs.
+  [function L37] _lifecycle_error_response(exc)
+      Function implementing  lifecycle error response.
+  [class L48] OrganizationOwnershipSettingsView
+      GET ownership & organization settings payload for owners/admins.
+      [method L53] get(self, request, slug)
+          Handles GET HTTP operation.
+  [class L106] OrganizationOwnershipTransferView
+      API view handling HTTP requests for this resource.
+      [method L109] post(self, request, slug)
+          Handles POST HTTP operation.
+  [class L132] OrganizationOwnershipCancelView
+      API view handling HTTP requests for this resource.
+      [method L135] post(self, request, slug)
+          Handles POST HTTP operation.
+  [class L150] OrganizationSubscriptionCancelView
+      Cancel paid service only — does not close the organization.
+      [method L155] post(self, request, slug)
+          Handles POST HTTP operation.
+  [class L195] OrganizationCloseView
+      API view handling HTTP requests for this resource.
+      [method L198] post(self, request, slug)
+          Handles POST HTTP operation.
+  [class L229] OrganizationCancelClosureView
+      API view handling HTTP requests for this resource.
+      [method L232] post(self, request, slug)
+          Handles POST HTTP operation.
+  [class L254] AdminOrganizationRestoreView
+      API view handling HTTP requests for this resource.
+      [method L257] post(self, request, slug)
+          Handles POST HTTP operation.
+  [class L279] OrganizationClaimRequestView
+      Record a claim/restoration request audit event (contact flow remains available).
+      [method L284] post(self, request, slug)
+          Handles POST HTTP operation.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/paypal_client.py
+--------------------------------------------------------------------------------
+Summary: PayPal REST helpers for subscription checkout (Stage 5).
+  [class L21] PayPalError
+      Custom exception type.
+      [method L22] __init__(self, message, *, code)
+          Special method __init__.
+  [function L27] paypal_mode()
+      Function implementing paypal mode.
+  [function L31] paypal_checkout_enabled()
+      Function implementing paypal checkout enabled.
+  [function L41] paypal_api_base()
+      Function implementing paypal api base.
+  [function L47] _basic_auth_header(client_id, secret)
+      Function implementing  basic auth header.
+  [function L54] get_access_token()
+      Returns access token.
+  [function L97] create_subscription(*, plan_id, custom_id, return_url, cancel_url, brand_name)
+      Create a PayPal subscription in APPROVAL_PENDING state.
+  [function L178] cancel_subscription(subscription_id, *, reason)
+      Cancel a PayPal subscription (stops future renewals).
+  [function L232] verify_webhook_signature(*, headers, event, webhook_id)
+      Verify a PayPal webhook using /v1/notifications/verify-webhook-signature.
+  [function L316] get_subscription(subscription_id)
+      Fetch subscription details (for billing period sync).
+
+--------------------------------------------------------------------------------
+FILE: backend/api/political_issue_classifier.py
+--------------------------------------------------------------------------------
+Summary: Batch political issue classification for live results.
+  [class L55] PoliticalClassificationItem
+      Class defining PoliticalClassificationItem behavior and state.
+      Methods: (none)
+  [function L67] _raw_text(response)
+      Function implementing  raw text.
+  [function L71] _is_gibberish(text)
+      Function implementing  is gibberish.
+  [function L87] response_needs_reclassification(response, *, force)
+      Function implementing response needs reclassification.
+  [function L110] _build_batch_prompt(responses, *, target_ids)
+      Function implementing  build batch prompt.
+  [function L181] _validate_confidence(value)
+      Function implementing  validate confidence.
+  [function L191] _validate_batch_payload(data, expected_ids)
+      Function implementing  validate batch payload.
+  [function L266] _call_openai_batch(prompt, meeting)
+      Function implementing  call openai batch.
+  [function L298] _call_ollama_batch(prompt, meeting)
+      Function implementing  call ollama batch.
+  [function L326] _title_case_phrase(text)
+      Function implementing  title case phrase.
+  [function L330] _rule_classify_text(text)
+      Function implementing  rule classify text.
+  [function L450] _rule_based_batch_classify(responses)
+      Function implementing  rule based batch classify.
+  [function L479] _classify_batch_with_llm(meeting, all_responses, target_ids)
+      Function implementing  classify batch with llm.
+  [function L510] classify_batch(meeting, all_responses, target_ids)
+      Function implementing classify batch.
+  [function L527] apply_political_classification(response, item)
+      Function implementing apply political classification.
+  [function L580] classify_political_slide_responses(session, slide, *, force)
+      Function implementing classify political slide responses.
+  [function L652] classification_summary(responses)
+      Function implementing classification summary.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/profile_board_views.py
+--------------------------------------------------------------------------------
+Summary: User profile and posting board API views.
+  [class L54] MeView
+      API view handling HTTP requests for this resource.
+      [method L57] get(self, request)
+          Handles GET HTTP operation.
+  [class L61] PublicUserProfileView
+      Public account card for inbox / directory links (no private contact fields).
+      [method L66] get(self, request, username)
+          Handles GET HTTP operation.
+  [class L91] MeProfileView
+      API view handling HTTP requests for this resource.
+      [method L95] patch(self, request)
+          Handles PATCH HTTP operation.
+  [class L138] PersonalBoardView
+      API view handling HTTP requests for this resource.
+      [method L141] get(self, request)
+          Handles GET HTTP operation.
+      [method L157] post(self, request)
+          Handles POST HTTP operation.
+  [class L172] PersonalBoardSettingsView
+      API view handling HTTP requests for this resource.
+      [method L175] patch(self, request)
+          Handles PATCH HTTP operation.
+  [class L188] PersonalBoardPostDeleteView
+      API view handling HTTP requests for this resource.
+      [method L191] delete(self, request, pk)
+          Handles DELETE HTTP operation.
+  [class L203] OrganizationBoardView
+      API view handling HTTP requests for this resource.
+      [method L206] get(self, request, slug)
+          Handles GET HTTP operation.
+      [method L245] post(self, request, slug)
+          Handles POST HTTP operation.
+  [class L274] OrganizationBoardSettingsView
+      API view handling HTTP requests for this resource.
+      [method L277] patch(self, request, slug)
+          Handles PATCH HTTP operation.
+  [class L297] OrganizationBoardPostDeleteView
+      API view handling HTTP requests for this resource.
+      [method L300] delete(self, request, slug, pk)
+          Handles DELETE HTTP operation.
+  [class L310] OrganizationBoardReplyView
+      API view handling HTTP requests for this resource.
+      [method L313] post(self, request, slug, pk)
+          Handles POST HTTP operation.
+  [class L335] OrganizationBoardReplyDeleteView
+      API view handling HTTP requests for this resource.
+      [method L338] delete(self, request, slug, pk, reply_pk)
+          Handles DELETE HTTP operation.
+  [class L349] OrganizationBoardPollVoteView
+      API view handling HTTP requests for this resource.
+      [method L352] post(self, request, slug, pk)
+          Handles POST HTTP operation.
+  [class L373] PersonalBoardPollVoteView
+      API view handling HTTP requests for this resource.
+      [method L376] post(self, request, pk)
+          Handles POST HTTP operation.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/serializers.py
+--------------------------------------------------------------------------------
+Summary: DRF serializers for request/response validation and shaping.
+  [class L27] UserSerializer
+      DRF serializer for validating/serializing API data.
+      [method L32] create(self, validated_data)
+          Creates and returns a new instance.
+  [class L35] NoteSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L40] SurveyQuestionSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L44] SurveyDetailSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L57] SurveyAnswerInputSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L60] SurveySubmitSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L63] OrganizationHubSurveySerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L67] OrganizationHubMeetingSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L71] OrganizationHubSerializer
+      DRF serializer for validating/serializing API data.
+      [method L90] get_surveys(self, obj)
+          Returns surveys.
+      [method L94] get_meetings(self, obj)
+          Returns meetings.
+      [method L111] get_has_board(self, obj)
+          Returns has board.
+      [method L114] get_board(self, obj)
+          Returns board.
+  [class L153] MyOrganizationSerializer
+      DRF serializer for validating/serializing API data.
+      [method L173] get_role(self, obj)
+          Returns role.
+      [method L180] get_community_code(self, obj)
+          Returns community code.
+      [method L186] get_directory_placement(self, obj)
+          Returns directory placement.
+  [class L192] CreateOrganizationSerializer
+      DRF serializer for validating/serializing API data.
+      [method L214] validate_name(self, value)
+          Validates the 'name' field or related input.
+      [method L220] validate_community_code(self, value)
+          Validates the 'community_code' field or related input.
+  [class L224] DashboardAccessCodeSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L230] DashboardSurveySerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L246] DashboardSurveyDetailSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L264] MeetingSlideSerializer
+      DRF serializer for validating/serializing API data.
+      [method L282] get_participant_fields(self, obj)
+          Returns participant fields.
+  [class L288] MeetingDetailSerializer
+      DRF serializer for validating/serializing API data.
+      [method L326] get_community_code(self, obj)
+          Returns community code.
+      [method L332] _user(self)
+          Method on MeetingDetailSerializer.
+      [method L336] get_wall(self, obj)
+          Returns wall.
+      [method L341] get_published_summary(self, obj)
+          Returns published summary.
+      [method L354] get_can_create_summary(self, obj)
+          Returns can create summary.
+      [method L361] get_can_view_results(self, obj)
+          Returns can view results.
+  [class L367] DashboardMeetingSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L391] OrganizationDashboardSerializer
+      DRF serializer for validating/serializing API data.
+      [method L418] get_board(self, obj)
+          Returns board.
+      [method L423] get_capabilities(self, obj)
+          Returns capabilities.
+      [method L428] get_lifecycle(self, obj)
+          Returns lifecycle.
+      [method L433] get_community_code(self, obj)
+          Returns community code.
+      [method L439] get_directory_placement(self, obj)
+          Returns directory placement.
+  [function L445] _profile_picture_url(profile, request)
+      Function implementing  profile picture url.
+  [function L453] serialize_post_author(user, request)
+      Function implementing serialize post author.
+  [function L468] build_me_payload(user, request)
+      Function implementing build me payload.
+  [class L503] UserProfileUpdateSerializer
+      DRF serializer for validating/serializing API data.
+      [method L513] validate_contact_email(self, value)
+          Validates the 'contact_email' field or related input.
+      [method L519] validate_username(self, value)
+          Validates the 'username' field or related input.
+  [class L526] BoardPostCreateSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L544] BoardPostReplyCreateSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L548] BoardPollVoteSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L552] BoardPostReplySerializer
+      DRF serializer for validating/serializing API data.
+      [method L560] get_author(self, obj)
+          Returns author.
+      [method L563] get_can_delete(self, obj)
+          Returns can delete.
+  [class L569] BoardPostSerializer
+      DRF serializer for validating/serializing API data.
+      [method L597] get_author(self, obj)
+          Returns author.
+      [method L600] get_can_delete(self, obj)
+          Returns can delete.
+      [method L605] get_poll(self, obj)
+          Returns poll.
+      [method L612] get_meeting(self, obj)
+          Returns meeting.
+      [method L621] get_type_label(self, obj)
+          Returns type label.
+  [class L631] PersonalBoardPostSerializer
+      DRF serializer for validating/serializing API data.
+      [method L655] get_author(self, obj)
+          Returns author.
+      [method L658] get_can_delete(self, obj)
+          Returns can delete.
+      [method L663] get_poll(self, obj)
+          Returns poll.
+      [method L670] get_type_label(self, obj)
+          Returns type label.
+  [class L679] OrganizationBoardPublicSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L695] OrganizationBoardSettingsSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L707] PersonalBoardSettingsSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L713] InboxComposeSerializer
+      DRF serializer for validating/serializing API data.
+      [method L719] validate(self, attrs)
+          Cross-field / object-level validation.
+  [class L733] InboxDraftSaveSerializer
+      DRF serializer for validating/serializing API data.
+      [method L741] validate(self, attrs)
+          Cross-field / object-level validation.
+  [class L758] SurveyQuestionCreateSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L770] DashboardSurveyCreateSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L784] DashboardSurveyUpdateSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L791] SurveyAppendQuestionsSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L795] ParticipantInfoFieldCreateSerializer
+      DRF serializer for validating/serializing API data.
+      [method L806] validate(self, attrs)
+          Cross-field / object-level validation.
+  [class L821] MeetingSlideCreateSerializer
+      DRF serializer for validating/serializing API data.
+      [method L836] validate(self, attrs)
+          Cross-field / object-level validation.
+  [class L893] DashboardMeetingCreateSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L923] DashboardMeetingUpdateSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L939] MeetingExpectedAttendanceSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L945] MeetingSummaryWriteSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L954] MeetingSessionPublicSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L972] MeetingJoinSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L977] MeetingProfileSubmitSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L983] MeetingRespondSerializer
+      DRF serializer for validating/serializing API data.
+      [method L996] validate_issues(self, value)
+          Validates the 'issues' field or related input.
+  [class L1023] MeetingLeaveSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L1027] MeetingStartSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L1031] MeetingGoToSlideSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L1035] MeetingRestartSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L1039] MeetingAddSlidesSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+  [class L1043] ContactSubmissionSerializer
+      DRF serializer for validating/serializing API data.
+      Methods: (none)
+
+--------------------------------------------------------------------------------
+FILE: backend/api/signals.py
+--------------------------------------------------------------------------------
+Summary: Python module: api/signals.py
+  [function L9] ensure_user_profile_and_board(sender, instance, created, **kwargs)
+      Function implementing ensure user profile and board.
+  [function L15] ensure_organization_board(sender, instance, created, **kwargs)
+      Function implementing ensure organization board.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/survey_service.py
+--------------------------------------------------------------------------------
+Summary: Business logic for survey.
+  [function L4] append_survey_questions(survey, question_payloads)
+      Function implementing append survey questions.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/tests.py
+--------------------------------------------------------------------------------
+Summary: Automated tests.
+Functions/classes: (none)
+
+--------------------------------------------------------------------------------
+FILE: backend/api/tests_access_codes.py
+--------------------------------------------------------------------------------
+Summary: Python module: api/tests_access_codes.py
+  [class L19] AccessCodeRedeemApiTests
+      Class defining AccessCodeRedeemApiTests behavior and state.
+      [method L20] setUp(self)
+          Method on AccessCodeRedeemApiTests.
+      [method L35] test_billing_exposes_enabled_flag_not_code(self)
+          Test: billing exposes enabled flag not code.
+      [method L43] test_redeem_activates_basic_without_paypal(self)
+          Test: redeem activates basic without paypal.
+      [method L74] test_invalid_code_rejected(self)
+          Test: invalid code rejected.
+      [method L83] test_cannot_redeem_twice_for_same_org(self)
+          Test: cannot redeem twice for same org.
+      [method L102] test_cancel_access_code_service_skips_paypal(self, mock_cancel)
+          Test: cancel access code service skips paypal.
+  [class L118] AccessCodeDisabledTests
+      Class defining AccessCodeDisabledTests behavior and state.
+      [method L119] setUp(self)
+          Method on AccessCodeDisabledTests.
+      [method L129] test_disabled_when_env_empty(self)
+          Test: disabled when env empty.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/tests_billing_checkout.py
+--------------------------------------------------------------------------------
+Summary: Python module: api/tests_billing_checkout.py
+  [class L16] PendingCheckoutApiTests
+      Class defining PendingCheckoutApiTests behavior and state.
+      [method L17] setUp(self)
+          Method on PendingCheckoutApiTests.
+      [method L37] test_admin_creates_pending_with_authoritative_plan(self)
+          Test: admin creates pending with authoritative plan.
+      [method L72] test_member_cannot_start_checkout(self)
+          Test: member cannot start checkout.
+      [method L78] test_enterprise_rejected(self)
+          Test: enterprise rejected.
+      [method L86] test_active_paypal_blocks_new_checkout(self)
+          Test: active paypal blocks new checkout.
+      [method L101] test_new_checkout_cancels_previous_pending(self)
+          Test: new checkout cancels previous pending.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/tests_billing_plans.py
+--------------------------------------------------------------------------------
+Summary: Python module: api/tests_billing_plans.py
+  [class L20] PlanResolutionUnitTests
+      Class defining PlanResolutionUnitTests behavior and state.
+      [method L22] test_basic_community_community_plus_map_correctly(self)
+          Test: basic community community plus map correctly.
+      [method L45] test_sandbox_mode_uses_sandbox_plan_ids(self)
+          Test: sandbox mode uses sandbox plan ids.
+      [method L62] test_free_and_enterprise_rejected(self)
+          Test: free and enterprise rejected.
+      [method L71] test_unknown_rejected(self)
+          Test: unknown rejected.
+  [class L77] CheckoutPreviewApiTests
+      Class defining CheckoutPreviewApiTests behavior and state.
+      [method L78] setUp(self)
+          Method on CheckoutPreviewApiTests.
+      [method L99] test_admin_gets_authoritative_plan_ignoring_client_price(self)
+          Test: admin gets authoritative plan ignoring client price.
+      [method L123] test_enterprise_and_free_rejected(self)
+          Test: enterprise and free rejected.
+      [method L135] test_member_cannot_preview(self)
+          Test: member cannot preview.
+      [method L142] test_billing_catalog_omits_paypal_plan_id(self)
+          Test: billing catalog omits paypal plan id.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/tests_feature_entitlements.py
+--------------------------------------------------------------------------------
+Summary: Free organizations retain READ access to historical engagement data.
+  [class L21] FeatureEntitlementApiTests
+      Class defining FeatureEntitlementApiTests behavior and state.
+      [method L22] setUp(self)
+          Method on FeatureEntitlementApiTests.
+      [method L58] test_free_capabilities_allow_view_deny_create(self)
+          Test: free capabilities allow view deny create.
+      [method L71] test_dashboard_exposes_capabilities_and_history(self)
+          Test: dashboard exposes capabilities and history.
+      [method L82] test_free_can_get_existing_meeting(self)
+          Test: free can get existing meeting.
+      [method L91] test_free_can_get_existing_survey(self)
+          Test: free can get existing survey.
+      [method L100] test_free_denied_create_meeting(self)
+          Test: free denied create meeting.
+      [method L127] test_free_denied_create_survey(self)
+          Test: free denied create survey.
+      [method L147] test_free_denied_start_meeting(self)
+          Test: free denied start meeting.
+      [method L163] test_cancel_paid_keeps_history_locks_create(self)
+          Test: cancel paid keeps history locks create.
+      [method L213] test_basic_can_create_meeting(self)
+          Test: basic can create meeting.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/tests_inbox.py
+--------------------------------------------------------------------------------
+Summary: Python module: api/tests_inbox.py
+  [class L19] UnifiedInboxTests
+      Class defining UnifiedInboxTests behavior and state.
+      [method L20] setUp(self)
+          Method on UnifiedInboxTests.
+      [method L36] test_org_owner_can_open_organization_inbox(self)
+          Test: org owner can open organization inbox.
+      [method L66] test_personal_and_org_share_same_message_tables(self)
+          Test: personal and org share same message tables.
+      [method L98] test_draft_save_and_send(self)
+          Test: draft save and send.
+      [method L144] test_ban_hides_from_blocked_user(self)
+          Test: ban hides from blocked user.
+      [method L179] test_read_keeps_conversation_in_folder(self)
+          Test: read keeps conversation in folder.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/tests_organization_create.py
+--------------------------------------------------------------------------------
+Summary: Python module: api/tests_organization_create.py
+  [class L18] OrganizationCreateApiTests
+      Class defining OrganizationCreateApiTests behavior and state.
+      [method L19] setUp(self)
+          Method on OrganizationCreateApiTests.
+      [method L57] _placement_payload(self, **overrides)
+          Method on OrganizationCreateApiTests.
+      [method L70] test_requires_auth(self)
+          Test: requires auth.
+      [method L74] test_creates_org_with_community_code_and_placement(self)
+          Test: creates org with community code and placement.
+      [method L108] test_generates_community_code_when_blank(self)
+          Test: generates community code when blank.
+      [method L115] test_rejects_duplicate_community_code(self)
+          Test: rejects duplicate community code.
+      [method L130] test_rejects_reserved_billing_code_as_community_code(self)
+          Test: rejects reserved billing code as community code.
+      [method L140] test_unique_slug_collision(self)
+          Test: unique slug collision.
+      [method L144] test_rejects_blank_name(self)
+          Test: rejects blank name.
+      [method L151] test_dashboard_shows_code_and_placement(self)
+          Test: dashboard shows code and placement.
+      [method L164] test_patch_directory_placement(self)
+          Test: patch directory placement.
+      [method L196] test_generate_community_code_helper(self)
+          Test: generate community code helper.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/tests_organization_lifecycle.py
+--------------------------------------------------------------------------------
+Summary: Python module: api/tests_organization_lifecycle.py
+  [class L22] OrganizationLifecycleApiTests
+      Class defining OrganizationLifecycleApiTests behavior and state.
+      [method L23] setUp(self)
+          Method on OrganizationLifecycleApiTests.
+      [method L50] test_sole_owner_cannot_cancel_ownership(self)
+          Test: sole owner cannot cancel ownership.
+      [method L57] test_transfer_then_cancel_ownership(self)
+          Test: transfer then cancel ownership.
+      [method L83] test_admin_cannot_close(self)
+          Test: admin cannot close.
+      [method L91] test_close_free_organization(self)
+          Test: close free organization.
+      [method L111] test_cancel_paid_service_keeps_org_active(self)
+          Test: cancel paid service keeps org active.
+      [method L130] test_close_paid_schedules_closure(self)
+          Test: close paid schedules closure.
+      [method L153] test_staff_can_restore(self)
+          Test: staff can restore.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/tests_organization_service.py
+--------------------------------------------------------------------------------
+Summary: Business logic for tests organization.
+  [class L15] OrganizationServiceResolverTests
+      Class defining OrganizationServiceResolverTests behavior and state.
+      [method L16] setUp(self)
+          Method on OrganizationServiceResolverTests.
+      [method L23] test_free_when_no_entitlement(self)
+          Test: free when no entitlement.
+      [method L27] test_pending_does_not_grant_paid_service(self)
+          Test: pending does not grant paid service.
+      [method L34] test_activate_pending_grants_community(self)
+          Test: activate pending grants community.
+      [method L50] test_cancel_returns_to_free_organization_intact(self)
+          Test: cancel returns to free organization intact.
+      [method L67] test_simulate_blocked_in_production(self)
+          Test: simulate blocked in production.
+      [method L76] test_simulate_allowed_when_flag_enabled(self)
+          Test: simulate allowed when flag enabled.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/tests_paypal_checkout.py
+--------------------------------------------------------------------------------
+Summary: Python module: api/tests_paypal_checkout.py
+  [class L25] PayPalCheckoutApiTests
+      Class defining PayPalCheckoutApiTests behavior and state.
+      [method L26] setUp(self)
+          Method on PayPalCheckoutApiTests.
+      [method L42] test_checkout_creates_pending_and_returns_approve_url(self, mock_create)
+          Test: checkout creates pending and returns approve url.
+      [method L80] test_confirm_activates_when_paypal_active(self, mock_get, mock_create)
+          Test: confirm activates when paypal active.
+      [method L118] test_confirm_stays_pending_when_paypal_not_active(self, mock_get, mock_create)
+          Test: confirm stays pending when paypal not active.
+      [method L141] test_manual_success_query_cannot_activate_without_pending(self)
+          Visiting confirm without a real pending checkout fails safely.
+      [method L153] test_disabled_paypal_stays_simulated(self)
+          Test: disabled paypal stays simulated.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/tests_paypal_webhook.py
+--------------------------------------------------------------------------------
+Summary: Python module: api/tests_paypal_webhook.py
+  [function L28] _event(event_type, *, event_id, subscription_id, custom_id, next_billing)
+      Function implementing  event.
+  [class L48] PayPalWebhookHandlerTests
+      Class defining PayPalWebhookHandlerTests behavior and state.
+      [method L49] setUp(self)
+          Method on PayPalWebhookHandlerTests.
+      [method L69] test_activated_makes_service_active(self)
+          Test: activated makes service active.
+      [method L93] test_activated_by_custom_id_when_subscription_missing(self)
+          Test: activated by custom id when subscription missing.
+      [method L109] test_idempotent_same_event_id(self)
+          Test: idempotent same event id.
+      [method L127] test_cancelled_keeps_active_until_period_end(self)
+          Test: cancelled keeps active until period end.
+      [method L150] test_suspended_cancels_immediately(self)
+          Test: suspended cancels immediately.
+      [method L169] test_expired_marks_expired(self)
+          Test: expired marks expired.
+      [method L188] test_unknown_subscription_not_found(self)
+          Test: unknown subscription not found.
+  [class L207] PayPalWebhookApiTests
+      Class defining PayPalWebhookApiTests behavior and state.
+      [method L208] setUp(self)
+          Method on PayPalWebhookApiTests.
+      [method L228] test_webhook_post_activates(self, _mock_verify)
+          Test: webhook post activates.
+      [method L246] test_invalid_signature_rejected(self, _mock_verify)
+          Test: invalid signature rejected.
+      [method L261] test_unauthenticated_allowed(self)
+          Test: unauthenticated allowed.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/urls.py
+--------------------------------------------------------------------------------
+Summary: URL route wiring for API endpoints.
+Functions/classes: (none)
+
+--------------------------------------------------------------------------------
+FILE: backend/api/views.py
+--------------------------------------------------------------------------------
+Summary: HTTP API views and viewsets.
+  [class L104] CreateUserView
+      API view handling HTTP requests for this resource.
+      Methods: (none)
+  [function L111] build_access_code_result(access_code)
+      Function implementing build access code result.
+  [class L151] ResolveCodeView
+      API view handling HTTP requests for this resource.
+      [method L156] get(self, request, query)
+          Handles GET HTTP operation.
+  [class L196] SurveyDetailView
+      API view handling HTTP requests for this resource.
+      [method L198] get(self, request, pk)
+          Handles GET HTTP operation.
+  [class L205] SurveySubmitView
+      API view handling HTTP requests for this resource.
+      [method L207] post(self, request, pk)
+          Handles POST HTTP operation.
+  [class L229] OrganizationHubView
+      API view handling HTTP requests for this resource.
+      [method L231] get(self, request, slug)
+          Handles GET HTTP operation.
+  [class L241] MyOrganizationsView
+      API view handling HTTP requests for this resource.
+      [method L244] get(self, request)
+          Handles GET HTTP operation.
+  [class L252] OrganizationCreateView
+      API view handling HTTP requests for this resource.
+      [method L255] post(self, request)
+          Handles POST HTTP operation.
+  [class L297] OrganizationDashboardView
+      API view handling HTTP requests for this resource.
+      [method L300] get(self, request, slug)
+          Handles GET HTTP operation.
+  [class L339] AccessCodeCheckView
+      API view handling HTTP requests for this resource.
+      [method L342] get(self, request)
+          Handles GET HTTP operation.
+  [class L374] OrganizationSurveyCreateView
+      API view handling HTTP requests for this resource.
+      [method L378] post(self, request, slug)
+          Handles POST HTTP operation.
+  [class L445] OrganizationSurveyDetailView
+      API view handling HTTP requests for this resource.
+      [method L448] get(self, request, slug, pk)
+          Handles GET HTTP operation.
+      [method L464] patch(self, request, slug, pk)
+          Handles PATCH HTTP operation.
+  [class L484] OrganizationSurveyAppendQuestionsView
+      API view handling HTTP requests for this resource.
+      [method L488] post(self, request, slug, pk)
+          Handles POST HTTP operation.
+  [class L510] OrganizationMeetingCreateView
+      API view handling HTTP requests for this resource.
+      [method L514] post(self, request, slug)
+          Handles POST HTTP operation.
+  [class L589] MeetingDetailView
+      API view handling HTTP requests for this resource.
+      [method L592] get(self, request, pk)
+          Handles GET HTTP operation.
+  [class L604] OrganizationMeetingDetailView
+      API view handling HTTP requests for this resource.
+      [method L607] get(self, request, slug, pk)
+          Handles GET HTTP operation.
+      [method L625] patch(self, request, slug, pk)
+          Handles PATCH HTTP operation.
+  [function L680] _serialize_session(session)
+      Function implementing  serialize session.
+  [function L688] _get_org_meeting_admin(request, slug, pk)
+      Function implementing  get org meeting admin.
+  [function L700] _control_session_response(meeting, session, detail)
+      Function implementing  control session response.
+  [class L712] MeetingSessionView
+      API view handling HTTP requests for this resource.
+      [method L716] get(self, request, pk)
+          Handles GET HTTP operation.
+  [class L725] MeetingJoinView
+      API view handling HTTP requests for this resource.
+      [method L729] post(self, request, pk)
+          Handles POST HTTP operation.
+  [class L788] MeetingProfileSubmitView
+      API view handling HTTP requests for this resource.
+      [method L792] post(self, request, pk)
+          Handles POST HTTP operation.
+  [class L816] MeetingRespondView
+      API view handling HTTP requests for this resource.
+      [method L820] post(self, request, pk)
+          Handles POST HTTP operation.
+  [class L886] MeetingLeaveView
+      API view handling HTTP requests for this resource.
+      [method L889] post(self, request, pk)
+          Handles POST HTTP operation.
+  [class L904] OrganizationMeetingStartView
+      API view handling HTTP requests for this resource.
+      [method L908] post(self, request, slug, pk)
+          Handles POST HTTP operation.
+  [class L943] OrganizationMeetingLiveView
+      API view handling HTTP requests for this resource.
+      [method L946] get(self, request, slug, pk)
+          Handles GET HTTP operation.
+  [class L957] OrganizationMeetingAnalyticsView
+      API view handling HTTP requests for this resource.
+      [method L960] get(self, request, slug, pk)
+          Handles GET HTTP operation.
+  [class L1023] OrganizationMeetingPoliticalClassifyView
+      API view handling HTTP requests for this resource.
+      [method L1026] post(self, request, slug, pk)
+          Handles POST HTTP operation.
+  [class L1059] OrganizationMeetingPauseView
+      API view handling HTTP requests for this resource.
+      [method L1063] post(self, request, slug, pk)
+          Handles POST HTTP operation.
+  [class L1077] OrganizationMeetingResumeView
+      API view handling HTTP requests for this resource.
+      [method L1081] post(self, request, slug, pk)
+          Handles POST HTTP operation.
+  [class L1095] OrganizationMeetingEndView
+      API view handling HTTP requests for this resource.
+      [method L1099] post(self, request, slug, pk)
+          Handles POST HTTP operation.
+  [class L1118] OrganizationMeetingNextSlideView
+      API view handling HTTP requests for this resource.
+      [method L1122] post(self, request, slug, pk)
+          Handles POST HTTP operation.
+  [class L1136] OrganizationMeetingPrevSlideView
+      API view handling HTTP requests for this resource.
+      [method L1140] post(self, request, slug, pk)
+          Handles POST HTTP operation.
+  [class L1154] OrganizationMeetingGoToSlideView
+      API view handling HTTP requests for this resource.
+      [method L1158] post(self, request, slug, pk)
+          Handles POST HTTP operation.
+  [class L1177] OrganizationMeetingRestartView
+      API view handling HTTP requests for this resource.
+      [method L1181] post(self, request, slug, pk)
+          Handles POST HTTP operation.
+  [class L1210] OrganizationMeetingAddSlidesView
+      API view handling HTTP requests for this resource.
+      [method L1214] post(self, request, slug, pk)
+          Handles POST HTTP operation.
+  [class L1248] OrganizationMeetingExportView
+      API view handling HTTP requests for this resource.
+      [method L1251] get(self, request, slug, pk)
+          Handles GET HTTP operation.
+  [class L1290] OrganizationMeetingProcessAIView
+      API view handling HTTP requests for this resource.
+      [method L1293] post(self, request, slug, pk)
+          Handles POST HTTP operation.
+  [class L1319] ContactSubmitView
+      API view handling HTTP requests for this resource.
+      [method L1323] post(self, request)
+          Handles POST HTTP operation.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/wall_service.py
+--------------------------------------------------------------------------------
+Summary: Helpers for wall posts (polls, events, typed create).
+  [function L25] _parse_dt(value)
+      Function implementing  parse dt.
+  [function L36] normalize_wall_create_data(data)
+      Function implementing normalize wall create data.
+  [function L92] create_org_wall_post(*, board, author, data)
+      Creates org wall post.
+  [function L107] create_personal_wall_post(*, board, data)
+      Creates personal wall post.
+  [function L121] serialize_org_poll(post, user)
+      Function implementing serialize org poll.
+  [function L148] serialize_personal_poll(post, user)
+      Function implementing serialize personal poll.
+  [function L176] vote_org_poll(*, post, user, option_id)
+      Function implementing vote org poll.
+  [function L189] vote_personal_poll(*, post, user, option_id)
+      Function implementing vote personal poll.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/data/us_county_fips.csv
+--------------------------------------------------------------------------------
+Summary: Non-Python file (.csv).
+Functions: (none — not a Python module)
+
+--------------------------------------------------------------------------------
+FILE: backend/api/management/__init__.py
+--------------------------------------------------------------------------------
+Summary: Python module: api/management/__init__.py
+Functions/classes: (none)
+
+--------------------------------------------------------------------------------
+FILE: backend/api/management/commands/__init__.py
+--------------------------------------------------------------------------------
+Summary: Python module: api/management/commands/__init__.py
+  [class L5] Command
+      Class defining Command behavior and state.
+      [method L8] handle(self, *args, **options)
+          Method on Command.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/management/commands/process_meeting_ai.py
+--------------------------------------------------------------------------------
+Summary: Python module: api/management/commands/process_meeting_ai.py
+  [class L7] Command
+      Class defining Command behavior and state.
+      [method L10] add_arguments(self, parser)
+          Method on Command.
+      [method L18] handle(self, *args, **options)
+          Method on Command.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/management/commands/seed_billing_demo.py
+--------------------------------------------------------------------------------
+Summary: Seed billing test organizations and entitlements for dashboard QA.
+  [class L71] Command
+      Class defining Command behavior and state.
+      [method L74] add_arguments(self, parser)
+          Method on Command.
+      [method L82] handle(self, *args, **options)
+          Method on Command.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/management/commands/seed_demo_data.py
+--------------------------------------------------------------------------------
+Summary: Python module: api/management/commands/seed_demo_data.py
+  [class L25] Command
+      Class defining Command behavior and state.
+      [method L28] add_arguments(self, parser)
+          Method on Command.
+      [method L36] handle(self, *args, **options)
+          Method on Command.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/management/commands/seed_directory_data.py
+--------------------------------------------------------------------------------
+Summary: Seed geographic reference data and the full org directory taxonomy.
+  [function L275] _unique_slug(base, used)
+      Function implementing  unique slug.
+  [function L286] _title_state_name(name)
+      Function implementing  title state name.
+  [class L294] Command
+      Class defining Command behavior and state.
+      [method L297] add_arguments(self, parser)
+          Method on Command.
+      [method L312] handle(self, *args, **options)
+          Method on Command.
+      [method L321] _seed_categories(self)
+          Method on Command.
+      [method L347] _seed_geo(self, *, skip_us_fips)
+          Method on Command.
+      [method L376] _seed_samples(self)
+          Method on Command.
+      [method L440] _seed_us_fips(self)
+          Method on Command.
+      [method L532] _seed_non_us_admin1(self)
+          Seed first administrative level for non-US starter countries.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/management/commands/seed_resource_types.py
+--------------------------------------------------------------------------------
+Summary: Python module: api/management/commands/seed_resource_types.py
+  [class L6] Command
+      Class defining Command behavior and state.
+      [method L9] handle(self, *args, **options)
+          Method on Command.
+
+--------------------------------------------------------------------------------
+FILE: backend/api/management/commands/simulate_billing_activate.py
+--------------------------------------------------------------------------------
+Summary: Simulate PENDING → ACTIVE for an OrganizationService (no PayPal).
+  [class L17] Command
+      Class defining Command behavior and state.
+      [method L20] add_arguments(self, parser)
+          Method on Command.
+      [method L26] handle(self, *args, **options)
+          Method on Command.
+
+--------------------------------------------------------------------------------
+FILE: backend/backend/__init__.py
+--------------------------------------------------------------------------------
+Summary: Python module: backend/__init__.py
+Functions/classes: (none)
+
+--------------------------------------------------------------------------------
+FILE: backend/backend/asgi.py
+--------------------------------------------------------------------------------
+Summary: ASGI config for backend project.
+Functions/classes: (none)
+
+--------------------------------------------------------------------------------
+FILE: backend/backend/settings.py
+--------------------------------------------------------------------------------
+Summary: Django settings for backend project.
+  [function L179] _env_or_file(name, default)
+      Read env var, or contents of {NAME}_FILE (Docker/Secret Manager mount).
+
+--------------------------------------------------------------------------------
+FILE: backend/backend/urls.py
+--------------------------------------------------------------------------------
+Summary: URL route wiring for API endpoints.
+Functions/classes: (none)
+
+--------------------------------------------------------------------------------
+FILE: backend/backend/wsgi.py
+--------------------------------------------------------------------------------
+Summary: WSGI config for backend project.
+Functions/classes: (none)
+
+================================================================================
+Totals: 67 files listed, 63 Python modules, 236 classes, 547 functions/methods.
+================================================================================

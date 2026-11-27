@@ -15,10 +15,16 @@ from datetime import timedelta
 from dotenv import load_dotenv
 import os
 
-load_dotenv()
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = BASE_DIR.parent
+
+APP_ENV = os.getenv("APP_ENV", "local")
+env_file = PROJECT_ROOT / f".env.{APP_ENV}"
+if env_file.is_file():
+    load_dotenv(env_file)
+else:
+    load_dotenv(PROJECT_ROOT / ".env")
 
 
 # Quick-start development settings - unsuitable for production
@@ -55,7 +61,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     "django.contrib.staticfiles",
-    "api",
+    "api.apps.ApiConfig",
     "rest_framework",
     "corsheaders",
 ]
@@ -95,16 +101,29 @@ WSGI_APPLICATION = 'backend.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.postgresql',
-        'NAME': os.getenv("DB_NAME"),
-        'USER': os.getenv("DB_USER"),
-        'PASSWORD': os.getenv('DB_PWD'),
-        'HOST': os.getenv('DB_HOST'),
-        'PORT': os.getenv('DB_PORT'),
+_db_options = {}
+if os.getenv("DB_SSLMODE"):
+    _db_options["sslmode"] = os.getenv("DB_SSLMODE")
+
+if os.getenv("DB_ENGINE") == "sqlite":
+    DATABASES = {
+        "default": {
+            "ENGINE": "django.db.backends.sqlite3",
+            "NAME": os.getenv("DB_NAME") or ":memory:",
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv("DB_NAME"),
+            'USER': os.getenv("DB_USER"),
+            'PASSWORD': os.getenv('DB_PWD'),
+            'HOST': os.getenv('DB_HOST'),
+            'PORT': os.getenv('DB_PORT'),
+            'OPTIONS': _db_options,
+        }
+    }
 
 
 # Password validation
@@ -143,16 +162,114 @@ USE_TZ = True
 
 STATIC_URL = 'static/'
 
+MEDIA_URL = "/media/"
+MEDIA_ROOT = BASE_DIR / "media"
+# Tests parse voter files in the request. Production parses after commit on a background thread.
+VOTER_PARSE_INLINE = False
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOW_ALL_ORIGINS = True
-CORS_ALLOWS_CREDENTIALS = True
+CORS_ALLOW_CREDENTIALS = True
 
 CSRF_TRUSTED_ORIGINS = [
     "http://127.0.0.1:8000",
     "http://localhost:8000",
+    "https://localhost",
+    "http://localhost",
+    "capacitor://localhost",
     "https://django-backend-460809694305.us-central1.run.app",
+    "https://communib.com",
+    "https://www.communib.com",
+    "https://communibetter.com",
+    "https://www.communibetter.com",
 ]
+
+CONTACT_INBOX_EMAIL = os.getenv("CONTACT_INBOX_EMAIL", "contactcommunibetter@gmail.com")
+
+
+def _env_or_file(name: str, default: str = "") -> str:
+    """Read env var, or contents of {NAME}_FILE (Docker/Secret Manager mount)."""
+    value = os.getenv(name)
+    if value:
+        return value.strip()
+    file_path = os.getenv(f"{name}_FILE")
+    if file_path and os.path.isfile(file_path):
+        with open(file_path, encoding="utf-8") as fh:
+            return fh.read().strip()
+    return default
+
+
+if os.getenv("EMAIL_HOST_USER"):
+    EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+    EMAIL_HOST = os.getenv("EMAIL_HOST", "smtp.gmail.com")
+    EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+    EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() in ("1", "true", "yes")
+    EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER")
+    # Prefer EMAIL_HOST_PASSWORD; GMAIL_KEY is the Secret Manager name used in prod.
+    EMAIL_HOST_PASSWORD = _env_or_file("EMAIL_HOST_PASSWORD") or _env_or_file("GMAIL_KEY")
+    DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER)
+else:
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+    DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", "communiB <noreply@communib.com>")
+
+# Stage 2+: allow PENDING→ACTIVE simulation without PayPal (never enable casually in production).
+BILLING_SIMULATION_ENABLED = os.getenv("BILLING_SIMULATION_ENABLED", "").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+
+# PayPal subscriptions (Stage 5+). Secrets via env / Secret Manager only.
+# Google Secret Manager names (communib project):
+#   PAYPAL_LIVE_CLIENT_ID / PAYPAL_LIVE_SECRET
+#   PAYPAL_SANDBOX_CLIENT_ID / PAYPAL_SANDBOX_SECRET
+# Cloud Run may map those onto PAYPAL_CLIENT_ID / PAYPAL_CLIENT_SECRET,
+# or expose the GSM names directly — both are supported below.
+# Local Docker: PAYPAL_*_FILE mounts from secrets/ via pull-paypal-sandbox-local.ps1
+PAYPAL_MODE = os.getenv("PAYPAL_MODE", "disabled").strip().lower()  # disabled|sandbox|live
+_paypal_client_id = _env_or_file("PAYPAL_CLIENT_ID")
+_paypal_client_secret = _env_or_file("PAYPAL_CLIENT_SECRET")
+if not _paypal_client_id or not _paypal_client_secret:
+    if PAYPAL_MODE == "live":
+        _paypal_client_id = _paypal_client_id or _env_or_file("PAYPAL_LIVE_CLIENT_ID")
+        _paypal_client_secret = _paypal_client_secret or _env_or_file("PAYPAL_LIVE_SECRET")
+    elif PAYPAL_MODE == "sandbox":
+        _paypal_client_id = _paypal_client_id or _env_or_file("PAYPAL_SANDBOX_CLIENT_ID")
+        _paypal_client_secret = _paypal_client_secret or _env_or_file(
+            "PAYPAL_SANDBOX_SECRET"
+        )
+PAYPAL_CLIENT_ID = _paypal_client_id
+PAYPAL_CLIENT_SECRET = _paypal_client_secret
+_paypal_webhook_id = _env_or_file("PAYPAL_WEBHOOK_ID")
+if not _paypal_webhook_id:
+    if PAYPAL_MODE == "live":
+        _paypal_webhook_id = _env_or_file("PAYPAL_LIVE_WEBHOOK_ID")
+    elif PAYPAL_MODE == "sandbox":
+        _paypal_webhook_id = _env_or_file("PAYPAL_SANDBOX_WEBHOOK_ID")
+PAYPAL_WEBHOOK_ID = _paypal_webhook_id
+PAYPAL_SUBSCRIPTIONS_ENABLED = os.getenv("PAYPAL_SUBSCRIPTIONS_ENABLED", "").lower() in (
+    "1",
+    "true",
+    "yes",
+)
+# Used for PayPal return/cancel URLs (browser). Local docker: http://localhost:10001
+FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:10001").rstrip("/")
+
+# YouTube / Google OAuth (Map Search channel verification).
+# Google Secret Manager (communib): Google_ID / Google_Secret
+# Mapped to GOOGLE_OAUTH_CLIENT_ID / GOOGLE_OAUTH_CLIENT_SECRET (see wire-google-oauth-prod.ps1).
+GOOGLE_OAUTH_CLIENT_ID = _env_or_file("GOOGLE_OAUTH_CLIENT_ID")
+GOOGLE_OAUTH_CLIENT_SECRET = _env_or_file("GOOGLE_OAUTH_CLIENT_SECRET")
+GOOGLE_OAUTH_REDIRECT_URI = os.getenv(
+    "GOOGLE_OAUTH_REDIRECT_URI",
+    "",
+).strip()
+
+# Temporary Basic complimentary access code (server-side only; never expose to clients).
+# Empty disables access-code redemption. Local Docker sets SUPERBASIC via compose.
+# Redeeming grants Basic for 4 months, then the entitlement expires.
+COMMUNIB_BASIC_ACCESS_CODE = _env_or_file("COMMUNIB_BASIC_ACCESS_CODE").strip()

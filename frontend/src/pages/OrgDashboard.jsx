@@ -1,0 +1,619 @@
+import { useCallback, useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
+import api from "../api";
+import AppHeader from "../components/AppHeader";
+import DashboardCollapsibleSection from "../components/DashboardCollapsibleSection";
+import MeetingFlyerButton from "../components/MeetingFlyerButton";
+import LiveResultsQrButton from "../components/LiveResultsQrButton";
+import OrgDashboardSettingsMenu from "../components/OrgDashboardSettingsMenu";
+import PostingBoard from "../components/PostingBoard";
+import UpgradeRequiredModal from "../components/UpgradeRequiredModal";
+import "../styles/Dashboard.css";
+import "../styles/Board.css";
+
+function readOnlyMessage(postingMode, isAdmin) {
+  if (postingMode === "restricted" && !isAdmin) {
+    return "This board is restricted. Only organization admins can create posts; logged-in users can reply.";
+  }
+  if (postingMode === "members_only") {
+    return "Only organization members can post and reply on this board.";
+  }
+  return "Sign in to post or reply on this board.";
+}
+
+export default function OrgDashboard() {
+  const { slug } = useParams();
+  const [org, setOrg] = useState(null);
+  const [boardData, setBoardData] = useState(null);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [boardLoading, setBoardLoading] = useState(true);
+  const [startingId, setStartingId] = useState(null);
+  const [upgradeModal, setUpgradeModal] = useState(null);
+  const [voterPlugin, setVoterPlugin] = useState(false);
+  const [mapSearchPlugin, setMapSearchPlugin] = useState(false);
+  const [measurePlugin, setMeasurePlugin] = useState(false);
+  const [canReviewPlugins, setCanReviewPlugins] = useState(false);
+
+  const caps = org?.capabilities || {};
+  const canCreateMeetings = caps.create_meetings !== false;
+  const canStartMeetings = caps.start_meetings !== false;
+  const canCreateSurveys = caps.create_surveys !== false;
+  const billingPath = `/dashboard/${slug}/billing`;
+
+  const openUpgrade = (title, body) => {
+    setUpgradeModal({ title, body });
+  };
+
+  const loadDashboard = useCallback(() => {
+    setLoading(true);
+    setError("");
+    return api
+      .get(`/api/organizations/${slug}/dashboard/`)
+      .then((res) => {
+        setOrg(res.data);
+      })
+      .catch((err) => {
+        setError(
+          err.response?.data?.detail ||
+            "Could not load this organization dashboard."
+        );
+      })
+      .finally(() => setLoading(false));
+  }, [slug]);
+
+  const loadBoard = useCallback(() => {
+    setBoardLoading(true);
+    return api
+      .get(`/api/organizations/${slug}/board/`)
+      .then((res) => setBoardData(res.data))
+      .catch((err) => {
+        setBoardData(null);
+        setError(err.response?.data?.detail || "Could not load this posting board.");
+      })
+      .finally(() => setBoardLoading(false));
+  }, [slug]);
+
+  useEffect(() => {
+    loadDashboard();
+    loadBoard();
+    api
+      .get(`/api/organizations/${slug}/plugins/`)
+      .then((res) => {
+        setVoterPlugin(
+          (res.data.plugins ?? []).some(
+            (plugin) =>
+              plugin.key === "nc_voter_powerquery" &&
+              plugin.installed &&
+              plugin.status === "approved"
+          )
+        );
+        setCanReviewPlugins(Boolean(res.data.can_review));
+        setMapSearchPlugin(
+          (res.data.plugins ?? []).some(
+            (plugin) => plugin.key === "map_search" && plugin.installed && plugin.status === "approved"
+          )
+        );
+        setMeasurePlugin(
+          (res.data.plugins ?? []).some(
+            (plugin) => plugin.key === "measure_reading" && plugin.installed && plugin.status === "approved"
+          )
+        );
+      })
+      .catch(() => setVoterPlugin(false));
+  }, [loadDashboard, loadBoard, slug]);
+
+  const handleStartMeeting = async (meetingId) => {
+    setStartingId(meetingId);
+    try {
+      await api.post(`/api/organizations/${slug}/meetings/${meetingId}/start/`);
+      await loadDashboard();
+    } catch (err) {
+      if (err.response?.data?.upgrade_required) {
+        openUpgrade(
+          "Start Meeting",
+          err.response.data.detail ||
+            "Starting meetings requires communiBetter Starter or higher."
+        );
+      } else {
+        setError(err.response?.data?.detail || "Could not start meeting.");
+      }
+    } finally {
+      setStartingId(null);
+    }
+  };
+
+  const handleCreatePost = async (payload) => {
+    await api.post(`/api/organizations/${slug}/board/`, payload);
+    await loadBoard();
+  };
+
+  const handleDeletePost = async (postId) => {
+    if (!window.confirm("Delete this post?")) return;
+    await api.delete(`/api/organizations/${slug}/board/posts/${postId}/`);
+    await loadBoard();
+  };
+
+  const handleCreateReply = async (postId, payload) => {
+    await api.post(`/api/organizations/${slug}/board/posts/${postId}/replies/`, payload);
+    await loadBoard();
+  };
+
+  const handleDeleteReply = async (postId, replyId) => {
+    if (!window.confirm("Delete this reply?")) return;
+    await api.delete(
+      `/api/organizations/${slug}/board/posts/${postId}/replies/${replyId}/`
+    );
+    await loadBoard();
+  };
+
+  const handleVotePoll = async (postId, optionId) => {
+    await api.post(`/api/organizations/${slug}/board/posts/${postId}/vote/`, {
+      option_id: optionId,
+    });
+    await loadBoard();
+  };
+
+  const handleMeetingRsvp = async (meetingId, status) => {
+    await api.post(`/api/meetings/${meetingId}/rsvp/`, { status: status || "" });
+    await loadBoard();
+  };
+
+  return (
+    <div className="dashboard">
+      <AppHeader />
+      <main className="dashboard-main">
+        <Link to="/dashboard" className="dashboard-back">
+          ← All organizations
+        </Link>
+
+        {loading && <p className="dashboard-empty">Loading...</p>}
+        {error && <p className="dashboard-error">{error}</p>}
+
+        {org && (
+          <>
+            <div className="dashboard-header">
+              <h1>{org.name}</h1>
+              <p>{org.description || "Organization dashboard"}</p>
+              {org.community_code && (
+                <div className="org-identity-block">
+                  <p className="org-community-code-label">Community Code</p>
+                  <div className="org-community-code-row">
+                    <code className="org-community-code">{org.community_code}</code>
+                    <button
+                      type="button"
+                      className="dashboard-btn"
+                      onClick={() => {
+                        if (navigator.clipboard?.writeText) {
+                          navigator.clipboard.writeText(org.community_code);
+                        }
+                      }}
+                    >
+                      Copy
+                    </button>
+                  </div>
+                </div>
+              )}
+              {org.usage && (
+                <section className="dashboard-usage" aria-label="Plan usage this period">
+                  <p className="org-community-code-label">Usage this billing period</p>
+                  <ul className="dashboard-usage-list">
+                    <li>
+                      Meetings started:{" "}
+                      {org.usage.meetings_started?.limit == null
+                        ? `${org.usage.meetings_started?.used ?? 0} used`
+                        : `${org.usage.meetings_started?.used ?? 0} of ${org.usage.meetings_started.limit}`}
+                    </li>
+                    <li>
+                      Survey responses:{" "}
+                      {org.usage.survey_submissions?.limit == null
+                        ? `${org.usage.survey_submissions?.used ?? 0} used`
+                        : `${org.usage.survey_submissions?.used ?? 0} of ${Number(
+                            org.usage.survey_submissions.limit
+                          ).toLocaleString()}`}
+                    </li>
+                    <li>
+                      AI meeting runs:{" "}
+                      {org.usage.ai_meeting_runs?.limit == null
+                        ? `${org.usage.ai_meeting_runs?.used ?? 0} used`
+                        : `${org.usage.ai_meeting_runs?.used ?? 0} of ${org.usage.ai_meeting_runs.limit}`}
+                    </li>
+                    <li>
+                      Interactive attendees per meeting:{" "}
+                      {org.usage.attendee_limit == null
+                        ? "Unlimited*"
+                        : org.usage.attendee_limit.toLocaleString()}
+                    </li>
+                  </ul>
+                </section>
+              )}
+              {org.directory_placement && (
+                <div className="org-directory-block">
+                  <p className="org-community-code-label">Directory Placement</p>
+                  {org.directory_placement.summary ? (
+                    <p className="org-directory-summary">
+                      {org.directory_placement.summary}
+                    </p>
+                  ) : (
+                    <p className="dashboard-meta">
+                      Not listed in Explore Communities yet.
+                    </p>
+                  )}
+                  {org.directory_placement.breadcrumb?.length > 0 && (
+                    <ol className="org-directory-breadcrumb">
+                      {org.directory_placement.breadcrumb.map((part) => (
+                        <li key={part}>{part}</li>
+                      ))}
+                    </ol>
+                  )}
+                  <Link
+                    to={`/dashboard/${slug}/directory`}
+                    className="dashboard-btn"
+                  >
+                    Edit Directory Placement
+                  </Link>
+                </div>
+              )}
+              <p className="dashboard-meta">
+                Service:{" "}
+                <strong>
+                  {caps.is_free
+                    ? "Free Organization"
+                    : caps.service_level_label || caps.service_level || "—"}
+                </strong>
+              </p>
+            </div>
+
+            <div className="dashboard-actions">
+              {((org?.discovery_enabled || caps.discovery_map) && mapSearchPlugin) && (
+                <Link
+                  to={`/dashboard/${slug}/map-search`}
+                  className="dashboard-btn dashboard-btn--primary"
+                >
+                  Map Search
+                </Link>
+              )}
+              <Link
+                to={`/dashboard/${slug}/inbox`}
+                className="dashboard-btn"
+              >
+                Messages
+              </Link>
+              <Link
+                to={`/dashboard/${slug}/plugins`}
+                className="dashboard-btn dashboard-btn--blue"
+              >
+                Add Plugin
+              </Link>
+              {(voterPlugin || canReviewPlugins) && (
+                <Link
+                  to={`/dashboard/${slug}/plugins/nc-voter`}
+                  className="dashboard-btn dashboard-btn--blue"
+                >
+                  NC Voter Record PowerQuery
+                </Link>
+              )}
+              {measurePlugin && (
+                <Link
+                  to={`/dashboard/${slug}/plugins/measure-reading`}
+                  className="dashboard-btn dashboard-btn--blue"
+                >
+                  Measure Reading
+                </Link>
+              )}
+              <Link
+                to={`/dashboard/${slug}/reports`}
+                className="dashboard-btn"
+              >
+                Reports
+              </Link>
+              <Link
+                to={`/dashboard/${slug}/documents`}
+                className="dashboard-btn"
+              >
+                Documents
+              </Link>
+              <Link
+                to={`/dashboard/${slug}/board-settings`}
+                className="dashboard-btn"
+              >
+                Board settings
+              </Link>
+              <Link
+                to={`/dashboard/${slug}/shared-with-us`}
+                className="dashboard-btn"
+              >
+                Shared with us
+              </Link>
+              <Link to={billingPath} className="dashboard-btn">
+                Billing &amp; Service
+              </Link>
+              <Link
+                to={`/dashboard/${slug}/settings`}
+                className="dashboard-btn"
+              >
+                Ownership &amp; Organization
+              </Link>
+              <Link
+                to={`/org/${slug}/hub`}
+                className="dashboard-btn"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                View public hub
+              </Link>
+              <OrgDashboardSettingsMenu slug={slug} />
+            </div>
+
+            {org.lifecycle?.status === "closure_pending" && (
+              <div className="dashboard-card">
+                <p>
+                  Organization scheduled to close on{" "}
+                  <strong>
+                    {org.lifecycle.closure_effective_at
+                      ? new Date(
+                          org.lifecycle.closure_effective_at
+                        ).toLocaleDateString()
+                      : "the paid-through date"}
+                  </strong>
+                  .{" "}
+                  <Link to={`/dashboard/${slug}/settings`}>
+                    Manage closure
+                  </Link>
+                </p>
+              </div>
+            )}
+
+            {caps.is_free && (
+              <div className="dashboard-card dashboard-upgrade-nudge">
+                <p>
+                  Want to run another engagement? Upgrade to create new
+                  meetings, surveys, and community participation activities.
+                </p>
+                <Link
+                  to={billingPath}
+                  className="dashboard-btn dashboard-btn--primary"
+                >
+                  View plans
+                </Link>
+              </div>
+            )}
+
+            {boardLoading && <p className="dashboard-empty">Loading board...</p>}
+            {boardData && (
+              <div className="dashboard-card">
+                <PostingBoard
+                  title={
+                    (boardData.board?.title || "").trim() ||
+                    boardData.organization_name ||
+                    "Community wall"
+                  }
+                  postingMode={boardData.board?.posting_mode}
+                  postingModeLabel={
+                    boardData.board?.visibility_label
+                      ? `${boardData.board.visibility_label} · ${boardData.board?.posting_mode_label || ""}`.trim()
+                      : boardData.board?.posting_mode_label
+                  }
+                  posts={boardData.posts}
+                  canPost={boardData.can_post}
+                  canReply={boardData.can_reply}
+                  readOnlyMessage={
+                    boardData.can_post
+                      ? ""
+                      : readOnlyMessage(
+                          boardData.board?.posting_mode,
+                          boardData.is_admin
+                        )
+                  }
+                  onCreatePost={
+                    boardData.can_post ? handleCreatePost : undefined
+                  }
+                  onCreateReply={
+                    boardData.can_reply ? handleCreateReply : undefined
+                  }
+                  onDeletePost={handleDeletePost}
+                  onDeleteReply={handleDeleteReply}
+                  onVotePoll={
+                    boardData.can_reply || boardData.can_post
+                      ? handleVotePoll
+                      : undefined
+                  }
+                  onMeetingRsvp={handleMeetingRsvp}
+                  emptyMessage="This organization board is empty. Share an update with your community."
+                />
+              </div>
+            )}
+
+            <DashboardCollapsibleSection id="org-surveys" title="Surveys" defaultOpen>
+              {org.surveys.length === 0 ? (
+                <p className="dashboard-empty">No surveys yet.</p>
+              ) : (
+                <ul className="dashboard-list">
+                  {org.surveys.map((survey) => (
+                    <li key={survey.id} className="dashboard-list-item">
+                      <div>
+                        <h3>{survey.title}</h3>
+                        <p className="dashboard-meta">
+                          {survey.is_active ? "Active" : "Inactive"} ·{" "}
+                          <Link to={`/s/${survey.id}`}>Open survey</Link> ·{" "}
+                          <Link to={`/dashboard/${slug}/surveys/${survey.id}/edit`}>
+                            Edit
+                          </Link>
+                          {survey.live_results_for_respondents && (
+                            <>
+                              {" · "}
+                              <Link to={`/s/${survey.id}/live-results/flyer`} target="_blank">
+                                Live-results QR
+                              </Link>
+                            </>
+                          )}
+                        </p>
+                      </div>
+                      <div>
+                        {(survey.access_codes ?? []).map((code) => (
+                          <span key={code.id} className="dashboard-code">
+                            {code.code}
+                          </span>
+                        ))}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {canCreateSurveys ? (
+                <Link
+                  to={`/dashboard/${slug}/surveys/new`}
+                  className="dashboard-btn dashboard-btn--primary"
+                  style={{ marginTop: "0.75rem", display: "inline-flex" }}
+                >
+                  Create new survey
+                </Link>
+              ) : (
+                <div className="dashboard-locked-action">
+                  <button
+                    type="button"
+                    className="dashboard-btn dashboard-btn--locked"
+                    aria-label="Create new survey requires Starter or higher"
+                    onClick={() =>
+                      openUpgrade(
+                        "Create a New Survey",
+                        "New surveys require communiBetter Starter or higher. You can continue viewing your previous surveys and results."
+                      )
+                    }
+                  >
+                    🔒 Create new survey
+                  </button>
+                  <p className="dashboard-lock-hint">Requires Starter or higher</p>
+                </div>
+              )}
+            </DashboardCollapsibleSection>
+
+            <DashboardCollapsibleSection id="org-meetings" title="Meetings" defaultOpen>
+              {org.meetings.length === 0 ? (
+                <p className="dashboard-empty">No meetings yet.</p>
+              ) : (
+                <ul className="dashboard-list">
+                  {org.meetings.map((meeting) => (
+                    <li key={meeting.id} className="dashboard-list-item">
+                      <div>
+                        <h3>{meeting.title}</h3>
+                        <p className="dashboard-meta">
+                          {meeting.access_mode} · {meeting.status}
+                        </p>
+                        <div className="dashboard-meeting-actions">
+                          <Link
+                            to={`/m/${meeting.id}`}
+                            className="dashboard-btn dashboard-btn--small"
+                          >
+                            View meeting
+                          </Link>
+                          <Link
+                            to={`/dashboard/${slug}/meetings/${meeting.id}/edit`}
+                            className="dashboard-btn dashboard-btn--small"
+                          >
+                            Edit
+                          </Link>
+                          <Link
+                            to={`/dashboard/${slug}/meetings/${meeting.id}/host`}
+                            className="dashboard-btn dashboard-btn--small"
+                          >
+                            View results / host
+                          </Link>
+                          <MeetingFlyerButton
+                            meetingId={meeting.id}
+                            className="dashboard-btn dashboard-btn--small"
+                            label="Print / share flyer"
+                          />
+                          {meeting.live_results_for_participants && (
+                            <LiveResultsQrButton
+                              kind="meeting"
+                              resourceId={meeting.id}
+                              className="dashboard-btn dashboard-btn--small"
+                            />
+                          )}
+                          {meeting.status === "scheduled" &&
+                            (canStartMeetings ? (
+                              <button
+                                type="button"
+                                className="dashboard-btn dashboard-btn--small dashboard-btn--primary"
+                                disabled={startingId === meeting.id}
+                                onClick={() => handleStartMeeting(meeting.id)}
+                              >
+                                {startingId === meeting.id
+                                  ? "Starting..."
+                                  : "Start meeting"}
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                className="dashboard-btn dashboard-btn--small dashboard-btn--locked"
+                                aria-label="Start meeting requires Starter or higher"
+                                onClick={() =>
+                                  openUpgrade(
+                                    "Start Meeting",
+                                    "Starting meetings requires communiBetter Starter or higher. You can still view previous meeting results."
+                                  )
+                                }
+                              >
+                                🔒 Start meeting
+                              </button>
+                            ))}
+                        </div>
+                        {meeting.status === "scheduled" && !canStartMeetings && (
+                          <p className="dashboard-lock-hint">
+                            Requires Starter or higher
+                          </p>
+                        )}
+                      </div>
+                      <div>
+                        {(meeting.access_codes ?? []).map((code) => (
+                          <span key={code.id} className="dashboard-code">
+                            {code.code}
+                          </span>
+                        ))}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {canCreateMeetings ? (
+                <Link
+                  to={`/dashboard/${slug}/meetings/new`}
+                  className="dashboard-btn dashboard-btn--primary"
+                  style={{ marginTop: "0.75rem", display: "inline-flex" }}
+                >
+                  Create new meeting
+                </Link>
+              ) : (
+                <div className="dashboard-locked-action">
+                  <button
+                    type="button"
+                    className="dashboard-btn dashboard-btn--locked"
+                    aria-label="Create new meeting requires Starter or higher"
+                    onClick={() =>
+                      openUpgrade(
+                        "Create a New Meeting",
+                        "New meetings require communiBetter Starter or higher. Your previous meetings, responses, and reports remain available."
+                      )
+                    }
+                  >
+                    🔒 Create new meeting
+                  </button>
+                  <p className="dashboard-lock-hint">Requires Starter or higher</p>
+                </div>
+              )}
+            </DashboardCollapsibleSection>
+          </>
+        )}
+      </main>
+
+      <UpgradeRequiredModal
+        open={Boolean(upgradeModal)}
+        title={upgradeModal?.title || ""}
+        body={upgradeModal?.body || ""}
+        billingPath={billingPath}
+        onClose={() => setUpgradeModal(null)}
+      />
+    </div>
+  );
+}
